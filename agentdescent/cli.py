@@ -1539,25 +1539,31 @@ def _unusable_refs(spec: EvolveSpec) -> List[str]:
 
 
 def _merge_policies_replaced(comp) -> Optional[str]:
-    """Say so when the spec's merge policies will be ignored by a custom aggregator.
+    """Say so when merge-side Policies will be ignored by a custom aggregator.
 
     An ``aggregator_factory`` -- the one ``gepa``, ``skillopt`` and ``dgm`` bring --
-    replaces the shipped merge pipeline, so ``conflict``/``fusion`` the spec
-    names never run. ``evolve()`` warns about it at run time; ``plan`` is where
-    that belongs, before a detached run buries it in ``log.txt`` (#504).
+    replaces the shipped merge pipeline, so ``conflict`` / ``fusion`` /
+    ``acceptance`` / ``promotion`` the spec (or an algorithm) installed on the
+    bundle never reach the factory path unless the factory reads them itself.
+    ``evolve()`` may warn at run time; ``plan`` is where that belongs, before a
+    detached run buries it in ``log.txt`` (#504, #805). Composing factory with
+    merge Policies without a silent drop is #807.
     """
     if comp.kwargs.get("aggregator_factory") is None:
         return None
     installed = comp.kwargs.get("policies")
-    dropped = sorted(name for name in ("conflict", "fusion")
-                     if installed is not None and getattr(installed, name, None) is not None)
+    dropped = sorted(
+        name for name in ("conflict", "fusion", "acceptance", "promotion")
+        if installed is not None and getattr(installed, name, None) is not None)
     if not dropped:
         return None
     who = (f"algorithm {comp.algorithm['name']!r}" if comp.algorithm
            else "aggregator_factory")
-    return (f"policies {dropped} are replaced by {who}'s own aggregator and will not "
-            "run; drop them from `policies` (or the algorithm) to silence evolve's "
-            "RuntimeWarning.")
+    return (f"policies {dropped} are ignored on the aggregator_factory path "
+            f"({who}); the factory replaces the shipped merge pipeline — pass "
+            "those rules into the factory/aggregator constructor or drop them "
+            "from `policies` (docs/algorithm-decision-tree.md; engine follow-up "
+            "#807). evolve() may also RuntimeWarning.")
 
 
 def _selection_not_merging(comp) -> Optional[str]:

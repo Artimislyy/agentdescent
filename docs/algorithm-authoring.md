@@ -13,9 +13,14 @@ card** that `plan` / `init` / hosts can call — without reading the whole
 
 | You want… | Use… |
 |---|---|
-| A name in `agentdescent algorithms list` / `"algorithm": "…"` | **This page** |
+| A name in `agentdescent algorithms list` / `"algorithm": "…"` | **This page** (Algorithm **card**) |
 | A full `examples/<name>/` research port | [porting-checklist.md](porting-checklist.md) |
 | A `MethodPolicy` microport in the matrix | [porting-methodpolicy.md](porting-methodpolicy.md) |
+| Not sure which / population vs Policies | [algorithm decision tree](algorithm-decision-tree.md) |
+
+Same name ≠ same fidelity: a card such as `"algorithm": "gepa"` is a wheel
+mechanism slice; `examples/gepa/` is the paper-faithful port. See
+[port fidelity](port-fidelity.md).
 
 The catalog of shipped cards is generated from the registry:
 [named algorithms](algorithms.md).

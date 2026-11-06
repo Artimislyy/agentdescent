@@ -167,6 +167,7 @@ nav:
     - Overview — twenty-three ports: self-evolution-examples.md
     - Named algorithms (spec / plugin): algorithms.md
     - Register a named Algorithm card: algorithm-authoring.md
+    - Algorithm decision tree: algorithm-decision-tree.md
     - Algorithm tournament: tournament.md
     - Campaign — iterate a spec: campaign.md
     - Porting checklist: porting-checklist.md

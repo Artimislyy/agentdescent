@@ -1,5 +1,7 @@
 # Port fidelity — what each port follows, and where it departs
 
+Choosing card vs MethodPolicy vs full port vs `aggregator_factory`: [algorithm decision tree](algorithm-decision-tree.md).
+
 Twenty-three published self-evolution algorithms run on this engine — eight as benchmark-faithful ports, fifteen as declared microports and analogues. Every one of them
 was published as a **serial** loop, and every one of them here runs in parallel
 with a merge step the original does not have. That is only an interesting claim

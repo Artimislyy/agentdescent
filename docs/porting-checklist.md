@@ -1,7 +1,7 @@
 # Porting checklist
 
 Use this before calling an algorithm example a **benchmark-faithful** port;
-microports/analogues follow the [MethodPolicy checklist](porting-methodpolicy.md).
+microports/analogues follow the [MethodPolicy checklist](porting-methodpolicy.md); or the [algorithm decision tree](algorithm-decision-tree.md) if unsure.
 
 - [ ] Give the port its own directory: `examples/<name>/` with `__init__.py`, a `README.md`, the entry point, and any helper only this port uses.
 - [ ] Start from **released code**, not only the paper; follow code on conflicts and document each conflict in `docs/algo-<name>.md`.

@@ -829,9 +829,19 @@ def test_plan_names_merge_policies_a_factory_algorithm_replaces():
     payload = cli.plan_payload(spec)
     joined = " ".join(payload["warnings"])
     assert "['conflict', 'fusion']" in joined and "'gepa'" in joined
+    assert "aggregator_factory path" in joined and "#807" in joined
     assert not [w for w in cli.plan_payload(_spec(algorithm="gepa", reflect=_REFLECT,
                                                   allow=["tests."]))["warnings"]
-                if "replaced by" in w]
+                if "aggregator_factory path" in w]
+
+
+def test_plan_warns_when_acceptance_is_ignored_on_factory_path():
+    """#805: acceptance (not only conflict/fusion) must not be a silent drop."""
+    spec = _spec(algorithm="gepa", reflect=_REFLECT, allow=["tests."],
+                 policies={"acceptance": "AdvantageAcceptance"})
+    joined = " ".join(cli.plan_payload(spec)["warnings"])
+    assert "acceptance" in joined and "aggregator_factory path" in joined
+    assert "algorithm-decision-tree" in joined
 
 
 def _skill_dir(tmp_path):

@@ -1,0 +1,2 @@
+Added
+Documented the contributor decision tree for Algorithm card vs MethodPolicy vs full `examples/` port vs `aggregator_factory` (`docs/algorithm-decision-tree.md`), cross-linked from authoring / port-fidelity / aggregator-factory. `plan` now warns when acceptance/promotion (as well as conflict/fusion) are installed on a factory path and will be ignored — engine composition without silent drop remains #807.
