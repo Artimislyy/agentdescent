@@ -134,6 +134,7 @@ nav:
     - Leakage guard: leakage.md
     - Marginal-gain stopping: stopping.md
     - Approval gate — high-risk changes: approval.md
+    - Edit predictions: predictions.md
     - Guard pipeline: guards.md
     - Guarded runtime: runtime.md
     - Risk policy: risk-policy.md

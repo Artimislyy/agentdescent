@@ -2727,6 +2727,57 @@ def cmd_traces(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_predictions(a: argparse.Namespace) -> int:
+    """``agentdescent predictions`` -- declare, observe and score edit predictions."""
+    from .prediction import (
+        PredictionError, PredictionLog, ProposalPrediction,
+    )
+
+    action = getattr(a, "predictions_cmd", None)
+    try:
+        log = PredictionLog(a.store)
+        if action == "predict":
+            prediction = ProposalPrediction(
+                expected_delta=a.delta, confidence=a.confidence,
+                expected_tasks=a.tasks or (), rationale=a.rationale or "")
+            pid = log.predict(a.artifact_id, a.diff_id or "", prediction)
+            payload = {
+                "schema_version": 1, "ok": True, "store": log.path,
+                "prediction_id": pid, "pending": True,
+                "prediction": prediction.to_dict(),
+            }
+        elif action == "observe":
+            payload = log.observe(
+                a.prediction_id, observed_delta=a.delta,
+                observed_tasks=a.tasks or (), tolerance=a.tolerance,
+                note=a.note or "").to_dict()
+        elif action == "report":
+            payload = log.report()
+        else:
+            raise PredictionError("predictions needs predict, observe or report")
+    except (PredictionError, OSError, ValueError) as error:
+        return _surface_error(a, error)
+    if a.json:
+        _out(payload, as_json=True)
+    else:
+        if action == "predict":
+            print(f"prediction: {payload['prediction_id']}  pending")
+        elif action == "observe":
+            print(f"{payload['prediction_id']}  hit={payload['hit']}  "
+                  f"brier={payload['brier']}  "
+                  f"error={payload['delta_error']:.3f}")
+        else:
+            print(f"predictions: {payload['predictions']}  "
+                  f"observed: {payload['observed']}  pending: {payload['pending']}")
+            print(f"hit_rate: {payload['hit_rate']}  "
+                  f"mean_brier: {payload['mean_brier']}  "
+                  f"mean_abs_error: {payload['mean_abs_error']}")
+            for bucket in payload["calibration"]:
+                print(f"confidence {bucket['low']:.1f}-{bucket['high']:.1f}: "
+                      f"n={bucket['count']} hit={bucket['hit_rate']:.3f}")
+    return 0
+
+
 def cmd_audit(a: argparse.Namespace) -> int:
     """``agentdescent audit <run_id> --archive PATH`` -- trace one adoption
     through its evidence rings."""
@@ -4159,6 +4210,34 @@ def build_parser() -> argparse.ArgumentParser:
                    help="module:attribute harness_evidence callable for the harness ring")
     s.add_argument("--bias-threshold", type=float, default=0.1, dest="bias_threshold")
     s.set_defaults(fn=cmd_audit)
+    s = sub.add_parser(
+        "predictions", help="declare, observe and score edit predictions")
+    predictions_sub = s.add_subparsers(dest="predictions_cmd", required=True)
+    sp = predictions_sub.add_parser("predict", help="store a prediction before measuring")
+    sp.add_argument("--store", required=True, help="prediction JSONL")
+    sp.add_argument("--artifact-id", required=True, dest="artifact_id")
+    sp.add_argument("--diff-id", default="", dest="diff_id")
+    sp.add_argument("--delta", type=float, required=True,
+                    help="expected change in held-out reward")
+    sp.add_argument("--confidence", type=float, required=True)
+    sp.add_argument("--tasks", default="",
+                    help="comma-separated task ids expected to flip")
+    sp.add_argument("--rationale", default="")
+    sp.set_defaults(fn=cmd_predictions)
+    sp = predictions_sub.add_parser("observe", help="record the measured result")
+    sp.add_argument("--store", required=True)
+    sp.add_argument("--prediction-id", required=True, dest="prediction_id")
+    sp.add_argument("--delta", type=float, required=True,
+                    help="observed change in held-out reward")
+    sp.add_argument("--tasks", default="")
+    sp.add_argument("--tolerance", type=float, default=0.0)
+    sp.add_argument("--note", default="")
+    sp.set_defaults(fn=cmd_predictions)
+    sp = predictions_sub.add_parser("report", help="hit rate, Brier and calibration")
+    sp.add_argument("--store", required=True)
+    sp.set_defaults(fn=cmd_predictions)
+
+
 
     s = sub.add_parser(
         "traces", help="summarise raw agent trajectories or drill into them")
