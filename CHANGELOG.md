@@ -6,6 +6,596 @@ All notable changes to AgentDescent are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-06
+
+### Added
+
+- `RSIPlatform` + `PlatformConfig` / `PlatformReport`: one bounded cycle that hands
+  compute allocation, the durable loop, trusted promotion, capability admission and
+  continual experience to each other. `complete` is false when a configured layer
+  does not produce a decision; a layer skipped by an upstream decision (for example
+  the foundry after a rejected promotion) is named in `skipped` and `detail`.
+  Post-loop decisions are cached per `run_id`, so re-running a terminal run returns
+  them instead of re-admitting or re-learning; a terminal run without a cache is
+  refused. A cycle that validates experience on its own rows marks
+  `self_validated=True`.
+
+  Changed
+  `LoopGeneration` now carries the observation's evidence, so the platform (and a
+  caller's own report) can see the compute action/option/features that produced a
+  generation without re-reading the event payload.
+
+- `CapabilityArchive`: a quality-diversity archive, artifact graph and semantic
+  dedup kept in sync. A near-duplicate never occupies a QD cell or the graph; an
+  elite replacement removes the evicted graph node and fingerprint; `add` rolls
+  the QD cell back to the previous elite if the graph rejects the artifact;
+  prepopulated graphs seed the dedup fingerprints. Retrieval goes through the
+  graph and selection through the QD archive.
+
+  Changed
+  `ArtifactGraph.remove()` removes an artifact and decrements document frequency
+  once per distinct token. Descendants keep their parent ids and treat the
+  removed node as external.
+
+- `CapabilityScout`: packages failed `TaskCandidate`s as `ToolSynthesisRequest`
+  examples, runs the existing `ToolSynthesizer`, and hands the selected candidate
+  to the caller's `CapabilityRequest` builder before `CapabilityFoundry.admit`.
+  The report makes `no-candidate` and `no-request` explicit; only an admitted tool
+  reaches `promoted`.
+
+- `BudgetedSearch`: runs `SearchFabric` at increasing UCT budgets and stops when
+  the value gain per expansion falls below a bar, using the existing
+  `MarginalGainStop` or a patience rule. The report keeps every round, the gain
+  it bought and why the search stopped, so compute spend is auditable rather than
+  hidden in one fixed budget.
+
+- `PromotionLedger`: only an accepted `promote()` decision becomes a release. It
+  builds an `ArtifactManifest` carrying the evidence/decision hashes and reasons,
+  HMAC-signs it, verifies the signature, and writes a lineage node with the parent
+  artifacts, run id, manifest hash and key id. Refused promotions are not signed.
+
+- `CounterfactualExperience`: turns `ReplayLab.shapley` step credit into per-step
+  `ExperienceRecord` rewards and ingests it into `ExperienceEngine`. Credits below
+  `min_credit` are dropped and an empty reward map is refused, so a trace with no
+  attributable gain cannot silently become zero-information replay.
+
+- `PreferenceReplay`: ranks stored `ExperienceRecord`s by a fitted
+  `PreferenceModel` and ingests the preferred slice into `ExperienceEngine`
+  without duplicating records. The preference model becomes the replay-selection
+  policy, so human pairwise feedback affects what the meta-policy learns from.
+
+- A current `main`-branch capability map covering the evolution loop, verification
+  and statistics, trusted promotion, durable operations, task/capability
+  discovery, archives and continual experience, with a staged path for evolving
+  Skills and Workflows.
+
+- `CapabilityLoop`: composes `TaskPipeline`, `CapabilityScout` and
+  `CapabilityArchive` so production traces become a validated, admitted and
+  archived capability in one call. The report records the pipeline verdict, scout
+  outcome and archive result; `admitted` is true only when the archive added the
+  artifact (#677).
+
+- `BudgetedStep`: composes `SearchFabric` and `BudgetedSearch` into a durable
+  loop step that scales search budgets with the controller's `budget_scale`,
+  stops on marginal gain, and returns a `LoopObservation` with round-by-round
+  evidence, risk and an artifact id (#678).
+
+- `curriculum_meta_run` gains opt-in verified seeding: `min_exam` (via
+  `verified_rules`) excludes unexamined, flagged or audit-biased rules when set,
+  and `oracle` + `audit_store` audit a sampled slice of the
+  validation pairs and persist the verdict with `audited_n`, `oracle_gain` and
+  `gain_bias` in the report. The generated-problem map is pruned to the live
+  frontier pool, and default run_ids get a random suffix so same-second
+  adoptions no longer collide (#679).
+
+- `release_evidence` and `release_candidate` compose trust evidence, promotion
+  and the `PromotionLedger` into one fail-closed release seam. An accepted
+  promotion is signed and written to lineage; a reject or defer returns a report
+  without touching the ledger. An accepted promotion requires an artifact hash (`artifact_hash=` or
+  `content_hash=`); missing signing material or a missing/mismatched artifact
+  hash is refused rather than silently signed (#680).
+
+- `PlatformCampaign`: runs several `RSIPlatform` cycles under the existing
+  `RSIController` stop policy (target, cost, patience, cycle count), cloning the
+  platform with a fresh seed and run id per cycle while sharing the run store,
+  compute, foundry and experience. An exception or incomplete cycle is reported
+  as an error and stops the campaign, and `PlatformCampaignReport.best_cycle`
+  names the highest-reward cycle (#681).
+
+- `TenantPlatform` wraps `RSIPlatform.run_cycle` so each cycle routed through it
+  is a reserved, authorized and audited tenant action. A cycle reserves quota at
+  the stated tokens/cost (which enforces `run:write` and the workspace limits)
+  and commits actual usage on success. An overrun or a recorded generation error
+  is charged the reserved amount before the refusal, so repeated overruns still
+  consume quota; only a platform call that produced no generation is released
+  without charge. `TenantCycleReport` exposes the platform report, reservation,
+  usage and a JSON-safe summary (#682).
+
+- `AdaptiveExperience`: one cross-cycle composition that ingests counterfactual
+  credit through `CounterfactualExperience`, selects validation anchors from a
+  fitted `PreferenceReplay` (or feature recall, recent history, or self-validation
+  on the first cycle), and delegates the guarded update to `ExperienceEngine`.
+  Ingestion deduplicates by `run_id`, and missing validation or bridge features
+  fail closed (#683).
+
+- `agentdescent.governed_harness` composes the capability gate, proof runner,
+  human approval store, canary/rollback plan and promotion rules into one governed
+  path for harness and code self-modifications. A denied gate, failed proof,
+  pending or rejected approval never reaches promotion, and approval keys are
+  content-bound so an old approval cannot be replayed for a different change. The
+  returned report is JSON-safe for manifests and decision logs (#684).
+
+- `CampaignOps` + `CampaignOpsReport`: publish a sequence of finished
+  `LoopReport`s into the control room in one call, recording each into the
+  console, lineage, telemetry and QD and returning the campaign metrics, alerts
+  and snapshot. Unknown statuses, duplicate run ids, malformed costs and invalid
+  thresholds fail closed before anything is recorded; fractional per-generation
+  costs are summed per loop and rounded up to integer calls (#685).
+
+- `meta_campaign_run` turns continuous meta-learning into a bounded campaign:
+  `RSIController` stop conditions wrap repeated `continuous_meta_run` sessions
+  that share one durable `ConsolidationStore`, each in its own fresh ledger repo,
+  so every session seeds from the adopted rule the last one archived. A failed
+  session is reported and stops the campaign instead of being promoted
+  (#686).
+
+- `agentdescent release` and the MCP `release` tool: one evidence-gated release
+  seam that builds trusted evidence from paired held-out scores, runs the
+  fail-closed promotion decision, and only on an accepted promotion signs an
+  `ArtifactManifest` and writes its lineage node. Signing material comes from an
+  environment variable or file (never argv); reject/defer leaves the lineage
+  untouched; the JSON result carries `schema_version: 1`. Use `--lineage` to
+  persist and extend the receipt graph and `--out` to write the full report.
+
+- Product surfaces for the four P1 capabilities, each with a CLI verb and an MCP
+  tool: `platform` runs a durable five-layer campaign from a JSON spec with a
+  runnable `--demo`; `capability` turns failure traces into an admitted, archived
+  capability; `ops` publishes terminal runs to the console/lineage/telemetry/
+  metrics with alerts; and `experience` reports, ingests, recalls, updates and
+  preference-replays an ExperienceStore. All returns carry `schema_version: 1`,
+  invalid input fails closed with a JSON `{"ok": false, "error": ...}` under
+  `--json`, and each command has a docs page and an offline demo or sample.
+
+- `agentdescent governed-harness` and the MCP `governed_harness` tool: one
+  spec-driven surface for the existing safety-gate -> proof -> approval ->
+  canary/rollback -> promotion chain. `init --demo` is runnable offline; `plan`
+  validates refs and scores without running the gates; `run` returns the full
+  `GovernedHarnessReport`. A failed proof or pending/rejected approval never
+  reaches promotion; a conformal/sequential reject is never waived; MCP refs and
+  writes use the operator's surface allowlists. JSON results carry
+  `schema_version: 1`. Direct `govern_harness_change` callers also get the
+  matching fix: optional conformal `insufficient` / sequential `continue`
+  evidence is ignored when the rules do not require those tests, while a
+  conformal/sequential reject still fails the promotion.
+
+- `agentdescent meta-campaign` and the MCP `meta_campaign` tool: repeated
+  `continuous_meta_run` sessions over one `ConsolidationStore`, each in a fresh
+  ledger repo, with `RSIController` target/cost/patience/session stops. `init
+  --demo` is runnable offline from `agentdescent.meta_demo`; `plan` resolves refs
+  and configs without calling builders or creating the archive; `run` returns the
+  per-session verdicts, best session and archive count. A rejected rule is a
+  normal measured session; an errored session stops the campaign with
+  `complete=false`. MCP refs and writes use the operator's surface allowlists.
+  JSON results carry `schema_version: 1`.
+
+- `agentdescent algorithms run` and `agentdescent init` take `--rounds N` /
+  `--workers N` (each >= 1), written into the spec's `evolve` block, so a cheap
+  trial of a named algorithm (`--rounds 1 --workers 1`) needs no hand-edited JSON.
+  Without the flags the plain `algorithms run` output names that quick-trial path
+  when the default plan is large, and the host skill and `/algorithms` commands
+  mention it (#707).
+
+- `evolve` / `async_evolve` score the seed artifact once on the held-out set
+  before round 0 and record it as `initial_reward` on `EvolutionResult`,
+  `result.json`, and run-store `status`. Foreground `evolve` / `demo` print
+  `held-out reward: <initial> -> <final>`; `show` and `status --json` / MCP
+  carry the field. Seed scoring never aborts the run (`null` on failure).
+  `plan`'s estimate adds `seed_score_calls` (#708).
+
+- `tools.module_audit`, a read-only reachability audit for the package: it
+  classifies every module as `cli/mcp`, `exported-only` or `isolated` (following
+  intra-package imports and `agentdescent.module:attribute` string refs), reports
+  module/LOC totals, the top-level `__all__` length and the CLI/MCP surface
+  counts, and emits JSON for scripting. It changes nothing by default;
+  `--fail-on-isolated` is an opt-in local check. This makes "what is actually on
+  the product path" measurable before any quarantine or merge work.
+
+- `agentdescent experience cycle` and the MCP `experience_cycle` tool: one
+  guarded adaptive-experience cycle that ingests new `ExperienceRecord`s, chooses
+  validation/anchors through the preference/recall/history cascade, and delegates
+  the update and forgetting guard to `ExperienceEngine`. It makes the previously
+  isolated `AdaptiveExperience` reachable from the product surface; the result
+  carries the plan, ingested ids and update decision, with `schema_version: 1`.
+  The CLI exits 1 when the update is not accepted; MCP `store` writes use
+  `AGENTDESCENT_SURFACE_WRITE_DIRS`.
+
+- `docs/experimental.md`, a status map for the modules that the CLI/MCP product
+  path does not exercise: research prototypes (`society_runtime`, `openended`,
+  `scaling`, `calibrated_deferral`/`deferral`) and the
+  `algorithms/_TEMPLATE.py` contributor template. It also records the recently
+  productized `adaptive_experience` (`experience cycle`, #711), `budgeted_loop`
+  (`platform step.budgeted`, #712) and `tenant_platform`/`workspaces`
+  (`tenant run`, #715). It explains that the
+  module audit's `isolated` category means "not statically referenced", not
+  "dead", and names the reversible cleanup order.
+
+- `agentdescent tenant` and the MCP `tenant` tool: one platform cycle under a
+  `WorkspaceRegistry` principal/workspace/roles/quota. The spec nests the normal
+  platform spec plus tenancy fields and the tokens/cost to reserve; `plan`
+  validates refs and checks `run:write` without creating the SQLite DB, and `run`
+  reserves quota, executes the cycle and commits usage through `TenantPlatform`.
+  A denied role or exhausted quota fails closed. This gives the previously
+  isolated `workspaces` / `tenant_platform` pair a product consumer. JSON results
+  carry `schema_version: 1`; MCP refs and writes use the operator allowlists.
+
+- `docs/main-path.md`: the design contract for the three supported product paths
+  (evolve one artifact, governed release, continuous platform), the advanced
+  capability/tenancy/ops/meta/harness layers, and a canonical-vs-alias table for
+  the near-duplicate control, promotion, ops, experience and campaign modules. It
+  also states the consumer-first rule for new modules. Docs only; no runtime
+  behavior changes.
+
+- `agentdescent demo --algorithm NAME` runs the offline demo with a named
+  algorithm, so one can be watched end to end before wiring a model and data.
+  Only algorithms verified against the offline agent are accepted
+  (`archive_selection`); others are refused with the `algorithms run` command
+  that runs them for real (#719).
+
+- MCP `algorithm_spec` tool: the MCP form of `agentdescent algorithms run NAME
+  PATH [cases]`. It runs the same checks, writes the starter spec beside the
+  target (never inside a directory target), plans it, and returns the estimate
+  plus the absolute `spec` dict to pass to `start`, so an MCP-only host no longer
+  hand-assembles a spec to try a named algorithm. `algorithms run` and the tool
+  share one code path (#723).
+
+- `PersistentWorkspaceRegistry` and the tenant spec's optional `registry` path:
+  the tested in-memory `WorkspaceRegistry` can now be saved as one atomically
+  replaced JSON snapshot, so quota usage, reservations and audit accumulate across
+  `agentdescent tenant` runs instead of being discarded with the process.
+  `WorkspaceRegistry` gains `to_dict`/`from_dict` and small existence/getters
+  (`workspace_exists`, `principal_exists`, `get_workspace`, `get_principal`); the
+  tenant surface uses the persistent registry when `registry` is set and keeps the
+  in-memory behavior when it is not. The file is authoritative: when it already
+  has a workspace or principal, `plan`/`run` compare the persisted quota and roles
+  with the spec and refuse a mismatch instead of silently using either value. The
+  file is a single-writer JSON slice, not a multi-process database.
+
+- `agentdescent release verify` and the MCP `release_verify` tool: recompute the
+  HMAC over a signed receipt's embedded manifest, check that its decision is an
+  accepted `promote` with both hashes present, and optionally require the lineage
+  node to carry the same manifest hash. A well-formed but edited or wrongly keyed
+  receipt reports `valid: false` and exits 1, so CI can consume the exit code
+  without trusting the JSON file.
+
+- `agentdescent governed-harness approvals|approve|reject`: list pending,
+  approved or rejected human-approval requests, and record a decision with an
+  optional note. A missing store is an empty queue; an unknown key or an
+  already-decided request is an input error, so a rejection cannot be silently
+  flipped into an approval. The decide verbs stay CLI-only, so a host model cannot
+  approve the change it proposed for itself, and the next `run` of the same
+  governed-harness spec reads the decision.
+
+- `agentdescent ops publish --history FILE` appends one JSONL record per publish
+  (tenant, workspace, each run's metrics and alerts) with an fsync, and
+  `agentdescent ops history` aggregates those records across runs. Totals are
+  deduplicated by run id, so publishing the same database twice does not double
+  the counts; alerts are deduplicated by message. Malformed lines are skipped and
+  counted, tenant/workspace filters and a missing history are handled without
+  rewriting the file, and the last record is reported with an ISO-8601 timestamp.
+
+- `agentdescent platform status` and the MCP `platform_status` tool: inspect a
+  campaign's SQLite run database after the process that wrote it has exited. With
+  no `--run-id`, list the most recent runs (newest first) with status, best
+  reward, generation count, accepted count and stop reason; with `--run-id`,
+  return that run's full loop report. The command only reads the database and
+  needs no compute, foundry or experience callbacks; a missing database or
+  unknown run is an input error.
+
+- `agentdescent tenant report --registry FILE`: a read-only view of a persistent
+  workspace registry with per-workspace quota and accumulated usage, principals
+  and their roles, and the most recent audit events when `--principal` names an
+  actor with `audit:read`. A missing registry is an input error and is never
+  created; a viewer or operator gets `audit: null` with a note. The command is
+  CLI-only so the local audit trail is not exposed to a host model. The report also makes stale `active` reservations visible, which a hard kill can otherwise leave behind.
+
+- `agentdescent traces digest|show` and the MCP `traces_digest` tool: turn raw
+  agent trajectory JSONL/JSON into a layered, sourced evidence digest (per-run and
+  per-task counts, normalised failure signatures, and a token-bounded prompt
+  block), then drill back into the exact source events by signature id. Failure
+  messages are normalised so repeated causes group, secret-shaped values are
+  redacted, malformed input is an input error, and no model or network call is
+  made.
+
+- `agentdescent predictions predict|observe|report`: an append-only prediction log
+  that pairs a proposal's expected delta, confidence and expected flipped tasks
+  with the later observation. Observations score hit/miss, delta error, task
+  overlap and Brier, and the report aggregates hit rate, calibration buckets and
+  falsified predictions. Predictions written before measurement stay pending until
+  observed; no model or network call is made.
+
+### Changed
+
+- The `docs/plugins.md` title and install line and the README host section now
+  name Grok Bot (as a scaffold that needs a tunnel, not a one-click install),
+  matching `plugin-quickstart.md` (#606).
+
+- An `--algorithm` / `algorithm:` kind mismatch (in `init`, `plan`, `evolve`,
+  campaigns and tournaments) now says which named algorithms do apply to that
+  kind (`agentdescent algorithms list --kind <kind>`), suggests targeting a skill
+  directory's single `SKILL.md` as `--kind text` when the algorithm runs on text,
+  and points to the default loop when nothing applies.
+
+- A `platform` spec may now set `step: {"budgeted": {...}}` to use the existing
+  `BudgetedStep` (PRM/verifier search with marginal-gain stopping) as the durable
+  loop's step. The block takes a `SearchFabric` builder/instance, a state
+  callable, `BudgetedStepConfig` and optional `risk`/`evidence_of` callables;
+  `plan` validates refs and config without calling the builders. This gives the
+  previously isolated `budgeted_loop` a product consumer without changing the
+  platform's compute or promotion behavior.
+
+- Moved the research prototypes `society_runtime`, `openended`, `scaling`,
+  `calibrated_deferral` and `deferral` under `agentdescent/experimental/`, so the
+  top-level package no longer presents them as part of the main engine. Their old
+  import paths remain compatibility shims (`from agentdescent.experimental.x
+  import *`), so existing code and tests keep working. No CLI/MCP verb or
+  top-level export changed.
+
+- `agentdescent install` / `uninstall` accept common host aliases, case-insensitive
+  (`claude`, `grok`, `grokbot`, `deepseek-harness`, `open-code`, …), and a bare
+  `install` / `uninstall` lists every host with its state and the command to run
+  instead of argparse's "the following arguments are required" (exit 2; `--json`
+  returns the same data) (#721).
+
+- `docs/main-path.md` now names the product verbs added around the three supported
+  paths: independent release-receipt verification, `platform status` over the
+  durable run store, `ops history`, governed-harness approval decisions, and the
+  persistent tenant registry report. Docs only; no runtime behavior changes.
+
+- Deep documentation refresh: one documentation map with the three supported paths
+  and the product surfaces, current main-path tables (tenant registry/report,
+  release verification, platform status, ops history, harness approvals), a module
+  map for the CLI/MCP surfaces, stale "on main" markers removed, the experimental
+  status updated for the persistent registry, and the navigation grouped into a
+  product-surfaces section. Docs only; no runtime behavior changes.
+
+### Fixed
+
+- `OpsFabric.record` now closes the `ops.record` span as `error` for a
+  failed run and `cancelled` for a cancelled one, instead of `ok` for every
+  terminal run, so telemetry error counts match the console (#630).
+
+- The key-preflight tests no longer fail on a machine that exports `ARK_API_KEY`
+  or another provider key: their fixture clears every name the preflight reads
+  (#632).
+
+- `openai_compatible` and `anthropic_compatible` now raise `ProviderConfigError`
+  on a deterministic refusal (HTTP 401/403/404, or a body naming
+  `UnsupportedModel` / `model_not_found` / `invalid_api_key`) and the engines stop
+  the run on the first one, instead of retrying it and spending a full round of
+  identical failing calls. The error names what to fix (the `model` or base URL,
+  or which `api_key_env` to check); 429, 5xx and timeouts still retry as before.
+  `diagnose` no longer recommends `log.txt` for a run that has none (#635).
+
+- `agentdescent mcp --transport streamable-http` now checks that its host:port
+  can be bound before announcing the URL: a busy port prints one line naming the
+  port and suggesting another `--port`, and exits 4 instead of failing inside
+  uvicorn's logs with the same exit code 3 as a missing MCP SDK. The Grok Bot
+  `HOST.md` scaffold and `docs/plugins.md` mention it (#636).
+
+- The `init` starter-reflector warning test no longer fails on a machine that
+  exports `ARK_API_KEY` or another provider key: it clears every name `init`
+  reads before pinning the "OPENAI_API_KEY is not set" warning (#646).
+
+- `agentdescent plan --json` on a missing, unreadable or malformed spec file now
+  prints the same `{"ok": false, "error": ...}` object on stdout as a spec that
+  fails to compile, instead of a bare `error:` line on stderr; without `--json`
+  the stderr line is unchanged (#648).
+
+- `agentdescent evolve`, `campaign` and `tournament` with `--json` now answer a
+  missing, unreadable, malformed or non-compiling spec with the same
+  `{"ok": false, "error": ...}` object on stdout that `plan --json` prints,
+  instead of a bare stderr line; without `--json` they print `spec error: ...`
+  on stderr as before (`evolve` on an unreadable file now uses that same
+  prefix) (#650).
+
+- A foreground `agentdescent evolve` whose provider refuses the model or key
+  (`ProviderConfigError`, or any other exception from the run) no longer dies with
+  a Python traceback: it prints the status line, one `error: ...` line with the
+  hint, the run dir and `next: agentdescent diagnose <run_id>`, and exits 1. With
+  `--json` it prints one `{"ok": false, "run_id", "state", "error", "dir"}`
+  object. `status`/`diagnose` are unchanged; `AGENTDESCENT_DEBUG=1` keeps the
+  traceback (#652).
+
+- `openai_compatible` and `anthropic_compatible` now raise `QuotaExhausted`
+  (a `ProviderConfigError`) on a quota- or billing-exhausted 429 — Ark
+  `AccountQuotaExceeded`, OpenAI `insufficient_quota`, and bodies naming
+  `quota` / `billing` — so `with_retries` and the engines fail on the first
+  call instead of backing off for minutes as a rate limit. Real throttling
+  (`rate_limit_exceeded`, bare 429 + `Retry-After`) still retries.
+  `diagnose` suggests waiting for the provider reset or pointing
+  `api_key_env` / `model` at another plan, not `doctor` (#653).
+
+- Foreground `campaign` and `tournament` print AgentDescent warnings as one
+  `warning: …` line (no `file:line` or source), matching `evolve`. The early-stop
+  warning is no longer echoed on the terminal when the status/summary line already
+  shows the error; library `evolve()` callers keep standard `warnings` behaviour
+  (#654).
+
+- Under `--json`, run-store errors (`status` / `show` / `apply` / `cancel` /
+  `resume` / `diagnose` on an unknown run) and archive errors (`portfolio` /
+  `audit` / `safety`) print `{"ok": false, "error": ...}` on stdout instead of a
+  bare `error:` line on stderr; exit codes and plain output are unchanged (#658).
+
+- Under `--json`, `init` ValueError / agent-mismatch refusals and `rsi`
+  archive or parameter errors print `{"ok": false, "error": ...}` on stdout
+  instead of a bare `error:` line on stderr; exit codes and plain output are
+  unchanged (#660).
+
+- `agentdescent init --json` now prints one `{"ok": true, "spec", "kind",
+  "providers_config", "warnings", "notes", "next"}` object on success instead
+  of the human prose lines; plain output is unchanged (#662).
+
+- `--json` now also covers argparse usage errors (missing required argument,
+  invalid choice, unknown option): instead of usage text on stderr, the CLI
+  prints one `{"ok": false, "error", "usage"}` object on stdout and still
+  exits 2; plain output is unchanged (#664).
+
+- An abbreviated `--json` (`--js`, `--jso`, `--j`), which argparse already
+  accepts, now also turns usage errors into the one `{"ok": false, "error",
+  "usage"}` object on stdout instead of plain usage text on stderr (#666).
+
+- `agentdescent serve` on a busy, privileged or out-of-range `--port` now prints
+  one `cannot listen on HOST:PORT -- <reason>` line and exits 4, like
+  `agentdescent mcp --transport streamable-http`, instead of announcing the URL
+  and then crashing with a traceback; under `--json` it is one
+  `{"ok": false, "error"}` object on stdout. The banner now names the port
+  actually bound, so `--port 0` reports the real one (#668).
+
+- `agentdescent exam --json` on a missing archive now prints one
+  `{"ok": false, "error"}` object on stdout (exit 2) like every other read-only
+  verb, instead of a bare `error:` line on stderr; plain output is unchanged and
+  the archive is still not created (#670).
+
+- `agentdescent exam --domain module:builder` now turns a builder that raises
+  (e.g. `TypeError` from `--domain json:dumps`) or returns a dict missing
+  required keys into one `error:` line (exit 2), or one `{"ok": false, "error"}`
+  object under `--json`, instead of a raw traceback (#672).
+
+- `agentdescent algorithms run NAME PATH [cases.jsonl]` now matches the plugin
+  slash `algorithms … run` verb: it writes a starter spec with that algorithm
+  (default `./agentdescent.<name>.spec.json`) and prints a `plan` estimate, then
+  points at `agentdescent evolve <spec>` — without starting a run (#674).
+
+- `agentdescent doctor` now checks the skill Grok Bot actually loads: a saved user
+  skill named `agentdescent` under `$AGENTDESCENT_GROK_BOT_SKILLS` (default
+  `<home>/agent-data/workflows`) is reported as `user skill ok|stale|missing`, a
+  stale one is a problem with a rewrite hint, and `--json` gains
+  `hosts.grok-bot.user_skill` / `user_skill_path`. The `host grok-bot` line no
+  longer says `cli not on PATH` (#675).
+
+- `agentdescent algorithms run` now prints `wrote <spec>` before the error when
+  the plan step fails after writing the spec, rejects an invalid group-level
+  `--kind` with the list of kinds before writing anything, and accepts
+  `--agent REF` like `init` (a mismatched ref is refused before writing) (#688).
+
+- `agentdescent algorithms run` now tips the optional `cases.jsonl` third
+  argument (or checks the path you passed) when plan fails because `data.path`
+  does not exist, instead of only naming the missing file (#692).
+
+- When the plan step of `agentdescent algorithms run` fails, `next` now says to
+  fix the spec and run `agentdescent plan <spec>` again. Before, `--json` said
+  `agentdescent evolve <spec>` on a spec that plan had just refused. Both
+  failure shapes now carry `spec_path` as well, and plain mode prints the same
+  `next:` line after the error (#694).
+
+- Algorithm names now ignore case and `-` vs `_`: `agentdescent algorithms show
+  GEPA`, `algorithms run archive-selection …`, `campaign` and an EvolveSpec
+  `algorithm` resolve to the one registered algorithm they match instead of
+  failing as unknown. `algorithms run` writes the registered name into the spec
+  and its default file name; an ambiguous name is still reported as unknown
+  (#696).
+
+- A case or `-`/`_` variant of a third-party algorithm plugin's name that failed
+  to load (`algorithms show ACME-Method` for a broken `acme_method`) now reports
+  the plugin's load error instead of "unknown algorithm" (#698).
+
+- `tests/test_async_meta_population.py` now really runs its outer meta-proposer
+  (a missing module-level `import re` made it raise `NameError` every round, so
+  no island was ever promoted) and checks that the async run promotes the same
+  island as the sequential one, each from its own copy of the archive (#700).
+
+- `agentdescent algorithms run NAME PATH` no longer answers a kind mismatch with
+  the `init --algorithm` text: the error names `algorithm 'NAME'` (the name is
+  positional), routes the one-file fix through `algorithms run NAME FILE --kind
+  text`, and, when `--kind` was not given, says a file is always `text` or that a
+  directory's kind was guessed and `--kind` overrides it (#702).
+
+- `init PATH` and `algorithms run NAME PATH` now refuse a PATH that does not
+  exist before guessing kind: exit 2 with `target '…' does not exist (cwd …)` and
+  no spec written, instead of falling through `guess_kind` to `skill_dir` and a
+  kind-mismatch or "is not a directory" error. With `--kind text`, a path-looking
+  missing target still writes the spec but warns that the path string will be used
+  as the prompt; `plan` surfaces the same warning. Directory kinds' `plan` says
+  `does not exist` when the target is absent (#706).
+
+- `init`, `algorithms run` and the MCP `algorithm_spec` tool no longer replace an
+  existing, different spec at the output path without a word: the old copy is
+  saved as a `<out>.bak-N` backup and a note names it. An identical re-run writes no backup
+  (#725).
+
+- `init`, `algorithms run` and the MCP `algorithm_spec` tool now back up a
+  replaced spec to numbered `<out>.bak-N` slots (like `apply`), so a second
+  re-run no longer overwrites the first backup; the OpenCode provider-only config
+  written next to the spec is backed up and named in a note the same way when it
+  held different content (#727).
+
+- The MCP `algorithm_spec` tool now passes its `params` object straight through
+  instead of re-encoding it as `--param KEY=VALUE` strings, so a key containing
+  `=` is no longer split into a different key and value, and an empty or
+  repeated key is reported as a `params` key rather than a CLI flag (#729).
+
+- `algorithms run ace` / `dgm` no longer drop or comma-shred the user's existing text prompt: ace seeds the playbook from the target and only appends lessons under `# Playbook (ACE)`, dgm keeps the prose intact and lists admitted capabilities under `## Capabilities`, and an unchanged run reports `apply` noop (#731).
+
+- When the seed prompt already scores the target on held-out and the run does
+  not improve on it, `diagnose` now reports `seed-already-solved` (add cases the
+  seed gets wrong, use a stricter score, or raise `target_reward`) instead of
+  `solved` / "review and apply the artifact", and foreground `evolve` prints the
+  same note after `held-out reward: 1.000 -> 1.000` (and adds `note` to `--json`).
+  `docs/algorithms.md` replaces an empty code block with a tip to include cases
+  the seed fails (#732).
+
+- `algorithms` ace / dgm: re-opening an applied text artifact parses the trailing `# Playbook (ACE)` / `## Capabilities` block back into strategy state so a second run appends under a single header instead of duplicating it (#741).
+
+- `algorithms` ace / dgm: re-opening an applied target no longer drops user text written after the `# Playbook (ACE)` / `## Capabilities` block; it is re-attached after the block, an unchanged run stays a byte-identical `apply` noop, and multi-line ACE lessons round-trip (#743).
+
+- `init` / `algorithms run`: an unknown `--agent` (for example the install host
+  name `claude-code`) is refused before the spec is written, listing only the
+  agent refs and suggesting `claude_code`, instead of writing a spec `plan`
+  rejects with a list of policy classes (#745).
+
+- `agentdescent algorithms run` no longer hides init's notes and warnings when
+  the follow-up `plan` fails: text mode prints the `note:` / `warning:` lines
+  (including where an overwritten spec was backed up as `<out>.bak-N`), and the
+  `--json` / MCP `algorithm_spec` error object now carries `notes` and
+  `warnings` lists like the success object (#749).
+
+- `init` / `algorithms run`: an `--agent` that is an `install` host name or alias
+  now gets a host-aware hint — `deepseek-harness` / `claudecode` / `open-code`
+  suggest `dsh` / `claude_code` / `opencode`, and `grok-bot` / `grok` say Grok
+  Bot is an install host with no worker CLI and point at `agentdescent doctor` /
+  `openai_compatible` (#752).
+
+- The only-`ARK_API_KEY` example in `docs/plugin-quickstart.md` now names
+  `deepseek-v4-flash`, the model the Ark Coding endpoint serves, instead of
+  `doubao-seed-code`, which that endpoint refuses with 404 `UnsupportedModel`
+  (#754).
+
+- `kind: text` now refuses an existing directory as its target: `init`,
+  `algorithms run`, `plan`, `evolve` and MCP `start` stop with "is a directory"
+  and point at a file inside it or `--kind skill_dir`, instead of evolving the
+  path string as the prompt; `apply` / `apply --dry-run` onto a directory give
+  the same error instead of claiming a write and then tracing back on
+  `IsADirectoryError` (#755).
+
+- `diagnose` no longer calls a run `partial-improvement` when its held-out reward
+  never rose above the seed's (for example `0.000 -> 0.000` with only
+  `dgm-select` parent-pick commits); such a run falls through to
+  `agent-failures` / `no-improvement`, and `partial-improvement` now names
+  `initial -> final` (#756).
+
+- Directory `apply` backups (both `EvolutionResult.write_to` and
+  `apply --from`) now land under `$AGENTDESCENT_HOME/backups/` instead of a
+  sibling `<path>.bak-N`, so host skill scanners (OpenCode, Claude Code) no longer
+  load the backup and shadow the evolved skill (#758).
+
+- DGM reflection prompts now include available task answers so spec-driven capability proposals can learn from failed outputs.
+
+- `init` and `algorithms run` now write an explicit reflector for `agent_dir`.
+  The reflector and OpenCode provider configuration use the same selected API key
+  environment variable (#760).
+
+- EvoSkill frontier merge reports now use category `evoskill-select`, so evolve/show/diagnose outcomes no longer collapse successful runs into `unknown`.
+
 ## [0.8.0] — 2026-10-30
 
 ### Added
@@ -6535,7 +7125,8 @@ First public release on PyPI as **`agentdescent`**.
   discrete-space `Aggregator`, staleness policies, DP/TP/PP parallelism, layered
   governance, and the provider-agnostic `agentdescent.agents` completion layer.
 
-[Unreleased]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.5.1...v0.6.0

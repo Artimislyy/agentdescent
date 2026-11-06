@@ -13,7 +13,7 @@ until step 3.
 Install **0.8.0** from PyPI with its MCP extra:
 
 ```bash
-pip install "agentdescent[mcp]>=0.8.0"
+pip install "agentdescent[mcp]>=0.9.0"
 ```
 
 Or, from a source checkout:

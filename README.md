@@ -67,10 +67,10 @@ is regenerable rather than a hand-edited binary.
 
 ## Install and run the offline demo
 
-Install **0.8.0** from PyPI:
+Install **0.9.0** from PyPI:
 
 ```bash
-pip install "agentdescent>=0.8.0"
+pip install "agentdescent>=0.9.0"
 agentdescent demo
 ```
 
