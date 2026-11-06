@@ -108,18 +108,19 @@ nav:
     - The RSI loop kernel: loop-kernel.md
     - Trusted promotion: trusted-promotion.md
     - Trusted evidence: trust-evidence.md
-    - Release a candidate: release.md
-    - Trajectory evidence: traces.md
-    - Governed harness change: governed-harness.md
-    - Meta campaign: meta-campaign.md
-    - Tenant cycle: tenant.md
     - Module audit: module-audit.md
     - Adaptive compute: compute-policy.md
     - Capability foundry: capability-foundry.md
     - Continual experience: continual-experience.md
+  - Product surfaces:
+    - Release a candidate: release.md
+    - Trajectory evidence: traces.md
+    - Governed harness change: governed-harness.md
+    - Tenant cycle: tenant.md
+    - Operations console: ops.md
     - The RSI platform cycle: platform.md
     - Capability loop: capability-loop.md
-    - Operations console: ops.md
+    - Meta campaign: meta-campaign.md
     - Experience store: experience-cli.md
   - The decision plane (policies):
     - Choosing policies: policies.md

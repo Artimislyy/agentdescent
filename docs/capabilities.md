@@ -61,7 +61,8 @@ See [evolution](evolution.md), [architecture](architecture.md),
   split-conformal bounds, anytime-valid e-processes and continuous evaluation.
 
 See [verifier](verifier.md), [statistical evidence](stats-eval.md) and
-[budget](budget.md).
+[budget](budget.md). Release receipts are verified independently with
+`release verify`; see [release](release.md).
 
 ## Trusted promotion
 
@@ -74,7 +75,8 @@ See [verifier](verifier.md), [statistical evidence](stats-eval.md) and
   binding applies when `artifact_hash` is supplied. See
   [trusted promotion](trusted-promotion.md).
 - `promotion_ledger`: an accepted promotion becomes a signed `ArtifactManifest`
-  and a lineage node carrying evidence and decision hashes.
+  and a lineage node carrying evidence and decision hashes. See
+  [release](release.md) and `release verify`.
 - `policy_release`, `proofs`, `safe_selfmod`, `capability_guard`, `risk_policy`,
   `approval`, `leakage`: policy-as-code, signed manifests, invariant
   certificates, capability gates, risk actions, human approval and leakage
@@ -86,24 +88,29 @@ See [verifier](verifier.md), [statistical evidence](stats-eval.md) and
 - `controller`, `runtime`, `campaign`, `tournament`: bounded sessions,
   `run_guarded`, multi-session campaigns and algorithm tournaments.
 - `durable_runs`: SQLite event log, leases, idempotency, retries, resume.
-- `workspaces`: tenant/workspace RBAC, quota reservations, scoped audit.
+- `workspaces`, `workspace_store`, `tenant_platform`: tenant/workspace RBAC,
+  quota reservations, scoped audit and a durable registry snapshot. See
+  [tenant](tenant.md) and `tenant report`.
 - `rsi_metrics`, `rsi_telemetry`: Prometheus samples and OTel-shaped spans.
-- `ops_console`: the read model for runs, approvals, QD, lineage and cost.
-- `ops_fabric` (on main): write one `LoopReport` into console, lineage,
+- `trace_digest`: a layered, sourced trajectory digest a reflector can consume;
+  see [trajectory evidence](traces.md) and `traces digest|show`.
+- `ops_console`: the read model for runs, approvals, QD, lineage and cost. See
+  [operations](ops.md), including `ops history`.
+- `ops_fabric`: write one `LoopReport` into console, lineage,
   telemetry and a QD snapshot.
-- `platform.RSIPlatform` (on main): one cycle of compute → loop → promote →
+- `platform.RSIPlatform`: one cycle of compute → loop → promote →
   foundry → experience, with `complete=False` when a configured layer produces
   no decision. See [platform](platform.md).
 
-See [runtime](runtime.md), [controller](controller.md) and
-[execution](execution.md).
+See [runtime](runtime.md), [controller](controller.md),
+[execution](execution.md), [platform](platform.md) and [ops](ops.md).
 
 ## Tasks, capabilities and archives
 
 - `data_flywheel`: traces → filtered, redacted, deduplicated dataset candidates.
 - `task_foundry`: failure seeds → validated, deduplicated, contamination-checked
   train/holdout tasks.
-- `task_pipeline` (on main): the hand-off between those two, respecting the
+- `task_pipeline`: the hand-off between those two, respecting the
   foundry's own verdict.
 - `tool_synthesis`: generate, validate and select tools; the generator sees
   earlier rejection reasons.

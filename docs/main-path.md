@@ -79,13 +79,30 @@ it only inspects the durable run store.
 | layer | canonical modules | surface |
 |---|---|---|
 | capability growth | `task_pipeline`, `capability_scout`, `capability_foundry`, `capability_archive`, `capability_loop` | `agentdescent capability` |
-| tenancy | `workspaces`, `tenant_platform` | `agentdescent tenant` (`plan`, `run`) |
+| tenancy | `workspaces`, `tenant_platform`, `workspace_store` | `agentdescent tenant` (`plan`, `run`, `report`) |
 | operations | `ops_fabric` (write), `ops_console` (read), `rsi_metrics`, `rsi_telemetry`, `campaign_ops` | `agentdescent ops` (`plan`, `publish`, `history`) |
 | meta-learning | `meta` (including `continuous_meta_run`), `meta_curriculum`, `meta_population`, `meta_campaign`, `meta_audit`, `meta_exam`, `verified_seed` | `agentdescent meta-campaign`, `exam`, `audit` |
 | governed harness | `safe_selfmod`, `proofs`, `approval`, `safety_controller`, `governed_harness` | `agentdescent governed-harness` (`plan`, `run`, `approvals`, `approve`, `reject`) |
 
 These are not “extra algorithms”; they are the control, evidence and memory
 layers around the three paths.
+
+## Product surfaces at a glance
+
+| surface | verbs | guide |
+|---|---|---|
+| release | `release`, `release verify` | [release.md](release.md) |
+| traces | `traces digest/show` | [traces.md](traces.md) |
+| governed harness | `governed-harness plan/run/approvals/approve/reject` | [governed-harness.md](governed-harness.md) |
+| tenant | `tenant plan/run/report` | [tenant.md](tenant.md) |
+| operations | `ops plan/publish/history` | [ops.md](ops.md) |
+| platform | `platform init/plan/run/status` | [platform.md](platform.md) |
+| capability growth | `capability init/plan/run` | [capability-loop.md](capability-loop.md) |
+
+Every surface is a wrapper over the same `evolve()` engine or a durable run
+store; none is a second optimiser. `release verify`, `platform status`,
+`ops history`, `tenant report` and the harness approval verbs are read-only or
+append-only where their guides say so.
 
 ## One concept, one owner
 
@@ -117,15 +134,14 @@ exist, so new code should follow the canonical column.
    `{"ok": false, "error": ...}` under `--json`, and confines MCP refs/writes
    with `AGENTDESCENT_SURFACE_ALLOW` / `AGENTDESCENT_SURFACE_WRITE_DIRS`.
 4. If it is research, do not export it from `agentdescent/__init__`; describe it
-   as experimental in `modules.md`. The `agentdescent/experimental/` namespace is
-   the next step for it once that move lands.
+   as experimental in `modules.md` and keep it in `agentdescent/experimental/`.
 5. If it duplicates an existing concept, extend the canonical module or add a
    documented alias; do not ship a second engine.
 
 ## Related pages
 
 - [Module audit](module-audit.md) — the current static reachability report.
-- The experimental status page (once it lands) — research and recently
+- [Experimental status](experimental.md) — research prototypes and recently
   productized modules.
 - [Architecture](architecture.md) — the five layers and their data flow.
 - [Module map](modules.md) — the catalog.

@@ -44,6 +44,7 @@ These are no longer isolated; keep them out of the "unwired" list.
 | `agentdescent.adaptive_experience` | `experience cycle` / MCP `experience_cycle` (#711) |
 | `agentdescent.budgeted_loop` | `platform` `step.budgeted` (#712) |
 | `agentdescent.tenant_platform` + `agentdescent.workspaces` | `tenant` one quota-checked platform cycle (#715) |
+| `agentdescent.workspace_store` | `tenant` durable registry: quota/audit across runs, read by `tenant report` (#733, #740) |
 
 ## What this means
 

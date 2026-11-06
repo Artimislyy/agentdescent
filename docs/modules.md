@@ -89,6 +89,22 @@ and *how*, that is *what*.
 | `ledger` | the git-backed, compare-and-swap artifact store | [Ledger](ledger.md) |
 | `governance` | L0 frozen / L1 slow / L2 fast, by blast radius | [Governance](governance.md) |
 
+## Product surfaces
+
+The CLI/MCP verbs are thin seams over these modules. They validate inputs,
+return `schema_version: 1`, and never reimplement the decision logic below.
+
+| module | what it is | page |
+|---|---|---|
+| `release_surface`, `release_pipeline`, `policy_release`, `promotion_ledger`, `lineage` | signed release receipt, independent verification and lineage | [Release](release.md) |
+| `surface_governed`, `governed_harness`, `approval`, `proofs`, `safe_selfmod` | one governed harness change: gate, proof, human approval, canary, promotion | [Governed harness](governed-harness.md) |
+| `surface_tenant`, `tenant_platform`, `workspaces`, `workspace_store` | roles, quota reservations, scoped audit and a durable registry snapshot | [Tenant](tenant.md) |
+| `surface_ops`, `campaign_ops`, `ops_fabric`, `ops_console`, `rsi_metrics`, `rsi_telemetry` | terminal runs into the control room, plus a JSONL publish history | [Operations](ops.md) |
+| `surface_platform`, `platform`, `platform_campaign`, `loop_kernel`, `durable_runs` | durable five-layer cycles and read-only campaign inspection | [Platform](platform.md) |
+| `surface_capability`, `capability_loop`, `capability_foundry`, `capability_scout` | failures into an admitted capability | [Capability loop](capability-loop.md) |
+| `trace_digest` | layered, sourced trajectory digest and drill-down | [Trajectory evidence](traces.md) |
+| `surface_common`, `runstore`, `rsi_control`, `controller`, `campaign`, `tournament` | shared envelopes/allowlists, detached runs and bounded sessions | [Runtime](runtime.md) |
+
 ## Across all of it
 
 | module | what it is | page |
