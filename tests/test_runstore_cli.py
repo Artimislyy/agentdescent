@@ -779,7 +779,9 @@ def test_plan_rejects_missing_agent_cli(tmp_path, monkeypatch):
     assert payload["ok"] is False
     err = payload["error"]
     assert "claude_code" in err and "claude" in err and "on PATH" in err
-    assert "install" in err or "openai_compatible" in err
+    assert "install" in err
+    # skill_dir must not advertise openai_compatible (#791)
+    assert "openai_compatible" not in err
     # missing binary is a hard error, not a soft warning
     assert not any("needs `claude` on PATH" in w for w in payload["warnings"])
 

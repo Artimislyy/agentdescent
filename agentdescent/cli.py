@@ -1198,6 +1198,11 @@ def _missing_cli_messages(spec: EvolveSpec,
 
     ``fields`` limits the check to those roles (``"agent"``, ``"reflect"``,
     ``"host"``); ``None`` checks all of them.
+
+    The install/switch remedy is kind-aware (#791): for ``agent`` on a directory
+    kind (``skill_dir`` / ``agent_dir`` / ``plugin`` / ``agent_code`` / ...) it
+    only points at WorkspaceAgent CLIs, never ``openai_compatible``. ``reflect``
+    and kind=``text`` / ``policy_slot`` may still name a non-CLI agent.
     """
     report = doctor_report()
     clis = report["agent_clis"]
@@ -1233,15 +1238,31 @@ def _missing_cli_messages(spec: EvolveSpec,
                        f"host must match the plugin's format, so a different "
                        f"`agent.ref` does not help); see `agentdescent doctor`")
             continue
+        # Directory kinds refuse a plain Completion for `agent` (#791): naming
+        # `openai_compatible` here sends the user into `init_agent_mismatch` /
+        # compose. Reflect (and kind=text / policy_slot agent) may still use it.
+        allow_plain = (
+            field != "agent"
+            or spec.kind in ("text", "policy_slot")
+        )
         if present:
             # Map binary -> short ref for the switch hint.
             alts = ", ".join(f"`{bin_to_ref[b]}`" for b in present)
-            remedy = (f"install `{binary}`, or switch `{field}.ref` to a CLI that "
-                      f"is on PATH ({alts}), or use a non-CLI agent "
-                      f"(e.g. `openai_compatible`); see `agentdescent doctor`")
+            if allow_plain:
+                remedy = (f"install `{binary}`, or switch `{field}.ref` to a CLI that "
+                          f"is on PATH ({alts}), or use a non-CLI agent "
+                          f"(e.g. `openai_compatible`); see `agentdescent doctor`")
+            else:
+                remedy = (f"install `{binary}`, or switch `{field}.ref` to a CLI that "
+                          f"is on PATH ({alts}); see `agentdescent doctor`")
         else:
-            remedy = (f"install `{binary}`, or set `{field}.ref` to a non-CLI agent "
-                      f"(e.g. `openai_compatible`); see `agentdescent doctor`")
+            if allow_plain:
+                remedy = (f"install `{binary}`, or set `{field}.ref` to a non-CLI agent "
+                          f"(e.g. `openai_compatible`); see `agentdescent doctor`")
+            else:
+                remedy = (f"install `{binary}`, or set `{field}.ref` to another "
+                          f"WorkspaceAgent ({' / '.join(_WORKSPACE_REFS)}); "
+                          f"see `agentdescent doctor`")
         out.append(f"{field}: `{ref}` needs `{binary}` on PATH; {remedy}")
     return out
 
