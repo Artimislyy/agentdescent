@@ -113,11 +113,21 @@ def _spec(tmp_path, agent):
 
 @pytest.fixture
 def opencode_on_path(monkeypatch):
+    """Stub opencode on PATH and clear gateway keys so soft-warning cases stay soft.
+
+    A real ARK_API_KEY in the environment would otherwise hard-refuse bare
+    opencode via #790 and break the custom-provider soft-warning tests.
+    """
     real = cli.doctor_report
 
     def fake():
         rep = real()
-        return {**rep, "agent_clis": {**rep["agent_clis"], "opencode": "/fake/opencode"}}
+        keys = dict(rep["provider_keys_present"])
+        for name in list(keys):
+            if name.endswith("_API_KEY") and name not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+                keys[name] = False
+        return {**rep, "provider_keys_present": keys,
+                "agent_clis": {**rep["agent_clis"], "opencode": "/fake/opencode"}}
 
     monkeypatch.setattr(cli, "doctor_report", fake)
 
@@ -174,15 +184,36 @@ def _with_keys(monkeypatch, **present):
     monkeypatch.setattr(cli, "doctor_report", fake)
 
 
-def test_plan_says_a_gateway_key_alone_leaves_opencode_on_its_default_model(
+def test_plan_hard_refuses_bare_opencode_when_a_gateway_key_is_set(
         tmp_path, monkeypatch):
+    """Gateway key + bare opencode is a hard plan error, not a soft warning (#790)."""
     _with_keys(monkeypatch, ARK_API_KEY=True)
-    warns = _warnings(tmp_path, {"ref": "opencode"})
-    assert len(warns) == 1, warns
-    w = warns[0]
-    assert "untested" not in w
-    assert "ARK_API_KEY" in w and "default model" in w
-    assert '"-m", "ark/deepseek-v4-flash"' in w and "OPENCODE_CONFIG" in w
+    payload = cli.plan_payload(_spec(tmp_path, {"ref": "opencode"}))
+    assert payload["ok"] is False, payload
+    err = payload.get("error") or ""
+    assert "ARK_API_KEY" in err and "default model" in err
+    assert '"-m", "ark/deepseek-v4-flash"' in err and "OPENCODE_CONFIG" in err
+    # Soft warnings must not restate the same trap once it is a hard error.
+    assert not any("default model" in w for w in payload["warnings"]), payload["warnings"]
+
+
+def test_require_cli_refuses_bare_opencode_gateway_before_create(tmp_path, monkeypatch):
+    _with_keys(monkeypatch, ARK_API_KEY=True)
+    import pytest
+    with pytest.raises(cli.SpecError) as ei:
+        cli.require_cli_on_path(_spec(tmp_path, {"ref": "opencode"}))
+    msg = str(ei.value)
+    assert "ARK_API_KEY" in msg and "bare" in msg
+
+
+def test_plan_still_ok_for_wired_opencode_coding_recipe(tmp_path, monkeypatch):
+    _with_keys(monkeypatch, ARK_API_KEY=True)
+    agent = {"ref": "opencode",
+             "extra_args": ["-m", "ark/deepseek-v4-flash"],
+             "env": {"OPENCODE_CONFIG": "/p.json"}}
+    payload = cli.plan_payload(_spec(tmp_path, agent))
+    assert payload["ok"] is True, payload
+    assert not any("bare" in w or "default model" in w for w in payload["warnings"])
 
 
 def test_plan_keeps_the_generic_warning_without_a_gateway_key(tmp_path, monkeypatch):

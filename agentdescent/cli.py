@@ -687,11 +687,24 @@ def _starter_model_warnings(spec: Dict[str, Any], out: str) -> List[str]:
         if todo:
             via = (f" It reads {key_env}, the provider key set here." if key_env != "OPENAI_API_KEY"
                    and os.environ.get(key_env) else "")
+            # Hand-filling reflect alone does not wire a bare opencode worker (#790).
+            agent_block = spec.get("agent")
+            bare_oc = (
+                (isinstance(agent_block, dict) and agent_block.get("ref") == "opencode"
+                 and not _opencode_configured(agent_block))
+                or agent_block == "opencode" or agent_block == {"ref": "opencode"})
+            fill_hint = (
+                " Filling reflect alone is not enough when `agent` is bare "
+                "`opencode` — also pass `--model` / `--base-url` (or write the "
+                "OpenCode Coding recipe) so the worker is not left on OpenCode's "
+                "default model"
+                if bare_oc and field == "reflect" else
+                f" Fill {'it' if len(todo) == 1 else 'them'} in, or re-run with "
+                "`--model` / `--base-url`")
             lines.append(
                 f"{' and '.join(todo)} in {out} {'is a placeholder' if len(todo) == 1 else 'are placeholders'}"
                 f": the model (and the endpoint for a non-OpenAI key) come from you, never "
-                f"a guess.{via} Fill {'it' if len(todo) == 1 else 'them'} in, or re-run with "
-                "`--model` / `--base-url`; `plan` refuses the spec until then")
+                f"a guess.{via}{fill_hint}; `plan` refuses the spec until then")
         if not os.environ.get(key_env):
             # The starter reflector is a model call whatever worker CLI was found,
             # so a machine with only `opencode` / `claude` gets one it cannot call.
@@ -704,12 +717,18 @@ def _starter_model_warnings(spec: Dict[str, Any], out: str) -> List[str]:
     # Bare isolated OpenCode + gateway key: same trap `plan` already names (#455).
     # Warn at init so the written `{"ref": "opencode"}` is not silent.
     agent = spec.get("agent")
-    if isinstance(agent, dict) and agent.get("ref") == "opencode" and not _opencode_configured(agent):
+    if ((isinstance(agent, dict) and agent.get("ref") == "opencode"
+         and not _opencode_configured(agent))
+            or agent == "opencode"):
+        block = agent if isinstance(agent, dict) else {"ref": "opencode"}
         keys = doctor_report()["provider_keys_present"]
-        remedy = _opencode_provider_remedy(agent, keys)
-        if remedy and not _opencode_model_arg(agent):
+        remedy = _opencode_provider_remedy(block, keys)
+        if remedy and not _opencode_model_arg(block):
             lines.append(
                 f"`agent` in {out} is bare `opencode`: {remedy}. "
+                "Filling `reflect` alone is not enough — pass `--model` / "
+                "`--base-url` (or write the full agent Coding recipe); "
+                "`plan` / `evolve` refuse a bare worker when a gateway key is set. "
                 "See docs/plugins.md (OpenCode Coding / OPENCODE_CONFIG)")
     return lines
 
@@ -1267,6 +1286,51 @@ def _missing_cli_messages(spec: EvolveSpec,
     return out
 
 
+
+def _agent_ref_block(spec: EvolveSpec):
+    """Return ``(ref, block)`` for the worker agent role."""
+    block = getattr(spec, "agent", None)
+    if isinstance(block, dict):
+        return block.get("ref"), block
+    if isinstance(block, str):
+        return block, block
+    return None, block
+
+
+def _bare_opencode_gateway_messages(spec: EvolveSpec) -> List[str]:
+    """Hard-fail when a gateway key + bare isolated ``opencode`` would burn calls (#790).
+
+    Filling ``reflect`` placeholders alone used to leave ``plan`` ``ok: true`` and
+    ``evolve`` / MCP start only soft-warned, then OpenCode fell through to its
+    built-in Volcengine default. Same fail-closed gate as placeholders (#451).
+
+    Only the fully bare case (no ``-m provider/model``) is escalated. A pin without
+    ``OPENCODE_CONFIG`` keeps the soft custom-provider warning (#373).
+    """
+    ref, block = _agent_ref_block(spec)
+    if ref != "opencode" or _opencode_model_arg(block):
+        return []
+    isolate = block.get("isolate") if isinstance(block, dict) else None
+    if isolate is False:
+        return []
+    report = doctor_report()
+    if not report["agent_clis"].get("opencode"):
+        return []  # missing binary is already a hard error via _missing_cli_messages
+    keys = report["provider_keys_present"]
+    # Only escalate the gateway-key / default-model trap (#455).
+    if not _opencode_gateway_keys(keys):
+        return []
+    remedy = _opencode_provider_remedy(block, keys)
+    if not remedy:
+        return []
+    return [
+        f"agent: `opencode` is bare (no Coding recipe) while a gateway key is set; "
+        f"{remedy}. `plan` / `evolve` refuse before starting so calls are not burned; "
+        "re-run init / `algorithms run` with `--model` / `--base-url`, or write the "
+        "full agent block (see docs/plugins.md)"
+    ]
+
+
 def require_cli_on_path(spec: EvolveSpec) -> None:
     """Refuse evolve/MCP start when a CLI binary the run needs is missing
     (#346; the plugin ``host`` too, #368).
@@ -1274,7 +1338,8 @@ def require_cli_on_path(spec: EvolveSpec) -> None:
     Shared with :func:`plan_payload` so plan and start fail closed the same way,
     before ``runstore.create`` / ``launch``.
     """
-    msgs = _missing_cli_messages(spec) + _placeholder_messages(spec)
+    msgs = (_missing_cli_messages(spec) + _placeholder_messages(spec)
+            + _bare_opencode_gateway_messages(spec))
     if msgs:
         raise SpecError("; ".join(msgs))
 
@@ -1460,6 +1525,12 @@ def _unusable_refs(spec: EvolveSpec) -> List[str]:
                     if ref in _CLI_ENV_FALLBACK else
                     "whether a provider key in the environment is enough instead "
                     "is untested for this CLI")
+                # Gateway-key + bare (no -m) opencode is a hard plan/evolve error (#790);
+                # do not also soft-warn the same trap on the agent role.
+                if (field == "agent" and ref == "opencode"
+                        and _opencode_gateway_keys(keys)
+                        and not _opencode_model_arg(block)):
+                    continue
                 out.append(
                     f"{field}: `{ref}` is on PATH but a worker runs isolated, so an "
                     f'interactive login does not carry over. Set "isolate": false '
@@ -1561,6 +1632,7 @@ def plan_payload(spec: EvolveSpec, *, usd_per_call: Optional[float] = None) -> D
         )
     hard_errors.extend(_missing_cli_messages(spec))
     hard_errors.extend(_placeholder_messages(spec))
+    hard_errors.extend(_bare_opencode_gateway_messages(spec))
     payload = {"ok": not hard_errors, "spec": spec.to_dict(), "tasks": n_tasks,
             "warnings": warnings,
             "artifact_id": spec.artifact_id(),
