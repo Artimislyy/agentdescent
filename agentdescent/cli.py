@@ -2849,6 +2849,44 @@ def cmd_predictions(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_hgm(a: argparse.Namespace) -> int:
+    """``agentdescent hgm`` -- inspect an HGM tree or ask for its next action."""
+    from .hgm import HGMError, load_hgm_tree
+
+    action = getattr(a, "hgm_cmd", None)
+    try:
+        tree = load_hgm_tree(a.tree)
+        if action == "next":
+            payload = tree.next_action()
+        elif action == "report":
+            payload = tree.report()
+        else:
+            raise HGMError("hgm needs next or report")
+    except (HGMError, OSError, ValueError) as error:
+        return _surface_error(a, error)
+    if a.json:
+        _out(payload, as_json=True)
+    else:
+        if action == "next":
+            print(f"action: {payload['action']}  "
+                  f"n_task_evals: {payload.get('n_task_evals')}")
+            if payload.get("node_id"):
+                print(f"node: {payload['node_id']}  "
+                      f"commit: {payload.get('commit_id') or '-'}")
+            if payload.get("task"):
+                print(f"task: {payload['task']}")
+            if payload.get("reason"):
+                print(f"reason: {payload['reason']}")
+        else:
+            print(f"nodes: {len(payload['nodes'])}  "
+                  f"n_task_evals: {payload['n_task_evals']}  "
+                  f"tasks: {payload['total_tasks']}")
+            for row in payload["nodes"]:
+                print(f"{row['node_id']}  evals={row['num_evals']}  "
+                      f"mean={row['mean_utility']}  cmp={row['cmp']}")
+    return 0
+
+
 def cmd_audit(a: argparse.Namespace) -> int:
     """``agentdescent audit <run_id> --archive PATH`` -- trace one adoption
     through its evidence rings."""
@@ -4307,6 +4345,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp = predictions_sub.add_parser("report", help="hit rate, Brier and calibration")
     sp.add_argument("--store", required=True)
     sp.set_defaults(fn=cmd_predictions)
+    s = sub.add_parser(
+        "hgm", help="inspect an HGM tree or ask for its next action")
+    hgm_sub = s.add_subparsers(dest="hgm_cmd", required=True)
+    sp = hgm_sub.add_parser("next", help="expand, evaluate or stop next")
+    sp.add_argument("--tree", required=True, help="HGM tree JSON")
+    sp.set_defaults(fn=cmd_hgm)
+    sp = hgm_sub.add_parser("report", help="per-node clade evidence")
+    sp.add_argument("--tree", required=True, help="HGM tree JSON")
+    sp.set_defaults(fn=cmd_hgm)
 
 
 

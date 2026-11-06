@@ -127,6 +127,7 @@ nav:
     - Using the slots — a guide: policy-guide.md
     - Task sampling: sampling.md
     - Candidate selection: selection.md
+    - HGM scheduling: hgm.md
     - Proposal policies: proposal-policies.md
     - Conflict policies: conflict-policies.md
     - Fusion policies: fusion-policies.md
