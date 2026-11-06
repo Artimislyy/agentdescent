@@ -97,13 +97,16 @@ def _evolved(store, tmp_path):
     return json.loads(out)["run_id"], spec
 
 
-def test_apply_after_the_target_already_matches_reports_noop(store, tmp_path, capsys):
+def test_apply_after_the_target_already_matches_reports_noop(store, tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "ad-home"))
     rid, spec = _evolved(store, tmp_path)
     # first apply really changes rules.md (forward -> reverse), and keeps a backup
     first = json.loads(_cli("--store", store, "apply", rid)[1])
     assert first["noop"] is False and "rules.md" in first["written"] and first["backup"]
-    baks = _baks(spec.target)
-    assert len(baks) == 1
+    bak = first["backup"][0]
+    assert os.path.isdir(bak)
+    assert bak.startswith(str(tmp_path / "ad-home" / "backups"))
+    assert _baks(spec.target) == []  # no sibling shadow next to the skill (#758)
     capsys.readouterr()
     # the target now equals the run's tree: nothing to do, no second backup
     for argv in (["apply", rid, "--dry-run"], ["apply", rid]):
@@ -114,7 +117,8 @@ def test_apply_after_the_target_already_matches_reports_noop(store, tmp_path, ca
         assert "rules.md" in plan["unchanged"]
         assert f"nothing to apply: {spec.target} already matches run {rid}" in (
             capsys.readouterr().err)
-    assert _baks(spec.target) == baks
+    assert _baks(spec.target) == []
+    assert os.path.isdir(bak)  # first backup still present
     # `show` reports the same judgement
     shown = cli.show_payload(rid, store=store)
     assert shown["apply_plan"]["noop"] is True and shown["apply_plan"]["written"] == []

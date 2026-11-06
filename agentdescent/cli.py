@@ -2173,9 +2173,11 @@ def apply_from_payload(source: str, *, to: str, dry_run: bool = False,
     ``agentdescent campaign`` leaves its best artifact in a workspace copy and
     keeps no run id, so ``apply <run_id>`` has nothing to point at. This takes
     the artifact path itself and gives it the same guarantees: a dry-run plan,
-    a ``.bak-N`` backup of whatever ``to`` held, and a no-op when ``to`` already
-    matches. Files in ``to`` that the artifact does not have are reported as
-    ``extra`` and left alone.
+    a backup of whatever ``to`` held (sibling ``.bak-N`` for a text file;
+    under ``$AGENTDESCENT_HOME/backups/`` for a directory, so host skill scanners
+    do not load the backup as another skill — #758), and a no-op when ``to``
+    already matches. Files in ``to`` that the artifact does not have are reported
+    as ``extra`` and left alone.
 
     Symlinks are refused (never dereferenced into real files). ``apply
     <run_id>`` materialises from FileTree state, which already skips symlinks
@@ -2284,7 +2286,8 @@ def apply_from_payload(source: str, *, to: str, dry_run: bool = False,
     if dry_run or plan["noop"]:
         return plan
     if backup and os.path.isdir(dest):
-        slot = _backup_slot(dest)
+        from .evolution import _file_tree_backup_path
+        slot = _file_tree_backup_path(dest)
         shutil.copytree(dest, slot, symlinks=True)
         plan["backup"] = [slot]
     for rel in changed:

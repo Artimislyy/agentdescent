@@ -180,8 +180,10 @@ plan = result.write_to("~/.claude/skills/pdf-audit", dry_run=True)
 ```
 
 This is the only call in the package that writes into a directory you care about,
-so it is conservative: `backup=True` (default) copies the directory to
-`<path>.bak-N` first; files present in the target but not in the artifact are
+so it is conservative: `backup=True` (default) copies the directory under
+`$AGENTDESCENT_HOME/backups/<name>-<digest>/bak-N` (not a sibling `<path>.bak-N`,
+which host skill scanners would load as another skill and shadow the evolved
+copy — see #758); files present in the target but not in the artifact are
 reported as `extra` and **left alone** unless `prune=True`; `dry_run=True` returns
 the plan without touching anything. Only files whose content would change are
 `written`; files already identical to the artifact are `unchanged`, and when

@@ -360,7 +360,7 @@ result.write_to(path, backup=True)   # 装回，先备份
 - `evolve_agent_code(path, ..., test_cmd="pytest -q")` → `blast_radius=0.6` + 测试门 + `frozen=["tests/**"]`
 
 `EvolutionResult` 增加 `write_to(path, *, backup=True, dry_run=False)`：
-默认先把原目录复制成 `<path>.bak-<version>`，`dry_run` 打印将写/将删的文件清单。
+默认先把原目录备份到 `$AGENTDESCENT_HOME/backups/`（不放在目标同级，避免 host 把 `.bak` 当 skill 加载），`dry_run` 打印将写/将删的文件清单。
 **这是本设计里唯一会写用户目录的操作，必须显式调用，`evolve` 本身永不写回。**
 
 ### 3.8 成本模型（真实 agent 下，这是首要设计约束）

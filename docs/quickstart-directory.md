@@ -74,7 +74,7 @@ explicit call:
 plan = result.write_to("~/.claude/skills/pdf-audit", dry_run=True)
 # {'written': [...], 'extra': ['notes.md'], 'deleted': [], 'backup': []}
 
-result.write_to("~/.claude/skills/pdf-audit")     # backs up to <path>.bak-0 first
+result.write_to("~/.claude/skills/pdf-audit")     # backs up under ~/.agentdescent/backups/
 ```
 
 ## 3. What happens per rollout

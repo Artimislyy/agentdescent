@@ -1410,6 +1410,30 @@ class FusionStats:
                 f"{self.below_baseline} below baseline), {self.ties} ties")
 
 
+def _file_tree_backup_path(dest: str) -> str:
+    """Return a ``bak-N`` directory that will not sit beside ``dest``.
+
+    Sibling ``<dest>.bak-N`` copies are scanned by host skill loaders (OpenCode,
+    Claude Code) as another skill with the same frontmatter ``name``, so the
+    backup can shadow the evolved tree after ``apply`` (#758). Keep backups
+    under ``$AGENTDESCENT_HOME/backups`` (else ``~/.agentdescent/backups``),
+    keyed by the target basename plus a short digest of the absolute path.
+    """
+    abs_dest = os.path.abspath(dest)
+    raw_name = os.path.basename(abs_dest.rstrip(os.sep)) or "dir"
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", raw_name).strip(".-") or "dir"
+    digest = hashlib.sha256(abs_dest.encode("utf-8")).hexdigest()[:12]
+    home = os.environ.get("AGENTDESCENT_HOME") or os.path.join(
+        os.path.expanduser("~"), ".agentdescent")
+    home = os.path.abspath(os.path.expanduser(home))
+    base = os.path.join(home, "backups", f"{name}-{digest}")
+    os.makedirs(base, exist_ok=True)
+    n = 0
+    while os.path.exists(os.path.join(base, f"bak-{n}")):
+        n += 1
+    return os.path.join(base, f"bak-{n}")
+
+
 @dataclass
 class EvolutionResult:
     state: Dict[str, str]
@@ -1812,8 +1836,13 @@ class EvolutionResult:
         Deliberately conservative, because this is the one call in the whole
         package that writes into a directory the user cares about:
 
-        * ``backup=True`` (default) copies the existing directory to
-          ``<path>.bak-N`` first -- but only when something is about to change;
+        * ``backup=True`` (default) copies the existing directory under
+          ``$AGENTDESCENT_HOME/backups/<name>-<digest>/bak-N`` (or
+          ``~/.agentdescent/backups/...``) first -- but only when something is
+          about to change. The backup is deliberately **not** a sibling of
+          ``path``: hosts that scan a skills folder (OpenCode, Claude Code)
+          would otherwise load ``<name>.bak-0`` as another skill and shadow the
+          evolved copy (#758);
         * files present in the target but **not** in the artifact are reported as
           ``extra`` and left alone unless ``prune=True`` -- the run only ever knew
           about the files its ``TreeSpec`` selected, so deleting by omission would
@@ -1889,11 +1918,9 @@ class EvolutionResult:
         if dry_run or plan["noop"]:
             return plan
         if backup and os.path.isdir(dest):
-            n = 0
-            while os.path.exists(f"{dest}.bak-{n}"):
-                n += 1
-            shutil.copytree(dest, f"{dest}.bak-{n}", symlinks=True)
-            plan["backup"] = [f"{dest}.bak-{n}"]
+            bak = _file_tree_backup_path(dest)
+            shutil.copytree(dest, bak, symlinks=True)
+            plan["backup"] = [bak]
         materialize({rel: self.state[rel] for rel in changed}, dest)
         if prune:
             for rel in extra:

@@ -92,7 +92,7 @@ so:
 ```bash
 agentdescent show  <run_id>              # the diff
 agentdescent apply <run_id> --dry-run    # what it would write
-agentdescent apply <run_id>              # write it, keeping a .bak- backup
+agentdescent apply <run_id>              # write it; dir backup under ~/.agentdescent/backups/
 ```
 
 When a run learns little, `show` also lists the worst rollouts (`samples`:

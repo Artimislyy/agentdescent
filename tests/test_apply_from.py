@@ -16,7 +16,8 @@ def _next_commands(out: str):
     return [ln.strip() for ln in lines[i + 1:] if ln.strip()]
 
 
-def test_campaign_prints_an_apply_path_that_works(tmp_path, capsys):
+def test_campaign_prints_an_apply_path_that_works(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "ad-home"))
     spec = _dir_spec(str(tmp_path))
     path = tmp_path / "spec.json"
     path.write_text(json.dumps(spec.to_dict()))
@@ -41,7 +42,10 @@ def test_campaign_prints_an_apply_path_that_works(tmp_path, capsys):
 
     assert cli.main([a for a in argv[1:] if a != "--dry-run"]) == 0
     done = json.loads(capsys.readouterr().out)
-    assert done["backup"] == [os.path.abspath(spec.target) + ".bak-0"]
+    assert len(done["backup"]) == 1 and os.path.isdir(done["backup"][0])
+    assert done["backup"][0].endswith("bak-0")
+    assert ".agentdescent" in done["backup"][0].replace("\\", "/") or "backups" in done["backup"][0]
+    assert not os.path.exists(os.path.abspath(spec.target) + ".bak-0")
     assert open(os.path.join(done["backup"][0], "rules.md")).read() == original
     assert "evolved line" in open(os.path.join(spec.target, "rules.md")).read()
 
@@ -49,6 +53,7 @@ def test_campaign_prints_an_apply_path_that_works(tmp_path, capsys):
     assert cli.main([a for a in argv[1:] if a != "--dry-run"]) == 0
     again = json.loads(capsys.readouterr().out)
     assert again["noop"] is True
+    assert again["backup"] == []
     assert not os.path.exists(os.path.abspath(spec.target) + ".bak-1")
 
 
@@ -64,7 +69,8 @@ def test_campaign_json_carries_the_next_commands(tmp_path, capsys):
     assert "--from" in out["next"][1] and "--to" in out["next"][1]
 
 
-def test_apply_from_a_text_file_backs_up_and_extra_files_are_left(tmp_path, capsys):
+def test_apply_from_a_text_file_backs_up_and_extra_files_are_left(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "ad-home"))
     src = tmp_path / "evolved.md"
     src.write_text("new prompt\n")
     dest = tmp_path / "prompt.md"
@@ -84,6 +90,8 @@ def test_apply_from_a_text_file_backs_up_and_extra_files_are_left(tmp_path, caps
     res = json.loads(capsys.readouterr().out)
     assert res["extra"] == ["keep.txt"] and (b / "keep.txt").read_text() == "mine"
     assert (b / "SKILL.md").read_text() == "x"
+    assert res["backup"] and "backups" in res["backup"][0]
+    assert not list(tmp_path.glob("b.bak-*"))
 
 
 def test_apply_from_argument_errors(tmp_path, capsys):
