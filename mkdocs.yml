@@ -59,6 +59,7 @@ nav:
     - Install and first run: install.md
     - Start here — the plugin, step by step: plugin-quickstart.md
     - Use it from your agent (DSH / Claude Code / Codex / OpenCode / Grok Bot): plugins.md
+    - MCP / CLI Path A: mcp-path-a.md
     - Set it up and test it: testing-guide.md
     - Quickstart — dataset to skill: quickstart-skill.md
     - Quickstart — evolve a directory: quickstart-directory.md

@@ -10,6 +10,12 @@ command with the same verbs. A run is an evolution: N workers propose edits in
 parallel, a merger keeps the ones that improve held-out reward, and nothing is
 written back until the user says so.
 
+**Path A only by default.** The MCP server exposes doctor → plan → start →
+status/show → apply (plus cancel/resume, diagnose, list/describe/algorithm_spec).
+Do not reach for audit_*, release, platform, experience, or other satellites
+unless the user asked and the server was started with `--advanced` /
+`AGENTDESCENT_MCP_ADVANCED=1`. See docs/mcp-path-a.md.
+
 ## The procedure
 
 1. **`doctor` first.** Report what is missing (worker agent CLI, provider key,

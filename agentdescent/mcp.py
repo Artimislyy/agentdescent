@@ -41,9 +41,10 @@ from .cli import (NESTED_ENV, apply_from_payload, apply_payload, doctor_report,
 from .evolvespec import (EvolveSpec, SpecError, budget_round_overshoot_warning,
                          compose, estimate)
 
-__all__ = ["DEFAULT_HTTP_HOST", "DEFAULT_HTTP_PORT", "RESCAN_ALLOW_ENV", "STREAMABLE_HTTP_REQUIRES", "TRANSPORTS",
-           "Tools", "TOOL_DESCRIPTIONS", "build_server", "is_loopback_host",
-           "rescan_allow_from_env", "serve"]
+__all__ = ["ADVANCED_ENV", "DEFAULT_HTTP_HOST", "DEFAULT_HTTP_PORT", "PATH_A_TOOLS",
+           "RESCAN_ALLOW_ENV", "STREAMABLE_HTTP_REQUIRES", "TRANSPORTS",
+           "Tools", "TOOL_DESCRIPTIONS", "advanced_from_env", "build_server",
+           "is_loopback_host", "rescan_allow_from_env", "serve"]
 
 #: Comma-separated import prefixes `audit_rescan` may resolve beyond this
 #: package, read from the operator's environment.
@@ -65,6 +66,24 @@ def rescan_allow_from_env(environ: Optional[Dict[str, str]] = None
     """
     raw = (environ if environ is not None else os.environ).get(RESCAN_ALLOW_ENV, "")
     return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+#: Default MCP discovery set (#803): doctor → plan → start → status/show → apply,
+#: plus cancel/resume, diagnose, and algorithm discovery/spec builders. Everything
+#: else (audit_*, release, platform, experience, …) stays in the package but is
+#: only registered when ``advanced=True`` / ``AGENTDESCENT_MCP_ADVANCED=1``.
+PATH_A_TOOLS = frozenset({
+    "doctor", "plan", "start", "status", "show", "apply", "cancel", "resume",
+    "diagnose", "list_algorithms", "describe_algorithm", "algorithm_spec",
+})
+ADVANCED_ENV = "AGENTDESCENT_MCP_ADVANCED"
+
+
+def advanced_from_env(environ: Optional[Dict[str, str]] = None) -> bool:
+    """True when the operator opted into the full MCP tool surface."""
+    raw = (environ if environ is not None else os.environ).get(ADVANCED_ENV, "")
+    return raw.strip().lower() not in ("", "0", "false", "no", "off")
+
 
 #: Written for the calling model: what the tool is for and what to do around it.
 TOOL_DESCRIPTIONS: Dict[str, str] = {
@@ -1091,8 +1110,18 @@ def _server_class():
 
 
 def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
-                 rescan_allow: Optional[Sequence[str]] = None):
-    """An MCP server with every tool in :data:`TOOL_DESCRIPTIONS` and two resources."""
+                 rescan_allow: Optional[Sequence[str]] = None,
+                 advanced: Optional[bool] = None):
+    """An MCP server with Path A tools by default, or the full set when advanced.
+
+    ``advanced=None`` reads :data:`ADVANCED_ENV` (``AGENTDESCENT_MCP_ADVANCED``).
+    Path A is doctor → plan → start → status/show → apply (+ cancel/resume,
+    diagnose, list/describe/algorithm_spec). Satellite tools keep the same
+    names/contracts when advanced is on (#803).
+    """
+    if advanced is None:
+        advanced = advanced_from_env()
+    active = set(TOOL_DESCRIPTIONS) if advanced else set(PATH_A_TOOLS)
     server_cls = _server_class()
     # `version` only where the constructor takes it: mcp 2.x does, and without it
     # `initialize` answers with an empty string, so every host that shows the
@@ -1101,15 +1130,32 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
     extra: Dict[str, Any] = {}
     if "version" in inspect.signature(server_cls.__init__).parameters:
         extra["version"] = __version__
+    path_a_line = (
+        "Path A (default tools): doctor -> write an EvolveSpec -> plan (show the "
+        "user) -> start -> status (once a round) -> show -> ask -> apply; "
+        "list_algorithms / describe_algorithm / algorithm_spec when naming a method; "
+        "cancel / resume / diagnose as needed."
+    )
+    advanced_line = (
+        " Advanced tools (audit_*, release, platform, experience, …) are also "
+        "registered on this server."
+        if advanced else
+        " Advanced tools (audit_*, release, platform, experience, …) are hidden; "
+        "restart with --advanced or AGENTDESCENT_MCP_ADVANCED=1 to expose them."
+    )
     server = server_cls(name, **extra, instructions=(
         "AgentDescent evolves skills, agent definitions, prompts, code and host plugins "
-        "against examples with a parallel, merge-based optimiser. Workflow: doctor -> "
-        "write an EvolveSpec -> plan (show the user) -> start -> status (once a round) -> "
-        "show -> ask -> apply. The audit_* tools are a separate axis and take a JSONL "
-        "path, not a run_id: when a run's reward was an agent judging an output rather "
-        "than a fact about it, the loop was optimising a proxy, and audit_status is the "
-        "only thing that can tell the user how far that proxy is from the truth."))
+        "against examples with a parallel, merge-based optimiser. " + path_a_line
+        + advanced_line))
     t = Tools(store, rescan_allow=rescan_allow)
+
+    def maybe_tool(tool_name: str):
+        """Register ``tool_name`` only when it is in the active discovery set."""
+        def deco(fn):
+            if tool_name in active:
+                return server.tool(description=TOOL_DESCRIPTIONS[tool_name])(fn)
+            return fn
+        return deco
 
     def attach_bridge(ctx: Any, loop: Any) -> None:
         """Stand up the sampling bridge the first time a launching tool runs.
@@ -1157,24 +1203,24 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             # proposes nothing and looks like a run that simply learned nothing.
             t.bridge, t.bridge_error = None, f"{type(e).__name__}: {e}"
 
-    @server.tool(description=TOOL_DESCRIPTIONS["doctor"])
+    @maybe_tool("doctor")
     def doctor(home: Optional[str] = None) -> Dict[str, Any]:
         return t.doctor(home)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["list_algorithms"])
+    @maybe_tool("list_algorithms")
     def list_algorithms(kind: Optional[str] = None) -> Dict[str, Any]:
         return t.list_algorithms(kind)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["describe_algorithm"])
+    @maybe_tool("describe_algorithm")
     def describe_algorithm(name: str) -> Dict[str, Any]:
         return t.describe_algorithm(name)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["rsi"])
+    @maybe_tool("rsi")
     def rsi(archive: Optional[str] = None, slot: Optional[str] = None,
             stagnation_window: int = 3) -> Dict[str, Any]:
         return t.rsi(archive, slot, stagnation_window)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["algorithm_spec"])
+    @maybe_tool("algorithm_spec")
     def algorithm_spec(name: str, path: str, cases: Optional[str] = None,
                        kind: Optional[str] = None,
                        params: Optional[Dict[str, Any]] = None,
@@ -1186,7 +1232,7 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
         return t.algorithm_spec(name, path, cases, kind, params, rounds, workers,
                                 agent, model, base_url, key_env, out, usd_per_call)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["plan"])
+    @maybe_tool("plan")
     def plan(spec: Dict[str, Any], usd_per_call: Optional[float] = None,
              budget_usd: Optional[float] = None) -> Dict[str, Any]:
         return t.plan(spec, usd_per_call, budget_usd)
@@ -1209,17 +1255,17 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             lambda: t.start(spec, budget_usd, usd_per_call))
 
     start.__annotations__["ctx"] = context_cls
-    server.tool(description=TOOL_DESCRIPTIONS["start"])(start)
+    maybe_tool("start")(start)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["status"])
+    @maybe_tool("status")
     def status(run_id: Optional[str] = None) -> Any:
         return t.status(run_id)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["show"])
+    @maybe_tool("show")
     def show(run_id: str, diff: bool = True) -> Dict[str, Any]:
         return t.show(run_id, diff)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["diagnose"])
+    @maybe_tool("diagnose")
     def diagnose(run_id: str) -> Dict[str, Any]:
         return t.diagnose(run_id)
 
@@ -1238,9 +1284,9 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
     apply.__annotations__["from_"] = Annotated[
         Optional[str],
         _Field(validation_alias="from", serialization_alias="from")]
-    server.tool(description=TOOL_DESCRIPTIONS["apply"])(apply)
+    maybe_tool("apply")(apply)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["cancel"])
+    @maybe_tool("cancel")
     def cancel(run_id: str) -> Dict[str, Any]:
         return t.cancel(run_id)
 
@@ -1255,27 +1301,27 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             lambda: t.resume(run_id, budget_usd, usd_per_call))
 
     resume.__annotations__["ctx"] = context_cls
-    server.tool(description=TOOL_DESCRIPTIONS["resume"])(resume)
+    maybe_tool("resume")(resume)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_status"])
+    @maybe_tool("audit_status")
     def audit_status(path: str, version: Optional[str] = None) -> Dict[str, Any]:
         return t.audit_status(path, version)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_pending"])
+    @maybe_tool("audit_pending")
     def audit_pending(path: str, limit: int = 50, older_than: Optional[float] = None,
                       version: Optional[str] = None,
                       order: str = "dispatched") -> Dict[str, Any]:
         return t.audit_pending(path, limit, older_than, version, order)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_resolve"])
+    @maybe_tool("audit_resolve")
     def audit_resolve(path: str, record_id: str, oracle_score: float) -> Dict[str, Any]:
         return t.audit_resolve(path, record_id, oracle_score)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_recompute"])
+    @maybe_tool("audit_recompute")
     def audit_recompute(path: str, version: Optional[str] = None) -> Dict[str, Any]:
         return t.audit_recompute(path, version)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_scorecard"])
+    @maybe_tool("audit_scorecard")
     def audit_scorecard(path: str, version: Optional[str] = None,
                         previous: Optional[str] = None,
                         max_false_negative: float = 0.05,
@@ -1284,21 +1330,21 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
         return t.audit_scorecard(path, version, previous, max_false_negative,
                                  verifier_seconds, oracle_seconds)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_rescan"])
+    @maybe_tool("audit_rescan")
     def audit_rescan(path: str, verifier: str, version: Optional[str] = None,
                      pairs: Optional[list] = None) -> Dict[str, Any]:
         return t.audit_rescan(path, verifier, version, pairs)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_drift"])
+    @maybe_tool("audit_drift")
     def audit_drift(path: str, versions: Optional[list] = None) -> Dict[str, Any]:
         return t.audit_drift(path, versions)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["safety"])
+    @maybe_tool("safety")
     def safety(archive: Optional[str] = None, audit: Optional[str] = None,
                bias_threshold: float = 0.1, min_exam: str = "passed") -> Dict[str, Any]:
         return t.safety(archive, audit, bias_threshold, min_exam)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["release"])
+    @maybe_tool("release")
     def release(before: Dict[str, float], after: Dict[str, float],
                 artifact_id: str, artifact_hash: str, key_id: str,
                 rules: Optional[Dict[str, Any]] = None,
@@ -1323,33 +1369,33 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             proxy_gains=proxy_gains, oracle_gains=oracle_gains,
             issuer=issuer, run_id=run_id, kind=kind, metadata=metadata)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["release_verify"])
+    @maybe_tool("release_verify")
     def release_verify(receipt: str, key_id: Optional[str] = None,
                        lineage: Optional[str] = None) -> Dict[str, Any]:
         return t.release_verify(
             receipt, key_id=key_id, lineage=lineage)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["tenant"])
+    @maybe_tool("tenant")
     def tenant(spec: Dict[str, Any], dry_run: bool = False,
                out: Optional[str] = None) -> Dict[str, Any]:
         return t.tenant(spec, dry_run=dry_run, out=out)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["meta_campaign"])
+    @maybe_tool("meta_campaign")
     def meta_campaign(spec: Dict[str, Any], dry_run: bool = False,
                       out: Optional[str] = None) -> Dict[str, Any]:
         return t.meta_campaign(spec, dry_run=dry_run, out=out)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["governed_harness"])
+    @maybe_tool("governed_harness")
     def governed_harness(spec: Dict[str, Any], dry_run: bool = False,
                          out: Optional[str] = None) -> Dict[str, Any]:
         return t.governed_harness(spec, dry_run=dry_run, out=out)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["platform"])
+    @maybe_tool("platform")
     def platform(spec: Dict[str, Any], dry_run: bool = False,
                  out: Optional[str] = None) -> Dict[str, Any]:
         return t.platform(spec, dry_run=dry_run, out=out)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["platform_status"])
+    @maybe_tool("platform_status")
     def platform_status(runs_db: str, tenant: Optional[str] = None,
                         workspace: Optional[str] = None,
                         run_id: Optional[str] = None,
@@ -1358,12 +1404,12 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             runs_db, tenant=tenant, workspace=workspace,
             run_id=run_id, limit=limit)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["capability"])
+    @maybe_tool("capability")
     def capability(spec: Dict[str, Any], dry_run: bool = False,
                    out: Optional[str] = None) -> Dict[str, Any]:
         return t.capability(spec, dry_run=dry_run, out=out)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["ops"])
+    @maybe_tool("ops")
     def ops(runs_db: str, tenant: str, workspace: str,
             dry_run: bool = False, min_acceptance: float = 0.0,
             max_cost_per_accepted: Optional[float] = None,
@@ -1375,7 +1421,7 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             max_cost_per_accepted=max_cost_per_accepted,
             out=out, prometheus=prometheus)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["experience_cycle"])
+    @maybe_tool("experience_cycle")
     def experience_cycle(store: Optional[str], records: Any,
                          validation: Any = None, anchors: Any = None,
                          actions: Any = None, dim: int = 0,
@@ -1391,20 +1437,20 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             min_gain=min_gain, seed=seed, require_anchors=require_anchors,
             anchor_tolerance=anchor_tolerance, features=features, k=k)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["experience_report"])
+    @maybe_tool("experience_report")
     def experience_report(store: Optional[str] = None) -> Dict[str, Any]:
         return t.experience_report(store)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["experience_ingest"])
+    @maybe_tool("experience_ingest")
     def experience_ingest(store: Optional[str], records: Any) -> Dict[str, Any]:
         return t.experience_ingest(store, records)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["experience_recall"])
+    @maybe_tool("experience_recall")
     def experience_recall(store: Optional[str], features: Any,
                           k: int = 5) -> Dict[str, Any]:
         return t.experience_recall(store, features, k)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["experience_update"])
+    @maybe_tool("experience_update")
     def experience_update(store: Optional[str], validation: Any, anchors: Any,
                           actions: Any, dim: int,
                           learning_rate: float = 0.2, l2: float = 1e-3,
@@ -1417,7 +1463,7 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             min_gain=min_gain, seed=seed, require_anchors=require_anchors,
             anchor_tolerance=anchor_tolerance)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["experience_replay"])
+    @maybe_tool("experience_replay")
     def experience_replay(source: str, store: Optional[str], pairs: Any,
                           actions: Any, dim: int, k: int = 5,
                           learning_rate: float = 0.2, l2: float = 1e-3,
@@ -1428,19 +1474,19 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
             learning_rate=learning_rate, l2=l2, replay_size=replay_size,
             min_gain=min_gain, seed=seed)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["portfolio"])
+    @maybe_tool("portfolio")
     def portfolio(archive: Optional[str] = None, floor: float = 0.05,
                   min_samples: int = 3, grow: float = 0.5, shrink: float = 0.5,
                   cap: Optional[float] = None) -> Dict[str, Any]:
         return t.portfolio(archive, floor, min_samples, grow, shrink, cap)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["audit_trace"])
+    @maybe_tool("audit_trace")
     def audit_trace(run_id: str, archive: Optional[str] = None,
                     meta_audit: Optional[str] = None, inner_audit: Optional[str] = None,
                     bias_threshold: float = 0.1) -> Dict[str, Any]:
         return t.audit_trace(run_id, archive, meta_audit, inner_audit, bias_threshold)
 
-    @server.tool(description=TOOL_DESCRIPTIONS["traces_digest"])
+    @maybe_tool("traces_digest")
     def traces_digest(events: str, run_id: Optional[str] = None,
                       task_id: Optional[str] = None,
                       signature: Optional[str] = None, limit: int = 50,
@@ -1490,7 +1536,8 @@ def is_loopback_host(host: str) -> bool:
 
 
 def serve(store: Optional[str] = None, *, transport: str = "stdio",
-          host: str = DEFAULT_HTTP_HOST, port: int = DEFAULT_HTTP_PORT) -> None:
+          host: str = DEFAULT_HTTP_HOST, port: int = DEFAULT_HTTP_PORT,
+          advanced: Optional[bool] = None) -> None:
     """Serve until the host closes the pipe (stdio) or the process is stopped.
 
     ``streamable-http`` listens on ``host:port`` at ``/mcp``. The host/port go
@@ -1501,7 +1548,7 @@ def serve(store: Optional[str] = None, *, transport: str = "stdio",
     """
     if transport not in TRANSPORTS:
         raise ValueError(f"unknown transport {transport!r}; expected one of {TRANSPORTS}")
-    server = build_server(store)
+    server = build_server(store, advanced=advanced)
     if transport == "stdio":
         server.run("stdio")
         return

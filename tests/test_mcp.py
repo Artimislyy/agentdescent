@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from agentdescent import runstore
-from agentdescent.mcp import TOOL_DESCRIPTIONS, Tools, build_server
+from agentdescent.mcp import PATH_A_TOOLS, TOOL_DESCRIPTIONS, Tools, build_server
 from agentdescent.cli import NESTED_ENV
 
 from tests.test_evolvespec import _dir_spec  # noqa: F401
@@ -112,15 +112,18 @@ def test_resources_are_json(store, tmp_path):
     assert "error" in json.loads(t.rounds_resource("nope"))
 
 
-def test_standalone_mcp_guide_lists_every_registered_tool():
+def test_standalone_mcp_guide_lists_path_a_and_advanced_sets():
     guide = (
         Path(__file__).resolve().parents[1] / "docs" / "testing-guide.md"
     ).read_text()
-    expected = re.search(r"Expected tools: `([^`]+)`", guide)
-    assert expected is not None
-    documented = set(expected.group(1).split())
-    assert documented == set(TOOL_DESCRIPTIONS)
-    assert len(documented) == 39
+    path_a = re.search(r"Expected tools \(Path A default\): `([^`]+)`", guide)
+    assert path_a is not None
+    assert set(path_a.group(1).split()) == set(PATH_A_TOOLS)
+    assert len(PATH_A_TOOLS) == 12
+    full = re.search(r"full set is also registered: `([^`]+)`", guide)
+    assert full is not None
+    assert set(full.group(1).split()) == set(TOOL_DESCRIPTIONS)
+    assert len(TOOL_DESCRIPTIONS) == 39
 
 
 def test_every_tool_has_a_description_written_for_the_model():
@@ -136,15 +139,16 @@ def test_every_tool_has_a_description_written_for_the_model():
 # ---------------------------------------------------------------------------
 
 
-def test_server_registers_every_tool_and_both_resources(store):
+def test_server_registers_path_a_by_default_and_both_resources(store):
     pytest.importorskip("mcp")
     import asyncio
 
-    server = build_server(store)
+    server = build_server(store, advanced=False)
 
     async def go():
         tools = {t.name for t in await server.list_tools()}
-        assert tools == set(TOOL_DESCRIPTIONS)
+        assert tools == set(PATH_A_TOOLS)
+        assert "audit_status" not in tools
         uris = {str(r.uri) for r in await server.list_resources()}
         assert "agentdescent://runs" in uris
         templates = await server.list_resource_templates()
@@ -155,6 +159,34 @@ def test_server_registers_every_tool_and_both_resources(store):
 
     res = asyncio.run(go())
     assert res is not None
+
+
+def test_server_registers_every_tool_when_advanced(store):
+    pytest.importorskip("mcp")
+    import asyncio
+
+    server = build_server(store, advanced=True)
+
+    async def go():
+        tools = {t.name for t in await server.list_tools()}
+        assert tools == set(TOOL_DESCRIPTIONS)
+        assert "audit_status" in tools and "plan" in tools
+
+    asyncio.run(go())
+
+
+def test_advanced_env_opts_into_full_tool_set(store, monkeypatch):
+    pytest.importorskip("mcp")
+    import asyncio
+    from agentdescent.mcp import ADVANCED_ENV
+
+    monkeypatch.setenv(ADVANCED_ENV, "1")
+    server = build_server(store)  # advanced=None → env
+
+    async def go():
+        return {t.name for t in await server.list_tools()}
+
+    assert asyncio.run(go()) == set(TOOL_DESCRIPTIONS)
 
 
 def test_status_with_no_runs_still_says_something(store):

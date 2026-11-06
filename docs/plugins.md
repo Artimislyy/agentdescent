@@ -221,6 +221,12 @@ enforces its shape:
 doctor  →  write a spec  →  plan (show the user)  →  start  →  status (once a round)  →  show  →  ask  →  apply
 ```
 
+That loop is **Path A** — the default MCP tool listing and the verbs to teach a
+host first ([MCP Path A](mcp-path-a.md)). Audit / release / platform /
+experience and the other satellites stay available behind
+`agentdescent mcp --advanced` (or `AGENTDESCENT_MCP_ADVANCED=1`); do not present
+all ~39 tools as the primary path.
+
 * **`plan` is separate from `start`.** `plan` resolves every reference, loads
   the data and builds the policy bundle without running anything, then returns
   the composed `evolve()` arguments and an upper bound on agent calls. A wrong

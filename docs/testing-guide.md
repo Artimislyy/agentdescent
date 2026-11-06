@@ -473,7 +473,7 @@ async def main():
 asyncio.run(main())
 ```
 
-Expected tools: `algorithm_spec apply audit_drift audit_pending audit_recompute audit_rescan audit_resolve audit_scorecard audit_status audit_trace cancel capability describe_algorithm diagnose doctor experience_cycle experience_ingest experience_recall experience_replay experience_report experience_update governed_harness list_algorithms meta_campaign ops plan platform platform_status portfolio release release_verify resume rsi safety show start status tenant traces_digest` and a doctor report (39 total: run lifecycle, audit, algorithm discovery and spec building, archive/meta, release, and the platform/capability/ops/experience/governed-harness/meta-campaign/tenant surfaces).
+Expected tools (Path A default): `algorithm_spec apply cancel describe_algorithm diagnose doctor list_algorithms plan resume show start status` (12 tools). With `agentdescent mcp --advanced` / `AGENTDESCENT_MCP_ADVANCED=1`, the full set is also registered: `algorithm_spec apply audit_drift audit_pending audit_recompute audit_rescan audit_resolve audit_scorecard audit_status audit_trace cancel capability describe_algorithm diagnose doctor experience_cycle experience_ingest experience_recall experience_replay experience_report experience_update governed_harness list_algorithms meta_campaign ops plan platform platform_status portfolio release release_verify resume rsi safety show start status tenant traces_digest` (39 total). See [MCP Path A](mcp-path-a.md).
 
 ## 7. The web panel
 

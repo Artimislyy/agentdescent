@@ -26,6 +26,8 @@ agentdescent demo                         # a complete evolution, offline, no AP
 agentdescent doctor                       # which agent CLIs and provider keys this machine has
 ```
 
+Host / MCP default loop is **Path A** (`doctor` → `plan` → `start` → `apply`); advanced MCP tools need `agentdescent mcp --advanced` — see [docs/mcp-path-a.md](docs/mcp-path-a.md).
+
 `[mcp]` adds the agent-facing MCP server and needs Python ≥ 3.10; the library
 itself supports 3.9, where you drop `[mcp]` and drive it with the CLI. Research examples are outside the wheel: to run
 `python -m examples.run_demo` or any algorithm port, clone the repo and follow

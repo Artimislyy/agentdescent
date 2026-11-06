@@ -141,7 +141,7 @@ def test_mcp1x_non_loopback_drops_loopback_host_pin(monkeypatch, host, keeps_pin
     import agentdescent.mcp as m
 
     fake = _Fake1xServer()
-    monkeypatch.setattr(m, "build_server", lambda store=None: fake)
+    monkeypatch.setattr(m, "build_server", lambda store=None, **kw: fake)
     m.serve(transport="streamable-http", host=host, port=9)
     assert fake.ran == "streamable-http"
     assert fake.settings.host == host and fake.settings.port == 9
@@ -171,7 +171,7 @@ def test_serve_rejects_streamable_http_on_pre_1_8_sdk(monkeypatch):
     import agentdescent.mcp as m
 
     fake = _FakePre18Server()
-    monkeypatch.setattr(m, "build_server", lambda store=None: fake)
+    monkeypatch.setattr(m, "build_server", lambda store=None, **kw: fake)
     with pytest.raises(RuntimeError, match=r"streamable-http needs mcp>=1\.8"):
         m.serve(transport="streamable-http", host="127.0.0.1", port=9)
     assert fake.ran is None
@@ -181,7 +181,7 @@ def test_cmd_mcp_streamable_http_on_pre_1_8_exits_with_actionable_message(monkey
     import agentdescent.mcp as m
 
     fake = _FakePre18Server()
-    monkeypatch.setattr(m, "build_server", lambda store=None: fake)
+    monkeypatch.setattr(m, "build_server", lambda store=None, **kw: fake)
     rc = main(["mcp", "--transport", "streamable-http", "--port", str(_free_port())])
     assert rc == 3
     err = capsys.readouterr().err

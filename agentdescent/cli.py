@@ -6,7 +6,9 @@ Claude Code or DeepSeek Harness can be inspected from a shell and a run started
 from a shell can be picked up by an agent. The skill file falls back to these
 commands on a host with no MCP.
 
-    agentdescent demo                                               run one, offline, no key
+**Path A** (the default host loop — start here)::
+
+    agentdescent doctor                                             what is installed
     agentdescent init    <path> [--kind ...] [--data cases.jsonl]   write a starter spec
     agentdescent plan    <spec.json>                                validate + cost, no run
     agentdescent evolve  <spec.json> [--detach] [--budget USD]      start a run
@@ -14,21 +16,19 @@ commands on a host with no MCP.
     agentdescent watch   <run_id>                                   follow rounds
     agentdescent show    <run_id> [--diff]                          the evolved tree
     agentdescent apply   <run_id> [--to PATH] [--dry-run]           install it, backed up
-    agentdescent apply   --from PATH --to PATH [--dry-run]          install an on-disk artifact
-    agentdescent cancel  <run_id>
-    agentdescent resume  <run_id>
-    agentdescent portfolio [archive]                          rank layers, reallocate budget
-    agentdescent exam     [archive] --domain module:builder    re-judge adoptions with an oracle
-    agentdescent audit    <run_id> --archive PATH              trace an adoption's evidence rings
-    agentdescent doctor                                             what is installed
-    agentdescent --version                                          which AgentDescent this is
-    agentdescent install <dsh|claude-code|codex|opencode|grok-bot>  wire a host
-    agentdescent uninstall <dsh|claude-code|codex|opencode|grok-bot> undo `install`
-    agentdescent algorithms list [--kind K] | show <name> | run …   named algorithms for a spec
-    agentdescent mcp                                                serve over stdio
+    agentdescent cancel  <run_id>  /  resume <run_id>
+    agentdescent algorithms list|show|run …                         named Algorithm cards
+    agentdescent demo                                               one offline run, no key
+    agentdescent mcp [--advanced]                                   MCP: Path A by default
+
+**Advanced** (opt-in; MCP needs ``--advanced`` / ``AGENTDESCENT_MCP_ADVANCED=1``)::
+
+    agentdescent portfolio / exam / audit / safety / release / …
+    agentdescent install|uninstall <host>                           wire a host
     agentdescent serve   [--port N]                                 read-only run panel
 
-``argparse`` only: the CLI is in the core and the core has no dependencies.
+See ``docs/mcp-path-a.md``. ``argparse`` only: the CLI is in the core and the
+core has no dependencies.
 """
 
 from __future__ import annotations
@@ -4205,10 +4205,12 @@ def cmd_mcp(a: argparse.Namespace) -> int:
         print(f"agentdescent mcp: streamable-http on http://{host}:{port}/mcp",
               file=sys.stderr)
     try:
+        advanced = True if getattr(a, "advanced", False) else None
         if transport == "stdio":
-            serve(store=a.store)
+            serve(store=a.store, advanced=advanced)
         else:
-            serve(store=a.store, transport=transport, host=host, port=port)
+            serve(store=a.store, transport=transport, host=host, port=port,
+                  advanced=advanced)
     except ImportError as e:
         print(f"agentdescent mcp: cannot start the MCP server -- {_mcp_import_failure(e)}",
               file=sys.stderr)
@@ -4982,6 +4984,10 @@ def build_parser() -> argparse.ArgumentParser:
                         "bound, e.g. already in use")
     s.add_argument("--allow-remote", action="store_true",
                    help="allow a non-loopback --host (the tools can start runs and write files)")
+    s.add_argument("--advanced", action="store_true",
+                   help="expose audit/meta/platform/experience/… MCP tools "
+                        "(default: Path A only — doctor/plan/start/status/show/apply/…; "
+                        "also AGENTDESCENT_MCP_ADVANCED=1)")
     s.set_defaults(fn=cmd_mcp)
 
     sub.metavar = "{" + ",".join(n for n in sub.choices if n not in _INTERNAL_COMMANDS) + "}"
