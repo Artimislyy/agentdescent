@@ -148,8 +148,9 @@ def run_guarded(spec: EvolveSpec, *, acceptance: Optional[Any] = None,
         notes.append("no acceptance injected")
     if comp.kwargs.get("aggregator_factory") is not None:
         notes.append(
-            "algorithm aggregator_factory is installed; the injected acceptance "
-            "is not consulted by that merge path")
+            "algorithm aggregator_factory is installed; merge Policies "
+            "(including injected acceptance) are forwarded into the factory / "
+            "applied on the aggregator when it exposes the slots (#807)")
 
     result = comp.run()
     decision = None

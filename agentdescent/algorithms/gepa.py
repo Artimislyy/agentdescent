@@ -73,9 +73,23 @@ class ParetoAggregator(AggregatorProtocol):
     def __init__(self, ledger: Ledger, verifier, audit, config, policy,
                  artifact_id: str = "gepa_prompt", seed: int = 0,
                  eval_concurrency: int = 8, merge_round=None,
-                 selection: Optional["ParetoFrontier"] = None):
+                 selection: Optional["ParetoFrontier"] = None,
+                 acceptance=None, fusion=None, conflict=None,
+                 promotion=None, screen=None):
         self.ledger = ledger
         self.eval_concurrency = eval_concurrency
+        #: Optional ``AcceptancePolicy`` from ``Policies(acceptance=…)``. When
+        #: set, a survivor that cleared the delta gate still needs this policy's
+        #: yes before it enters the Pareto pool (#807).
+        self.acceptance = acceptance
+        # ``fusion=`` is the Policies name for the same seat as ``merge_round``.
+        if merge_round is None and fusion is not None:
+            merge_round = fusion
+        # conflict/promotion/screen are accepted so evolve can compose them
+        # without orphaning; GEPA's loop does not consult them yet.
+        self.conflict = conflict
+        self.promotion = promotion
+        self.screen = screen
         #: Optional :class:`~agentdescent.policies.FusionPolicy`. When set, the
         #: round's surviving diffs are combined into **one** candidate before
         #: admission, so the pool grows by one per round instead of one per
@@ -266,6 +280,22 @@ class ParetoAggregator(AggregatorProtocol):
                 continue
             survivors.append(card.diff)
 
+        if self.acceptance is not None and survivors:
+            from agentdescent.policies import MergeContext
+            kept = []
+            n = max(1, len(self.verifier.held_out))
+            for diff in survivors:
+                cand = head.apply(diff)
+                base = head.score(self.verifier.held_out)
+                em = cand.score(self.verifier.held_out)
+                decision = self.acceptance.accept(MergeContext(
+                    artifact=head, candidate=cand, cards=list(cards),
+                    base_counts=(base * n, (1 - base) * n),
+                    cand_counts=(em * n, (1 - em) * n), diff=diff))
+                if decision.accept:
+                    kept.append(diff)
+            survivors = kept
+
         # **One candidate per round instead of one per worker.** Admission is what
         # this aggregator pays for: every candidate that enters the pool is scored
         # across the whole of D_pareto, so a round from N workers costs N sweeps.
@@ -321,14 +351,26 @@ class ParetoAggregator(AggregatorProtocol):
 def pareto_aggregator_factory(artifact_id: str = "gepa_prompt", seed: int = 0,
                               eval_concurrency: int = 8, merge_round=None):
     """Build the `aggregator_factory=` callable evolve() expects, capturing the
-    live aggregator in `.last` so the example can read GEPA's best candidate."""
-    holder = {}
+    live aggregator in `.last` so the example can read GEPA's best candidate.
 
-    def factory(ledger, verifier, audit, config, policy):
-        agg = ParetoAggregator(ledger, verifier, audit, config, policy,
-                               artifact_id=artifact_id, seed=seed,
-                               eval_concurrency=eval_concurrency,
-                               merge_round=merge_round)
+    ``evolve`` forwards merge-side ``Policies`` into this factory (#807):
+    ``fusion`` fills ``merge_round`` when the capture left it empty, and
+    ``acceptance`` / ``conflict`` / ``promotion`` / ``screen`` land on the
+    aggregator so a caller does not have to strip the bundle.
+    """
+    holder = {}
+    default_merge = merge_round
+
+    def factory(ledger, verifier, audit, config, policy,
+                acceptance=None, fusion=None, conflict=None,
+                promotion=None, screen=None, **_ignored):
+        agg = ParetoAggregator(
+            ledger, verifier, audit, config, policy,
+            artifact_id=artifact_id, seed=seed,
+            eval_concurrency=eval_concurrency,
+            merge_round=default_merge if default_merge is not None else fusion,
+            acceptance=acceptance, fusion=fusion, conflict=conflict,
+            promotion=promotion, screen=screen)
         holder["agg"] = agg
         return agg
 

@@ -374,11 +374,21 @@ class StrictGateAggregator(AggregatorProtocol):
 
 def strict_gate_factory(ctx: SkillOptContext, *, artifact_id: str = "skill_document",
                         acceptance: Optional[StrictImprovement] = None):
-    """The `aggregator_factory=` evolve() expects for SkillOpt."""
-    def factory(ledger, verifier, audit, config, policy):
-        return StrictGateAggregator(ledger, verifier, ctx,
-                                    artifact_id=artifact_id,
-                                    acceptance=acceptance)
+    """The `aggregator_factory=` evolve() expects for SkillOpt.
+
+    Merge-side ``Policies`` (``acceptance=``, ``fusion=``) are forwarded by
+    ``evolve`` into this factory (#807); a caller-supplied acceptance wins over
+    the captured default, and ``fusion`` lands on ``merge_round``.
+    """
+    default_acceptance = acceptance
+
+    def factory(ledger, verifier, audit, config, policy,
+                acceptance=None, fusion=None, **_ignored):
+        return StrictGateAggregator(
+            ledger, verifier, ctx, artifact_id=artifact_id,
+            acceptance=(acceptance if acceptance is not None
+                        else default_acceptance),
+            merge_round=fusion)
     return factory
 
 

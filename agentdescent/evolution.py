@@ -871,7 +871,12 @@ def _publish_stable(aggregator) -> None:
 _WIRED_POLICIES = ("task_sampler", "selection", "proposal", "conflict", "fusion",
                    "acceptance", "promotion", "staleness", "verifier", "ledger",
                    "aggregator_factory", "eval_cache", "sandbox_spec", "evaluator",
-                   "executor", "screen")
+                   "executor", "screen", "accept_orphaned_merge_policies")
+
+#: Merge-side Policies the default Aggregator (and population_factory) wire.
+#: An aggregator_factory that cannot take them used to warn and drop them;
+#: #807 fails that combination unless accept_orphaned_merge_policies=True.
+_MERGE_POLICY_NAMES = ("conflict", "fusion", "acceptance", "promotion", "screen")
 
 #: The same bundle, minus the one field the barrier-free loop does not read.
 #: `async_evolve`'s worker calls `eng.run` directly; there is no executor seam in
@@ -881,6 +886,85 @@ _WIRED_POLICIES = ("task_sampler", "selection", "proposal", "conflict", "fusion"
 #: executor started working on the synchronous path: flipping
 #: `asynchronous=True` would otherwise silently stop honouring it.
 _ASYNC_WIRED_POLICIES = tuple(p for p in _WIRED_POLICIES if p != "executor")
+
+
+
+def _requested_merge_policies(pol) -> list:
+    return [name for name in _MERGE_POLICY_NAMES
+            if getattr(pol, name, None) is not None]
+
+
+def _apply_merge_policies(aggregator, pol) -> list:
+    """Attach merge-side Policies onto an aggregator that exposes the seats.
+
+    ``PopulationAggregator`` / ``Aggregator`` store them as ``*_policy`` at
+    construction (``population_factory`` closes over the Policies values);
+    mechanism cards such as GEPA/SkillOpt expose ``acceptance`` and often
+    ``merge_round`` as the fusion seat. Returns the names that landed.
+    """
+    applied = []
+    for name in _MERGE_POLICY_NAMES:
+        val = getattr(pol, name, None)
+        if val is None:
+            continue
+        attrs = [name]
+        if name == "fusion":
+            attrs.append("merge_round")
+        attrs.append(f"{name}_policy")
+        landed = False
+        for attr in attrs:
+            if not hasattr(aggregator, attr):
+                continue
+            current = getattr(aggregator, attr)
+            if current is None:
+                try:
+                    setattr(aggregator, attr, val)
+                except AttributeError:
+                    continue
+                if attr == "merge_round" and hasattr(val, "bind"):
+                    binder = getattr(aggregator, "verifier", None)
+                    if binder is not None:
+                        val.bind(binder)
+                landed = True
+                break
+            if current is val:
+                # Factory already closed this Policies value into the seat
+                # (Aggregator uses ``conflict_policy`` / ``fusion_policy`` / …).
+                landed = True
+                break
+        if landed:
+            applied.append(name)
+    return applied
+
+
+def _call_aggregator_factory(factory, ledger, verifier, audit, config, staleness,
+                             pol):
+    """Build via factory, forwarding merge Policies the callable can take (#807)."""
+    import inspect
+    merge_kwargs = {name: getattr(pol, name)
+                    for name in _MERGE_POLICY_NAMES
+                    if getattr(pol, name, None) is not None}
+    kwargs = {}
+    try:
+        params = inspect.signature(factory).parameters
+    except (TypeError, ValueError):
+        params = {}
+    accepts_var = any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
+    for name, val in merge_kwargs.items():
+        if name in params or accepts_var:
+            kwargs[name] = val
+    if kwargs:
+        try:
+            aggregator = factory(ledger, verifier, audit, config, staleness,
+                                 **kwargs)
+        except TypeError:
+            # Signature lied or is a partial that rejects the kwargs — fall back.
+            aggregator = factory(ledger, verifier, audit, config, staleness)
+    else:
+        aggregator = factory(ledger, verifier, audit, config, staleness)
+    applied = _apply_merge_policies(aggregator, pol)
+    return aggregator, applied
 
 
 def _propose_via_policy(policy, settled_reader=None):
@@ -2728,23 +2812,10 @@ def _build_engine(tasks, reward, *, agent, run, propose, strategy, initial_state
             "factory if it does its own candidate selection, the policy if it "
             "should run on the shipped merge pipeline.")
 
-    # A custom factory builds its own optimizer, so the merge-side policies never
-    # reach anything -- `policies=Policies(**reflective_merge(...))` alongside
-    # `aggregator_factory=` looks configured and changes nothing. Silence there is
-    # the bug: the caller paid for a model-merging run and got the factory's own
-    # behaviour. The task/proposal/eval-cache halves of `Policies` are read above
-    # and are unaffected, so only the merge side is named.
-    if aggregator_factory is not None:
-        dropped = [name for name in ("conflict", "fusion", "acceptance", "promotion",
-                                     "screen")
-                   if getattr(pol, name, None) is not None]
-        if dropped:
-            warnings.warn(
-                f"aggregator_factory= replaces the optimizer, so policies "
-                f"{sorted(dropped)} are not used. Drop one or the other -- an "
-                f"aggregator that ignores the policies it was given is "
-                f"indistinguishable from one that honours them.",
-                RuntimeWarning, stacklevel=3)
+    # Merge-side Policies used to be warned-and-dropped under aggregator_factory=
+    # (#504 quieted a false warning; #807 makes composition the default). The
+    # requested names are recorded here and checked after the factory returns.
+    _merge_requested = _requested_merge_policies(pol)
 
     def _default_aggregator(ledger, verifier, audit, config, policy):
         return Aggregator(ledger, verifier, audit, config, staleness_policy=policy,
@@ -2781,8 +2852,25 @@ def _build_engine(tasks, reward, *, agent, run, propose, strategy, initial_state
     if fusion_tournament is not None:
         cfg = _replace(cfg, fusion_tournament=fusion_tournament)
 
-    aggregator = (aggregator_factory or _default_aggregator)(
-        ledger, verifier, AuditScheduler(), cfg, staleness_policy)
+    if aggregator_factory is not None:
+        aggregator, _merge_applied = _call_aggregator_factory(
+            aggregator_factory, ledger, verifier, AuditScheduler(), cfg,
+            staleness_policy, pol)
+        orphaned = [n for n in _merge_requested if n not in _merge_applied]
+        if orphaned:
+            allow = bool(getattr(pol, "accept_orphaned_merge_policies", None))
+            msg = (
+                f"aggregator_factory= left Policies({sorted(orphaned)}) unused. "
+                "Pass the slots into the factory (see population_factory), expose "
+                "them on the returned aggregator, or set "
+                "Policies(accept_orphaned_merge_policies=True).")
+            if allow:
+                warnings.warn(msg, RuntimeWarning, stacklevel=3)
+            else:
+                raise ValueError(msg)
+    else:
+        aggregator = _default_aggregator(
+            ledger, verifier, AuditScheduler(), cfg, staleness_policy)
     # Wire the value allocator (if any) so the merge path can report commit
     # outcomes back into it. The worker asks the allocator its per-candidate
     # spend decision through the budget governor; this is the feedback half.

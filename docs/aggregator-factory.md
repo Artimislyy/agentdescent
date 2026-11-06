@@ -32,15 +32,19 @@ ledger commit that rewrites the head.**
 | `StrictGateAggregator` | SkillOpt's strict gate (acceptance rule: `StrictImprovement`) + rejected-edit buffer + LR schedule | `examples/skillopt/` |
 | `PromptBreederPopulation` | PromptBreeder's binary tournament: two units re-scored on a train batch, the loser's slot reused | `examples/promptbreeder/` |
 
-## The one trap
+## Composing with merge Policies (#807)
 
-The factory path bypasses the default-aggregator construction, so `Policies`
-fields that the default path would wire (`conflict`, `fusion`, `acceptance`,
-`promotion`) **do not reach a factory-built aggregator through the bundle**.
-Pass them into your aggregator's constructor instead, and strip them from the
-bundle — carried in both places, one copy is silently ignored, which is the
-exact failure `require_supported` exists to prevent on the other path.
-`agentdescent.population.population_factory` shows the pattern.
+`evolve` forwards merge-side `Policies` (`conflict`, `fusion`, `acceptance`,
+`promotion`, `screen`) into the factory when its signature accepts them, and
+then applies any remaining slots onto attributes the returned aggregator
+exposes (`fusion` also maps to `merge_round` on GEPA/SkillOpt). A factory that
+still leaves requested slots unused **raises** unless
+`Policies(accept_orphaned_merge_policies=True)` — warn-and-drop was how callers
+lost governance gates.
+
+`agentdescent.population.population_factory` remains the template for a custom
+`Aggregator` subclass. Shipped mechanism factories (`gepa`, `skillopt`) accept
+the same kwargs.
 
 A declared `selection` policy and an `aggregator_factory=` are refused together
 rather than resolved: both fill the aggregator seat, and a caller who passed

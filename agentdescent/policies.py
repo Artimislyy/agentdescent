@@ -524,6 +524,13 @@ class Policies:
     verifier: Optional[VerifierProtocol] = None
     ledger: Optional[LedgerProtocol] = None
     aggregator_factory: Optional["AggregatorFactory"] = None
+    #: When ``True`` with an ``aggregator_factory=`` that cannot honour
+    #: merge-side fields (``conflict`` / ``fusion`` / ``acceptance`` /
+    #: ``promotion`` / ``screen``), the run warns and continues. The default
+    #: ``None``/false **fails** instead of silently dropping those Policies
+    #: (#807). Population / mechanism factories that take the slots do not
+    #: need this flag.
+    accept_orphaned_merge_policies: Optional[bool] = None
     #: Where evaluations are memoised. The default is in-process; a shared one
     #: lets separate processes stop paying twice for the same gate.
     eval_cache: Optional["CacheProtocol"] = None
