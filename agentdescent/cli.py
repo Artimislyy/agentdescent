@@ -3021,10 +3021,23 @@ def cmd_algorithms(a: argparse.Namespace) -> int:
         if a.kind is not None and a.kind not in KINDS:
             raise SpecError(f"--kind must be one of {list(KINDS)}, got {a.kind!r}")
         found = algorithms.listing(a.kind)
+        # Same explanation MCP list_algorithms already returns for this kind
+        # (#799): policy_slot evolves a policy value, so no named algorithm
+        # applies and plan refuses one.
+        policy_slot_note = (
+            "no algorithm applies to kind 'policy_slot': that kind evolves a "
+            "policy slot, and `plan` refuses an algorithm for it")
         if as_json:
+            # Keep the array shape scripts already parse; put the note on
+            # stderr so hosts that only read stdout still see a list.
+            if a.kind == "policy_slot" and not found:
+                print(f"note: {policy_slot_note}", file=sys.stderr)
             _out([x.describe() for x in found], as_json=True)
         elif not found:
-            print(f"no algorithms for kind {a.kind!r}")
+            if a.kind == "policy_slot":
+                print(policy_slot_note)
+            else:
+                print(f"no algorithms for kind {a.kind!r}")
         else:
             width = max(len(x.name) for x in found)
             for x in found:

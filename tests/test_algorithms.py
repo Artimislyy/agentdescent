@@ -474,6 +474,19 @@ def test_mcp_explains_that_policy_slot_has_no_algorithms():
     assert out["algorithms"] == [] and "no algorithm applies" in out["note"]
 
 
+def test_cli_list_explains_that_policy_slot_has_no_algorithms(capsys):
+    # #799: CLI matches the MCP note so an empty list is actionable.
+    assert cli.main(["algorithms", "list", "--kind", "policy_slot"]) == 0
+    out = capsys.readouterr().out
+    assert "no algorithm applies to kind 'policy_slot'" in out
+    assert "`plan` refuses an algorithm for it" in out
+    assert "no algorithms for kind" not in out
+    assert cli.main(["algorithms", "list", "--kind", "policy_slot", "--json"]) == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == []
+    assert "no algorithm applies to kind 'policy_slot'" in captured.err
+
+
 def test_dgm_registers_the_keep_all_archive():
     alg = algorithms.get("dgm")
     assert alg.kinds == ("text",) and alg.fidelity == "mechanism_microport"
