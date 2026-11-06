@@ -98,11 +98,12 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
         "before planning a run, and tell the user what is missing instead of starting a "
         "run that fails on round one."),
     "list_algorithms": (
-        "List the named algorithms a spec can ask for (`algorithm` field), with a "
-        "one-line summary, the kinds each applies to and its fidelity. Call this when "
-        "the user names a method (GEPA, ACE, RRSI, ...) or asks what methods exist; if "
-        "they named none, the default recipe for the kind is usually right. Do not "
-        "invent a name -- an unknown one fails in plan."),
+        "List Algorithm *cards* a spec can ask for (`algorithm` field): name, summary, "
+        "kinds, fidelity, and surface=card. Pass `kind` to filter to cards that run on "
+        "that host artifact (text/skill_dir/…). Same-name examples/<algo>/ research "
+        "ports are NOT listed — they are source-only and may differ in fidelity. Call "
+        "when the user names a method or asks what exists; if they named none, the "
+        "default recipe for the kind is usually right. Do not invent a name."),
     "rsi": (
         "The archive's longitudinal self-improvement trend: per decision slot, "
         "the first and best adopted reward, the gain, the adoption that set the "
@@ -111,10 +112,11 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
         "read-only and costs no model calls. `--archive` is the consolidation "
         "archive, not a run store."),
     "describe_algorithm": (
-        "One algorithm's card: summary, kinds, fidelity, source, extra cost and every "
-        "parameter with its type, default and bounds. Call this before setting "
-        "`algorithm: {name, params}` so the values you pass are the ones plan expects. "
-        "The same data is in `agentdescent algorithms show <name>`."),
+        "One Algorithm card: summary, kinds, fidelity, surface=card, source, extra "
+        "cost, params, and — when a same-name examples/<name>/ research port exists — "
+        "research_port + fidelity_note so you do not claim paper fidelity for a "
+        "mechanism slice. Call before setting `algorithm: {name, params}`. Same data "
+        "as `agentdescent algorithms show <name>`."),
     "algorithm_spec": (
         "Build and plan a starter spec for one named algorithm on the user's target "
         "-- the MCP form of `agentdescent algorithms run NAME PATH [cases]`. Pass the "
@@ -431,7 +433,10 @@ class Tools:
         if kind is not None and kind not in KINDS:
             return {"error": f"unknown kind {kind!r}; choose from {list(KINDS)}"}
         payload: Dict[str, Any] = {
-            "algorithms": [a.describe() for a in algorithms.listing(kind)]}
+            "algorithms": [a.describe() for a in algorithms.listing(kind)],
+            "surface": "card",
+            "note": algorithms.CARDS_VS_PORTS_NOTE,
+        }
         errors = algorithms.external_errors()
         if errors:
             payload["load_errors"] = errors
@@ -439,6 +444,12 @@ class Tools:
             payload["note"] = ("no algorithm applies to kind 'policy_slot': that "
                                "kind evolves a policy slot, and `plan` refuses an "
                                "algorithm for it")
+        elif kind is not None and not payload["algorithms"]:
+            payload["note"] = (
+                f"no Algorithm card applies to kind {kind!r}; omit algorithm for "
+                "the default recipe, or pick a card from list_algorithms without "
+                "a kind filter (each card lists its kinds). "
+                + algorithms.CARDS_VS_PORTS_NOTE)
         return payload
 
     def rsi(self, archive: Optional[str] = None, slot: Optional[str] = None,

@@ -1023,3 +1023,40 @@ def test_ace_lesson_with_blank_line_round_trips():
     out = pb2.render(st2)
     assert ACEPlaybook(seed=out).initial() == st2
     assert out.rstrip("\n").endswith("y")
+
+
+def test_card_vs_research_port_fidelity_fields():
+    """#384 addendum: same-name cards declare surface + research_port honestly."""
+    gepa = algorithms.get("gepa").describe()
+    assert gepa["surface"] == "card"
+    assert gepa["research_port"] == "examples/gepa/"
+    assert "mechanism_microport" in gepa["fidelity_note"]
+    assert "examples/gepa/" in gepa["fidelity_note"]
+    for name in ("ace", "dgm", "skillopt", "evoskill"):
+        card = algorithms.get(name).describe()
+        assert card["surface"] == "card"
+        assert card["research_port"] == f"examples/{name}/"
+    rrsi = algorithms.get("rrsi").describe()
+    assert rrsi["surface"] == "card"
+    assert "research_port" not in rrsi
+
+
+def test_cli_show_and_plan_echo_card_surface(tmp_path, capsys):
+    assert cli.main(["algorithms", "show", "gepa"]) == 0
+    text = capsys.readouterr().out
+    assert "surface" in text and "examples/gepa/" in text
+    path = _write(tmp_path, _spec(algorithm="gepa"))
+    assert cli.main(["--json", "plan", path]) == 0
+    alg = json.loads(capsys.readouterr().out)["algorithm"]
+    assert alg["surface"] == "card" and alg["research_port"] == "examples/gepa/"
+    assert "fidelity_note" in alg
+
+
+def test_mcp_list_algorithms_carries_cards_vs_ports_note():
+    from agentdescent.mcp import Tools
+    payload = Tools(None).list_algorithms(kind="text")
+    assert payload["surface"] == "card"
+    assert "Algorithm cards" in payload["note"]
+    names = {a["name"] for a in payload["algorithms"]}
+    assert "gepa" in names and "evoskill" not in names  # kind filter
+    assert all(a["surface"] == "card" for a in payload["algorithms"])

@@ -1,5 +1,7 @@
 # Port fidelity — what each port follows, and where it departs
 
+Product surface note (#384): `agentdescent algorithms list` / `show` and host pick UIs list **Algorithm cards** (`surface=card`) shipped in the wheel. When a card shares a slug with an `examples/<algo>/` research port (ACE, GEPA, DGM, SkillOpt, EvoSkill), `show` / `plan` carry `research_port` and a `fidelity_note` so a mechanism slice is never read as the paper port. Filter cards with `--kind` / `kind=` for the host artifact.
+
 Choosing card vs MethodPolicy vs full port vs `aggregator_factory`: [algorithm decision tree](algorithm-decision-tree.md).
 
 Twenty-three published self-evolution algorithms run on this engine — eight as benchmark-faithful ports, fifteen as declared microports and analogues. Every one of them

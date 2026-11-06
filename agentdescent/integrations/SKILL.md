@@ -43,8 +43,12 @@ unless the user asked and the server was started with `--advanced` /
      run asked for 8 rounds and completed 2 in 90 minutes. Read `plan`'s notes
      aloud: they say how many held-out tasks the gate actually gets, and with
      too few it has both committed a worse rule and committed nothing at all.
-   - `algorithm` (optional): a named method. Call `list_algorithms` (or
-     `describe_algorithm` for one) before naming one; the same data is in
+   - `algorithm` (optional): a named **Algorithm card** (`surface=card`). Call
+     `list_algorithms` with the artifact's `kind` (or `describe_algorithm` for
+     one) before naming one; filter by kind so ineligible cards are not offered.
+     Same-name `examples/<algo>/` research ports are source-only and may differ
+     in fidelity — `plan` echoes `fidelity` / `research_port` / `fidelity_note`;
+     never claim the paper port ran when only the card did. The same data is in
      `agentdescent algorithms list` / `show`. To build the spec for one,
      call `algorithm_spec` (name, absolute `path`, absolute `cases`, optional
      `params` object, `rounds`/`workers` 1/1 for a quick trial): it writes the

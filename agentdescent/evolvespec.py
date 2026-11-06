@@ -996,9 +996,19 @@ def _algorithm_echo(chosen: Tuple[Any, Dict[str, Any]], spec: EvolveSpec,
         [f"policies.{k}" for k in ov.policies if k in asked]
         + [f"agg_config.{k}" for k in ov.agg_config if k in spec.agg_config]
         + [f"evolve.{k}" for k in ov.knobs if k in spec.evolve])
-    return {"name": alg.name, "summary": alg.summary, "fidelity": alg.fidelity,
-            "params": params, "extra_calls": alg.extra_calls, "source": alg.source,
-            "doc": alg.doc, "overridden_by_spec": overridden}
+    card = alg.describe()
+    echo: Dict[str, Any] = {
+        "name": card["name"], "summary": card["summary"],
+        "fidelity": card["fidelity"], "surface": card.get("surface", "card"),
+        "params": params, "extra_calls": card["extra_calls"],
+        "source": card["source"], "doc": card["doc"],
+        "overridden_by_spec": overridden,
+    }
+    if card.get("research_port"):
+        echo["research_port"] = card["research_port"]
+    if card.get("fidelity_note"):
+        echo["fidelity_note"] = card["fidelity_note"]
+    return echo
 
 
 #: ``evolve()`` parameters whose annotation is made only of these names take plain

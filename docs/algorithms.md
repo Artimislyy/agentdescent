@@ -24,6 +24,12 @@ the target on held-out, the run stops at once with
 `held-out reward: 1.000 -> 1.000`, nothing is learned, and
 `diagnose` reports `seed-already-solved`.
 
+These rows are Algorithm **cards** (`surface=card`) shipped in the
+wheel. A same-name [`examples/<algo>/`](https://github.com/ThinkFlowLab/agentdescent/tree/main/examples)
+research port is a separate, source-only script and may use a different
+propose/strategy path — see [port fidelity](port-fidelity.md). Filter with
+`--kind` so hosts are not offered cards that cannot run on that artifact.
+
 To **register one named card in a single PR**, follow
 [Register a named Algorithm card](algorithm-authoring.md).
 Full research ports still use the
@@ -36,7 +42,9 @@ ACE's sectioned playbook: append content-addressed lessons, refuse near-duplicat
 
 - **Kinds:** `text`
 - **Fidelity:** `mechanism_microport`
+- **Surface:** `card` (Algorithm card)
 - **Cost:** none (one reflection call per failed rollout, as the default recipe)
+- **Research port:** `examples/ace/` — separate source-only path; Algorithm card (mechanism_microport) — not the benchmark-faithful research port at examples/ace/ (docs/port-fidelity.md). Same name, different propose/strategy path.
 - **Source:** ACE: Agentic Context Engineering (Zhang et al., 2025)
 - **Details:** [algo-ace.md](algo-ace.md)
 - **Spec:** `"algorithm": "ace"`
@@ -52,6 +60,7 @@ Parent sampling from an archive of every accepted candidate, tempered by novelty
 
 - **Kinds:** `text`, `skill_dir`, `agent_dir`, `agent_code`, `plugin`
 - **Fidelity:** `preset`
+- **Surface:** `card` (Algorithm card)
 - **Cost:** none
 - **Source:** Darwin Gödel Machine (choose_selfimproves), ADAS archive, SICA best-agent
 - **Spec:** `"algorithm": "archive_selection"`
@@ -68,7 +77,9 @@ Darwin Gödel Machine's open-ended archive: keep every capability self-modificat
 
 - **Kinds:** `text`
 - **Fidelity:** `mechanism_microport`
+- **Surface:** `card` (Algorithm card)
 - **Cost:** one reflection call per failed rollout; each candidate is scored on the held-out set
+- **Research port:** `examples/dgm/` — separate source-only path; Algorithm card (mechanism_microport) — not the benchmark-faithful research port at examples/dgm/ (docs/port-fidelity.md). Same name, different propose/strategy path.
 - **Source:** Darwin Gödel Machine (Zhang et al., 2025); see docs/algo-dgm.md
 - **Details:** [algo-dgm.md](algo-dgm.md)
 - **Spec:** `"algorithm": "dgm"`
@@ -85,7 +96,9 @@ EvoSkill's two-role skill induction: Proposer analyses a failure batch, Generato
 
 - **Kinds:** `skill_dir`, `agent_dir`, `plugin`
 - **Fidelity:** `mechanism_microport`
+- **Surface:** `card` (Algorithm card)
 - **Cost:** two model calls per induced skill; one full held-out re-eval per admitted candidate
+- **Research port:** `examples/evoskill/` — separate source-only path; Algorithm card (mechanism_microport) — not the benchmark-faithful research port at examples/evoskill/ (docs/port-fidelity.md). Same name, different propose/strategy path.
 - **Source:** EvoSkill: skill discovery (see docs/algo-evoskill.md)
 - **Details:** [algo-evoskill.md](algo-evoskill.md)
 - **Spec:** `"algorithm": "evoskill"`
@@ -102,7 +115,9 @@ GEPA's genetic reflective loop: keep a Pareto pool of candidates scored per inst
 
 - **Kinds:** `text`
 - **Fidelity:** `mechanism_microport`
+- **Surface:** `card` (Algorithm card)
 - **Cost:** every admitted candidate is scored over the full held-out set once (the Pareto row); no extra reflection calls
+- **Research port:** `examples/gepa/` — separate source-only path; Algorithm card (mechanism_microport) — not the benchmark-faithful research port at examples/gepa/ (docs/port-fidelity.md). Same name, different propose/strategy path.
 - **Source:** GEPA: Reflective Prompt Evolution (Agrawal et al., 2025); arXiv:2507.19457
 - **Details:** [algo-gepa.md](algo-gepa.md)
 - **Spec:** `"algorithm": "gepa"`
@@ -118,6 +133,7 @@ Regularized recursive self-improvement: an annealed edit budget, a leakage scree
 
 - **Kinds:** `text`
 - **Fidelity:** `mechanism_microport`
+- **Surface:** `card` (Algorithm card)
 - **Cost:** none (the reflection model proposes as it would anyway; the screen is deterministic and runs before any held-out sweep)
 - **Source:** Google RRSI (regularized harness selection); docs/algo-rrsi.md
 - **Details:** [algo-rrsi.md](algo-rrsi.md)
@@ -146,7 +162,9 @@ SkillOpt's skill-document training: bounded edit patches, a strict held-out gate
 
 - **Kinds:** `text`
 - **Fidelity:** `mechanism_microport`
+- **Surface:** `card` (Algorithm card)
 - **Cost:** one analyst call per failed rollout; the strict gate scores each candidate over the full held-out set
+- **Research port:** `examples/skillopt/` — separate source-only path; Algorithm card (mechanism_microport) — not the benchmark-faithful research port at examples/skillopt/ (docs/port-fidelity.md). Same name, different propose/strategy path.
 - **Source:** SkillOpt: skill-document training; see docs/algo-skillopt.md
 - **Details:** [algo-skillopt.md](algo-skillopt.md)
 - **Spec:** `"algorithm": "skillopt"`

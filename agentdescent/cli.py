@@ -2537,9 +2537,17 @@ def cmd_doctor(a: argparse.Namespace) -> int:
 
 
 def _algorithm_card_text(card: Dict[str, Any]) -> str:
-    lines = [f"{card['name']}  [{card['fidelity']}]", f"  {card['summary']}",
+    surface = card.get("surface", "card")
+    lines = [f"{card['name']}  [{card['fidelity']}; {surface}]",
+             f"  {card['summary']}",
              f"  kinds:       {', '.join(card['kinds'])}",
+             f"  surface:     {surface} (wheel Algorithm card; not an examples/ port)",
              f"  extra calls: {card['extra_calls']}"]
+    if card.get("research_port"):
+        lines.append(f"  research port: {card['research_port']} "
+                     "(source checkout; different fidelity — see docs/port-fidelity.md)")
+    if card.get("fidelity_note"):
+        lines.append(f"  note:        {card['fidelity_note']}")
     if card["source"]:
         lines.append(f"  source:      {card['source']}")
     if card["doc"]:
@@ -3034,10 +3042,12 @@ def cmd_algorithms(a: argparse.Namespace) -> int:
             "no algorithm applies to kind 'policy_slot': that kind evolves a "
             "policy slot, and `plan` refuses an algorithm for it")
         if as_json:
-            # Keep the array shape scripts already parse; put the note on
+            # Keep the array shape scripts already parse; put product notes on
             # stderr so hosts that only read stdout still see a list.
             if a.kind == "policy_slot" and not found:
                 print(f"note: {policy_slot_note}", file=sys.stderr)
+            else:
+                print(f"note: {algorithms.CARDS_VS_PORTS_NOTE}", file=sys.stderr)
             _out([x.describe() for x in found], as_json=True)
         elif not found:
             if a.kind == "policy_slot":
@@ -3046,8 +3056,13 @@ def cmd_algorithms(a: argparse.Namespace) -> int:
                 print(f"no algorithms for kind {a.kind!r}")
         else:
             width = max(len(x.name) for x in found)
+            print("surface=card  (Algorithm cards; same-name examples/<algo>/ "
+                  "ports are separate — docs/port-fidelity.md)")
             for x in found:
-                print(f"{x.name:<{width}}  {x.fidelity:<19}  {','.join(x.kinds):<42}  {x.summary}")
+                port = "  +examples/" if algorithms.research_port_for(x.name) else ""
+                print(f"{x.name:<{width}}  {x.fidelity:<19}  "
+                      f"{','.join(x.kinds):<42}  {x.summary}{port}")
+            print(f"note: {algorithms.CARDS_VS_PORTS_NOTE}")
         return 0
     if a.action == "run":
         return _cmd_algorithms_run(a)

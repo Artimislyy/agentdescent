@@ -40,8 +40,13 @@ def _card(algorithm: algorithms.Algorithm) -> List[str]:
         "",
         f"- **Kinds:** {', '.join(f'`{k}`' for k in card['kinds'])}",
         f"- **Fidelity:** `{card['fidelity']}`",
+        f"- **Surface:** `{card.get('surface', 'card')}` (Algorithm card)",
         f"- **Cost:** {card['extra_calls']}",
     ]
+    if card.get("research_port"):
+        lines.append(
+            f"- **Research port:** `{card['research_port']}` — separate "
+            f"source-only path; {card.get('fidelity_note', 'see port-fidelity.md')}")
     if card.get("source"):
         lines.append(f"- **Source:** {card['source']}")
     if card.get("doc"):
@@ -85,6 +90,12 @@ def render() -> str:
         "the target on held-out, the run stops at once with",
         "`held-out reward: 1.000 -> 1.000`, nothing is learned, and",
         "`diagnose` reports `seed-already-solved`.",
+        "",
+        "These rows are Algorithm **cards** (`surface=card`) shipped in the",
+        "wheel. A same-name [`examples/<algo>/`](https://github.com/ThinkFlowLab/agentdescent/tree/main/examples)",
+        "research port is a separate, source-only script and may use a different",
+        "propose/strategy path — see [port fidelity](port-fidelity.md). Filter with",
+        "`--kind` so hosts are not offered cards that cannot run on that artifact.",
         "",
         "To **register one named card in a single PR**, follow",
         "[Register a named Algorithm card](algorithm-authoring.md).",

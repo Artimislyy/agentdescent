@@ -40,9 +40,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
-__all__ = ["Algorithm", "AlgorithmError", "BuildContext", "ENTRY_POINT_GROUP",
-           "FIDELITY", "Overrides", "Param", "external_errors", "get", "names",
-           "kind_mismatch_message", "register", "resolve_params", "listing"]
+__all__ = ["Algorithm", "AlgorithmError", "BuildContext", "CARDS_VS_PORTS_NOTE",
+           "ENTRY_POINT_GROUP", "FIDELITY", "Overrides", "Param", "external_errors",
+           "get", "names", "kind_mismatch_message", "register", "resolve_params",
+           "listing", "research_port_for"]
 
 FIDELITY = ("benchmark_faithful", "mechanism_microport", "preset")
 
@@ -168,11 +169,28 @@ class Algorithm:
             raise ValueError(f"{self.name}: fidelity must be one of {FIDELITY}")
 
     def describe(self) -> Dict[str, Any]:
-        """The JSON-able card ``show`` prints and ``plan`` echoes."""
-        return {"name": self.name, "summary": self.summary, "kinds": list(self.kinds),
-                "fidelity": self.fidelity, "source": self.source,
-                "extra_calls": self.extra_calls, "doc": self.doc,
-                "params": [p.to_dict() for p in self.params]}
+        """The JSON-able card ``show`` prints and ``plan`` echoes.
+
+        Always labels the entry as an Algorithm **card** (``surface: "card"``).
+        When the same slug also has an ``examples/<name>/`` research port, the
+        card carries ``research_port`` and a ``fidelity_note`` so hosts never
+        read a mechanism slice as the paper port (#384 fidelity addendum).
+        """
+        out: Dict[str, Any] = {
+            "name": self.name, "summary": self.summary, "kinds": list(self.kinds),
+            "fidelity": self.fidelity, "surface": "card", "source": self.source,
+            "extra_calls": self.extra_calls, "doc": self.doc,
+            "params": [p.to_dict() for p in self.params],
+        }
+        port = research_port_for(self.name)
+        if port is not None:
+            out["research_port"] = port
+            out["fidelity_note"] = (
+                f"Algorithm card ({self.fidelity}) — not the benchmark-faithful "
+                f"research port at {port} (docs/port-fidelity.md). Same name, "
+                "different propose/strategy path."
+            )
+        return out
 
 
 _REGISTRY: Dict[str, Algorithm] = {}
@@ -194,6 +212,31 @@ _EXAMPLES_ONLY_PORTS = frozenset({
     "r_zero", "reflexion", "self_refine", "sica", "skillweaver", "textgrad",
     "voyager",
 })
+
+#: Registered card names that *also* have a full ``examples/<name>/`` research
+#: port. Card ≠ port: the wheel entry is a mechanism slice; the checkout script
+#: is the paper-faithful path (#384 fidelity addendum). Keep in sync with the
+#: shipped cards that share a slug with ``docs/algo-*.md`` ports.
+_CARDS_WITH_RESEARCH_PORT = frozenset({
+    "ace", "dgm", "evoskill", "gepa", "skillopt",
+})
+
+
+def research_port_for(name: str) -> Optional[str]:
+    """``examples/<name>/`` when this card shares a slug with a research port."""
+    if name in _CARDS_WITH_RESEARCH_PORT:
+        return f"examples/{name}/"
+    return None
+
+
+#: One-line product-surface note for ``algorithms list`` / MCP list_algorithms.
+CARDS_VS_PORTS_NOTE = (
+    "Listed names are Algorithm cards shipped in the wheel (mechanism slices). "
+    "A same-name examples/<algo>/ research port is a separate, source-only "
+    "script and may use a different propose/strategy path — see "
+    "docs/port-fidelity.md. Filter with --kind / kind= so hosts are not offered "
+    "cards that cannot run on that artifact."
+)
 
 
 def register(algorithm: Algorithm, *, replace: bool = False) -> Algorithm:

@@ -22,6 +22,11 @@ Same name ≠ same fidelity: a card such as `"algorithm": "gepa"` is a wheel
 mechanism slice; `examples/gepa/` is the paper-faithful port. See
 [port fidelity](port-fidelity.md).
 
+Same name ≠ same fidelity: a card such as `"algorithm": "gepa"` is a wheel
+mechanism slice (`surface=card`); `examples/gepa/` is the paper-faithful port.
+`algorithms list --kind K` / MCP `list_algorithms(kind=…)` must filter by host
+kind so ineligible cards are not offered. See [port fidelity](port-fidelity.md).
+
 The catalog of shipped cards is generated from the registry:
 [named algorithms](algorithms.md).
 
