@@ -1,0 +1,2 @@
+Changed
+The homepage interactive demo now replays a session the way the shipped skill runs one: each host's real slash command (or plain request for DeepSeek Harness), default skill folder and MCP tool naming; doctor, spec, plan with the real call estimate, a start approval, status polls with a round/phase/held-out progress panel, `show diff=true` with a unified diff, and a separately approved apply with the real backup location. Still a browser-only sample; no model calls.
