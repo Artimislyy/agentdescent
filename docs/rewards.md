@@ -1,6 +1,6 @@
 # Rewards — the scorers everyone writes
 
-*Module:* [`agentdescent.rewards`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/rewards.py)
+*Module:* [`agentdescent.rewards`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/rewards.py)
 · *API:* [`exact_match`, `contains`, `last_number`, `numeric_close`](api.md#ready-made-scorers)
 
 A reward is `(task, output) -> float` in `[0, 1]`, and writing one is easy —

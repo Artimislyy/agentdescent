@@ -1,7 +1,7 @@
 # The reference orchestrator and the reference domain
 
-*Modules:* [`agentdescent.orchestrator`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/orchestrator.py)
-· [`agentdescent.domains.router`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/domains/router.py)
+*Modules:* [`agentdescent.orchestrator`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/orchestrator.py)
+· [`agentdescent.domains.router`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/domains/router.py)
 · *API:* [`AgentDescent`, `RoundStat`, `run_fork_baseline`](api.md#the-reference-orchestrator)
 
 [`evolve()`](evolution.md) is the entry point you build on. `AgentDescent` is the
@@ -84,7 +84,7 @@ strategy, and it is the control for the framework's central claim: N workers
 merging should beat N workers forking on an equal budget.
 
 Measured on the reference domain (see [results](results.md) and
-[`examples/run_demo.py`](https://github.com/Birfy/agentdescent/blob/main/examples/run_demo.py)):
+[`examples/run_demo.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/run_demo.py)):
 
 ```
 AgentDescent (merge) held-out accuracy : 1.000

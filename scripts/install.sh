@@ -20,7 +20,7 @@ if ! command -v git >/dev/null 2>&1; then
 fi
 
 printf '\n[1/3] Installing AgentDescent from current main with MCP support...\n'
-python3 -m pip install --upgrade 'agentdescent[mcp] @ git+https://github.com/Birfy/agentdescent.git@main'
+python3 -m pip install --upgrade 'agentdescent[mcp] @ git+https://github.com/ThinkFlowLab/agentdescent.git@main'
 
 # pip may install a user script outside the current PATH.
 if ! command -v agentdescent >/dev/null 2>&1; then

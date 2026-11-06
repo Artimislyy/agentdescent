@@ -2,7 +2,7 @@
 
 Evolve skills, agent definitions, prompts, code and host plugins from inside
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), using
-[AgentDescent](https://github.com/Birfy/agentdescent).
+[AgentDescent](https://github.com/ThinkFlowLab/agentdescent).
 
 ```bash
 pip install "agentdescent[mcp]"            # the tools this plugin exposes

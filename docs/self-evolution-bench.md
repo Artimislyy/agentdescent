@@ -1,6 +1,6 @@
 # Self-evolution bench — measure every rung, end to end
 
-*Script:* [`bench/self_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/bench/self_evolution.py)
+*Script:* [`bench/self_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/self_evolution.py)
 
 Each rung of the meta stack has its own module and its own tests; nothing
 showed that they **compose**. This bench runs the whole chain on one

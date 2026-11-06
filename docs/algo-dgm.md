@@ -8,7 +8,7 @@ description: A runnable reproduction of DGM (Darwin Godel Machine): a coding age
 > keeping every variant in an open-ended archive. Runs through
 > [`evolve()`](evolution.md) with a custom `Strategy` + `aggregator_factory` at
 > **L1** governance. Example:
-> [`examples/dgm/dgm_self_improve.py`](https://github.com/Birfy/agentdescent/blob/main/examples/dgm/dgm_self_improve.py).
+> [`examples/dgm/dgm_self_improve.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/dgm/dgm_self_improve.py).
 >
 > **Spec form:** the archive mechanism ships in
 > `agentdescent/algorithms/dgm.py`; a spec can name `"algorithm": "dgm"`
@@ -24,7 +24,7 @@ description: A runnable reproduction of DGM (Darwin Godel Machine): a coding age
 |---|---|
 | **Paper** | *Darwin Gödel Machine* — Zhang, Hu, Lu, Lange, Clune, 2025 ([arXiv:2505.22954](https://arxiv.org/abs/2505.22954)) |
 | **Upstream code** | [`jennyzzt/dgm`](https://github.com/jennyzzt/dgm) |
-| **Example** | [`examples/dgm/dgm_self_improve.py`](https://github.com/Birfy/agentdescent/blob/main/examples/dgm/dgm_self_improve.py) |
+| **Example** | [`examples/dgm/dgm_self_improve.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/dgm/dgm_self_improve.py) |
 | **Domain** | **SWE-bench Verified** instance ids against a transparent surrogate (default), or 64 vendored bugs with real pytest runs (`--objective real`, which the rows below used) |
 | **Layer** | L1 harness (`blast_radius=0.6`) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
@@ -67,7 +67,7 @@ plug in the actual Docker harness.
 
 ## Plug-ins implemented
 
-In [`examples/dgm/dgm_self_improve.py`](https://github.com/Birfy/agentdescent/blob/main/examples/dgm/dgm_self_improve.py):
+In [`examples/dgm/dgm_self_improve.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/dgm/dgm_self_improve.py):
 
 | Plug-in | `evolve()` slot | What it does |
 |---|---|---|

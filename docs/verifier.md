@@ -1,6 +1,6 @@
 # The verifier — rule, learned, oracle
 
-*Module:* [`agentdescent.verifier`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/verifier.py)
+*Module:* [`agentdescent.verifier`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/verifier.py)
 · *API:* [`ThreeLayerVerifier`, `VerifierBudget`](api.md#the-verifier)
 
 The [aggregator](aggregator.md) needs to score candidates at two very different

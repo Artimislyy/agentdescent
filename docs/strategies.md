@@ -4,8 +4,8 @@ description: Strategies decide what evolves and how a proposal becomes a diff. T
 
 # Strategies — what evolves, and how a proposal becomes a diff
 
-*Modules:* [`agentdescent.strategies`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/strategies.py)
-(text) · [`agentdescent.treestrategy`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/treestrategy.py)
+*Modules:* [`agentdescent.strategies`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/strategies.py)
+(text) · [`agentdescent.treestrategy`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/treestrategy.py)
 (a directory) — one module per strategy family, none of them inside the engine
 · *API:* [`Strategy`, `SingleSlot`, `AppendRules`, `KeyedRules`](api.md#the-loop), [`FileTree`](api.md#the-file-tree-strategy)
 
@@ -187,7 +187,7 @@ Each is a real `Strategy` you can read and reuse:
 ## Examples-level strategies
 
 The eleven MethodPolicy ports ride four shared strategies in
-[`examples/_method_policy.py`](https://github.com/Birfy/agentdescent/blob/main/examples/_method_policy.py) —
+[`examples/_method_policy.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/_method_policy.py) —
 the same seam, packaged with validation (an unparseable proposal is counted and
 produces no diff):
 

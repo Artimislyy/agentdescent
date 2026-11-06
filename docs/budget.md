@@ -92,7 +92,7 @@ The decision and the feedback are two separate points on the merge path:
 
 - **The worker asks** — before spending the self-verify rollout, the budget
   governor calls the allocator's `decide(ctx)` with an
-  [`AllocatorContext`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/allocator.py)
+  [`AllocatorContext`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/allocator.py)
   built from the diff's size and the rollout's advantage. High-value candidates
   keep the spend; low-value ones lose it; counterfactual ones get it anyway.
 - **The aggregator reports** — every measured decision is reported exactly
@@ -109,7 +109,7 @@ refused.
 ## 4. The A/B — is it actually worth it?
 
 The mechanism's own premise is *an analogy without an A/B is decoration*. The
-equal-budget experiment is [`bench/ab_allocator.py`](https://github.com/Birfy/agentdescent/blob/main/bench/ab_allocator.py):
+equal-budget experiment is [`bench/ab_allocator.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/ab_allocator.py):
 
 ```bash
 python -m bench.ab_allocator --dataset hotpotqa --budget-rollouts 96 \

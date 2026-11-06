@@ -47,7 +47,7 @@ scheduling and merge timing only"* on every row. A row saying anything else is
 either a bug or a finding, and either way it has to be written down.
 
 !!! note "That column is generated, not typed"
-    It is [`bench.matrix_run.SEMANTICS`](https://github.com/Birfy/agentdescent/blob/main/bench/matrix_run.py)
+    It is [`bench.matrix_run.SEMANTICS`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/matrix_run.py)
     — one entry per row **per arm**, declared beside the rows the sweep runs, and
     `bench/matrix_report.py` refuses to render a row that has no entry. A column
     filled in afterwards is filled in from memory by whoever is writing up the

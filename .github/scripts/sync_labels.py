@@ -1,7 +1,7 @@
 """Create or update the labels listed in ``.github/labels.json``.
 
-    python3 .github/scripts/sync_labels.py --repo Birfy/agentdescent           # dry run: print the plan
-    python3 .github/scripts/sync_labels.py --repo Birfy/agentdescent --apply   # create / update
+    python3 .github/scripts/sync_labels.py --repo ThinkFlowLab/agentdescent           # dry run: print the plan
+    python3 .github/scripts/sync_labels.py --repo ThinkFlowLab/agentdescent --apply   # create / update
 
 The ``labels`` workflow runs it with ``--apply`` when ``labels.json`` changes on
 ``main`` (built-in ``GITHUB_TOKEN`` only); a maintainer may also run it by hand

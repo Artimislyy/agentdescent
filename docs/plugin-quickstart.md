@@ -159,7 +159,7 @@ echo "Call the agentdescent doctor tool and print its run_store field." | \
 Skip `install` — Codex reads the same plugin package Claude Code does:
 
 ```bash
-codex plugin marketplace add Birfy/agentdescent
+codex plugin marketplace add ThinkFlowLab/agentdescent
 codex plugin add agentdescent@agentdescent
 codex mcp list        # agentdescent ... enabled
 ```

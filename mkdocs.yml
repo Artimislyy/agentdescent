@@ -7,9 +7,9 @@ site_description: >-
   reproductions of twenty published self-evolution algorithms.
 # Required for canonical URLs, an absolute-URL sitemap, and the social cards
 # below -- without it mkdocs emits neither, and the social plugin warns.
-site_url: https://birfy.github.io/agentdescent/
-repo_url: https://github.com/Birfy/agentdescent
-repo_name: Birfy/agentdescent
+site_url: https://thinkflowlab.github.io/agentdescent/
+repo_url: https://github.com/ThinkFlowLab/agentdescent
+repo_name: ThinkFlowLab/agentdescent
 docs_dir: docs
 site_dir: site
 
@@ -53,7 +53,7 @@ theme:
 nav:
   - Home: index.md
   # Keep the demo reachable in Material's mobile drawer when header links hide.
-  - Interactive demo: https://birfy.github.io/agentdescent/#demo
+  - Interactive demo: https://thinkflowlab.github.io/agentdescent/#demo
   - Documentation: docs.md
   - Getting started:
     - Install and first run: install.md
@@ -229,4 +229,4 @@ extra_javascript:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/Birfy/agentdescent
+      link: https://github.com/ThinkFlowLab/agentdescent

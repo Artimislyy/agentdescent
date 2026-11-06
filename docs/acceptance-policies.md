@@ -1,7 +1,7 @@
 # Acceptance policies — whether a candidate commits
 
-*Module:* [`agentdescent.defaults`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/defaults.py),
-[`agentdescent.advantage`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/advantage.py)
+*Module:* [`agentdescent.defaults`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/defaults.py),
+[`agentdescent.advantage`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/advantage.py)
 · *Contract:* `AcceptancePolicy.accept(ctx: MergeContext) -> AcceptDecision`
 
 The gate at the end of the merge pipeline: given the merged candidate's

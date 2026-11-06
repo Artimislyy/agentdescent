@@ -1,6 +1,6 @@
 # Joint multi-slot evolution — search the whole decision plane
 
-*Module:* [`agentdescent.joint_meta`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/joint_meta.py)
+*Module:* [`agentdescent.joint_meta`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/joint_meta.py)
 · *Issue:* #388 (P7)
 
 Every other rung of the meta stack evolves **one** slot: `meta_run` /

@@ -3516,7 +3516,7 @@ value-directed evaluation or Genesis blind-mode proposals.
   `http://127.0.0.1.evil.com`.
 - **Codex installs the same plugin as Claude Code.** Codex reads the Claude
   Code plugin format and marketplace, so `codex plugin marketplace add
-  Birfy/agentdescent && codex plugin add agentdescent@agentdescent` installs the
+  ThinkFlowLab/agentdescent && codex plugin add agentdescent@agentdescent` installs the
   package this repository already publishes, and the MCP server comes with it --
   verified with `codex plugin list` and `codex mcp list` against codex-cli
   0.153.4. `agentdescent install codex` still writes the files for anyone who
@@ -6535,17 +6535,17 @@ First public release on PyPI as **`agentdescent`**.
   discrete-space `Aggregator`, staleness policies, DP/TP/PP parallelism, layered
   governance, and the provider-agnostic `agentdescent.agents` completion layer.
 
-[Unreleased]: https://github.com/Birfy/agentdescent/compare/v0.8.0...HEAD
-[0.8.0]: https://github.com/Birfy/agentdescent/compare/v0.7.0...v0.8.0
-[0.7.0]: https://github.com/Birfy/agentdescent/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/Birfy/agentdescent/compare/v0.5.1...v0.6.0
-[0.5.1]: https://github.com/Birfy/agentdescent/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/Birfy/agentdescent/compare/v0.4.6...v0.5.0
-[0.4.6]: https://github.com/Birfy/agentdescent/compare/v0.4.5...v0.4.6
-[0.4.5]: https://github.com/Birfy/agentdescent/compare/v0.4.2...v0.4.5
-[0.4.2]: https://github.com/Birfy/agentdescent/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/Birfy/agentdescent/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/Birfy/agentdescent/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/Birfy/agentdescent/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/Birfy/agentdescent/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Birfy/agentdescent/releases/tag/v0.1.0
+[Unreleased]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.4.6...v0.5.0
+[0.4.6]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.4.5...v0.4.6
+[0.4.5]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.4.2...v0.4.5
+[0.4.2]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/ThinkFlowLab/agentdescent/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/ThinkFlowLab/agentdescent/releases/tag/v0.1.0

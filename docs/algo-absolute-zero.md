@@ -7,13 +7,13 @@ description: A runnable reproduction of Absolute Zero zero-data self-play, where
 > **Self-play policy evolution.** One model proposes and solves its own tasks,
 > graded by a local verifier and rewarded for *learnability*. Runs through the
 > shared [`MethodPolicy`](policies.md) runner. Example:
-> [`examples/absolute_zero/absolute_zero_selfplay.py`](https://github.com/Birfy/agentdescent/blob/main/examples/absolute_zero/absolute_zero_selfplay.py).
+> [`examples/absolute_zero/absolute_zero_selfplay.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/absolute_zero/absolute_zero_selfplay.py).
 
 | | |
 |---|---|
 | **Paper** | *Absolute Zero: Reinforced Self-play Reasoning with Zero Data* — Zhao et al., 2025 ([arXiv:2505.03335](https://arxiv.org/abs/2505.03335)) |
 | **Upstream code** | [LeapLabTHU/Absolute-Zero-Reasoner@484afa48](https://github.com/LeapLabTHU/Absolute-Zero-Reasoner/tree/484afa480c8f6fd77faa3d35451f24f287f58ee1) |
-| **Example** | [`examples/absolute_zero/absolute_zero_selfplay.py`](https://github.com/Birfy/agentdescent/blob/main/examples/absolute_zero/absolute_zero_selfplay.py) |
+| **Example** | [`examples/absolute_zero/absolute_zero_selfplay.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/absolute_zero/absolute_zero_selfplay.py) |
 | **Domain** | self-generated cart arithmetic — 16 self-play slots + 16/16 frozen evaluation carts (deduction + abduction) |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `inference_analogue` — [what the classes mean](port-fidelity.md) |
@@ -50,7 +50,7 @@ difficulty, not peaked at 50%. Both roles update the same weights via TRR++
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration), two solver samples per
 proposed item, `deepseek-v4-flash` at temperature 0.7. Recorded in
-[`bench/results/absolute-zero-selfplay.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/absolute-zero-selfplay.json).
+[`bench/results/absolute-zero-selfplay.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/absolute-zero-selfplay.json).
 
 | seed | test quality | validation | accepted | calls |
 |---|---|---|---|---|

@@ -8,13 +8,13 @@ description: A runnable reproduction of SkillWeaver web-agent API synthesis with
 > web APIs into a growing library. Runs through the shared
 > [`MethodPolicy`](policies.md) runner with `self_verify` on (the reward model).
 > Example:
-> [`examples/skillweaver/skillweaver_web_apis.py`](https://github.com/Birfy/agentdescent/blob/main/examples/skillweaver/skillweaver_web_apis.py).
+> [`examples/skillweaver/skillweaver_web_apis.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skillweaver/skillweaver_web_apis.py).
 
 | | |
 |---|---|
 | **Paper** | *SkillWeaver: Web Agents can Self-Improve by Discovering and Honing Skills* — Zheng et al., 2025 ([arXiv:2504.07079](https://arxiv.org/abs/2504.07079)) |
 | **Upstream code** | [OSU-NLP-Group/SkillWeaver@f2a63d65](https://github.com/OSU-NLP-Group/SkillWeaver/tree/f2a63d65d0f6ff46ac30e817cede8797f8f25b97) |
-| **Example** | [`examples/skillweaver/skillweaver_web_apis.py`](https://github.com/Birfy/agentdescent/blob/main/examples/skillweaver/skillweaver_web_apis.py) |
+| **Example** | [`examples/skillweaver/skillweaver_web_apis.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skillweaver/skillweaver_web_apis.py) |
 | **Domain** | deterministic settings web service — 48 form tasks, 16/16/16 splits |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `environment_analogue` — [what the classes mean](port-fidelity.md) |
@@ -51,7 +51,7 @@ Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge **off** and `self_verify` on (both this method's own
 declaration), `deepseek-v4-flash` at temperature 0.7.
 Recorded in
-[`bench/results/skillweaver-web-apis.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/skillweaver-web-apis.json).
+[`bench/results/skillweaver-web-apis.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/skillweaver-web-apis.json).
 
 | seed | test quality | validation | accepted | calls |
 |---|---|---|---|---|

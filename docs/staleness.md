@@ -4,7 +4,7 @@
     This is the `staleness` field of the [Policies bundle](policies.md); where a keyword argument exists it is a shortcut onto that field, and an explicit argument wins over a bundle default.
 
 
-*Module:* [`agentdescent.staleness`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/staleness.py)
+*Module:* [`agentdescent.staleness`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/staleness.py)
 · *API:* [`StalenessPolicy`, `FullStaleness`, `GuardedStaleness`, `ReflectiveStaleness`, `get_policy`](api.md#staleness-policies)
 
 This is the problem parallel self-improvement has and serial self-improvement does
@@ -85,8 +85,8 @@ Measured on the reference domain at `async_ratio=4`, where all three converge to
 | Guarded | ~20k | ~17k | ~5.1s |
 
 Reproduce with
-[`examples/rq2_staleness.py`](https://github.com/Birfy/agentdescent/blob/main/examples/rq2_staleness.py)
-and [`examples/run_async.py`](https://github.com/Birfy/agentdescent/blob/main/examples/run_async.py).
+[`examples/rq2_staleness.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/rq2_staleness.py)
+and [`examples/run_async.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/run_async.py).
 What the table says:
 
 * **Guarded discards more work than Reflective** — that is the claim under test,

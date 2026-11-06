@@ -1,6 +1,6 @@
 # Verified seeding — trust becomes a gate, not a report
 
-*Module:* [`agentdescent.verified_seed`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/verified_seed.py)
+*Module:* [`agentdescent.verified_seed`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/verified_seed.py)
 
 The self-exam stamps adoptions `passed` / `flagged` / `demoted`, and the
 meta-audit measures the oracle-vs-verifier gain bias. `_archived_rules` already

@@ -46,12 +46,12 @@
 
   const hosts = {
     claude: {name: 'CLAUDE CODE', label: 'Claude Code', setup: 'agentdescent install claude-code\nclaude --plugin-dir ~/.agentdescent/plugins/claude-code', help: 'Start Claude Code with the plugin directory. In the session, /plugin lists it.'},
-    codex: {name: 'CODEX', label: 'Codex', setup: 'codex plugin marketplace add Birfy/agentdescent\ncodex plugin add agentdescent@agentdescent\ncodex mcp list', help: 'The marketplace plugin includes the AgentDescent MCP server. Confirm that codex mcp list shows it.'},
+    codex: {name: 'CODEX', label: 'Codex', setup: 'codex plugin marketplace add ThinkFlowLab/agentdescent\ncodex plugin add agentdescent@agentdescent\ncodex mcp list', help: 'The marketplace plugin includes the AgentDescent MCP server. Confirm that codex mcp list shows it.'},
     opencode: {name: 'OPENCODE', label: 'OpenCode', setup: 'agentdescent install opencode\nopencode mcp list', help: 'Restart OpenCode after installation and check that AgentDescent is connected.'},
     dsh: {name: 'DEEPSEEK HARNESS', label: 'DeepSeek Harness', setup: 'agentdescent install dsh\ndsh --profile web --dump-config | grep agentdescent', help: 'Restart DeepSeek Harness and check that its configuration contains AgentDescent.'}
   };
-  const oneClickCommand = 'curl -fsSL https://raw.githubusercontent.com/Birfy/agentdescent/main/scripts/install.sh | bash';
-  const pipCommand = "python3 -m pip install --upgrade 'agentdescent[mcp] @ git+https://github.com/Birfy/agentdescent.git@main'";
+  const oneClickCommand = 'curl -fsSL https://raw.githubusercontent.com/ThinkFlowLab/agentdescent/main/scripts/install.sh | bash';
+  const pipCommand = "python3 -m pip install --upgrade 'agentdescent[mcp] @ git+https://github.com/ThinkFlowLab/agentdescent.git@main'";
   const hostOpen = {
     claude: {label:'LAUNCH CLAUDE CODE', command:'claude --plugin-dir ~/.agentdescent/plugins/claude-code', help:'The installer writes a local plugin directory. Launch Claude Code with it.'},
     codex: {label:'VERIFY CODEX', command:'codex mcp list', help:'Restart Codex, then check that the agentdescent MCP server is enabled.'},

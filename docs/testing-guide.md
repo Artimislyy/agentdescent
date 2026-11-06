@@ -13,7 +13,7 @@ One command does all of it — AgentDescent, and the wiring for every agent CLI
 you already have:
 
 ```bash
-git clone https://github.com/Birfy/agentdescent && cd agentdescent
+git clone https://github.com/ThinkFlowLab/agentdescent && cd agentdescent
 bash scripts/setup-hosts.sh
 ```
 
@@ -109,7 +109,7 @@ claude --plugin-dir ~/.agentdescent/plugins/claude-code   # Claude Code
 Codex reads the same plugin format, so it can skip the file edits entirely:
 
 ```bash
-codex plugin marketplace add Birfy/agentdescent
+codex plugin marketplace add ThinkFlowLab/agentdescent
 codex plugin add agentdescent@agentdescent
 ```
 

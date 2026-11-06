@@ -7,7 +7,7 @@ description: A runnable reproduction of SkillOpt (ReflACT) skill-document editin
 > **Skill-document self-evolution.** Train a single markdown skill doc as the
 > external state of a frozen agent, with optimizer discipline. Runs through
 > [`evolve()`](evolution.md) with a custom `Strategy` + `aggregator_factory`.
-> Example: [`examples/skillopt/skillopt_skill_training.py`](https://github.com/Birfy/agentdescent/blob/main/examples/skillopt/skillopt_skill_training.py).
+> Example: [`examples/skillopt/skillopt_skill_training.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skillopt/skillopt_skill_training.py).
 
 > **Spec form:** the optimizer ships in
 > `agentdescent/algorithms/skillopt.py`; a spec can name
@@ -20,7 +20,7 @@ description: A runnable reproduction of SkillOpt (ReflACT) skill-document editin
 |---|---|
 | **Paper** | *SkillOpt: Executive Strategy for Self-Evolving Agent Skills* — Yang et al., 2025 ([arXiv:2605.23904](https://arxiv.org/abs/2605.23904)) |
 | **Upstream code** | [`microsoft/SkillOpt`](https://github.com/microsoft/SkillOpt) (PyPI `skillopt`) |
-| **Example** | [`examples/skillopt/skillopt_skill_training.py`](https://github.com/Birfy/agentdescent/blob/main/examples/skillopt/skillopt_skill_training.py) |
+| **Example** | [`examples/skillopt/skillopt_skill_training.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skillopt/skillopt_skill_training.py) |
 | **Domain** | **SearchQA** (single-turn text QA), EM / F1 |
 | **Layer** | L2 skill (`blast_radius=0.2`) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
@@ -58,7 +58,7 @@ repo and omitted from this minimal-but-faithful slice.
 
 ## Plug-ins implemented
 
-In [`examples/skillopt/skillopt_skill_training.py`](https://github.com/Birfy/agentdescent/blob/main/examples/skillopt/skillopt_skill_training.py):
+In [`examples/skillopt/skillopt_skill_training.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skillopt/skillopt_skill_training.py):
 
 | Plug-in | `evolve()` slot | What it does |
 |---|---|---|

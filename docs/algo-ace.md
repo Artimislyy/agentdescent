@@ -6,7 +6,7 @@ description: A runnable reproduction of ACE (Agentic Context Engineering): evolv
 
 > **Skill / context self-evolution.** Evolve a *playbook of lessons* (the model's
 > context), not the weights. Runs through [`evolve()`](evolution.md) with a custom
-> `Strategy`. Example: [`examples/ace/ace_context_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/ace/ace_context_evolution.py).
+> `Strategy`. Example: [`examples/ace/ace_context_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/ace/ace_context_evolution.py).
 >
 > **Spec form:** the playbook and Curator ship in
 > `agentdescent/algorithms/ace.py`; a spec can name `"algorithm": "ace"`
@@ -20,7 +20,7 @@ description: A runnable reproduction of ACE (Agentic Context Engineering): evolv
 |---|---|
 | **Paper** | *Agentic Context Engineering* — Zhang et al., 2025 ([arXiv:2510.04618](https://arxiv.org/abs/2510.04618)) |
 | **Upstream code** | [`ace-agent/ace`](https://github.com/ace-agent/ace) |
-| **Example** | [`examples/ace/ace_context_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/ace/ace_context_evolution.py) |
+| **Example** | [`examples/ace/ace_context_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/ace/ace_context_evolution.py) |
 | **Domain** | **FiNER-139** (financial XBRL tagging) — `nlpaueb/finer-139` |
 | **Layer** | L2 skill (`blast_radius=0.2`) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
@@ -70,7 +70,7 @@ documented in the module docstring.
 ## Plug-ins implemented
 
 The example provides these plug-ins to `evolve()` (in
-[`examples/ace/ace_context_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/ace/ace_context_evolution.py)):
+[`examples/ace/ace_context_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/ace/ace_context_evolution.py)):
 
 | Plug-in | `evolve()` slot | What it does |
 |---|---|---|

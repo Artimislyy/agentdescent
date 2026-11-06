@@ -6,8 +6,8 @@ the same one every other example on this site runs; what is new is the domain �
 and that the domain has something to put in AlphaZero's `P(s,a)` slot, which ERA
 leaves uniform.
 
-- Entry point: [`examples/porous/porous_tree_search.py`](https://github.com/Birfy/agentdescent/blob/main/examples/porous/porous_tree_search.py)
-- Folder README: [`examples/porous/`](https://github.com/Birfy/agentdescent/blob/main/examples/porous/README.md)
+- Entry point: [`examples/porous/porous_tree_search.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/porous/porous_tree_search.py)
+- Folder README: [`examples/porous/`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/porous/README.md)
 - Selection rule: [`FlatPuct`](selection.md) — the ERA rule, with a real prior
 - Aggregator seam: [`aggregator_factory`](aggregator-factory.md)
 
@@ -66,7 +66,7 @@ An LLM asked for a rigid cage will answer with a five-bonded carbon, an
 unclosed ring digit, a methyl radical or `c1ccc1` often enough that accepting
 them would spend the budget scoring things that cannot exist. There is no RDKit
 here — the repository has zero required dependencies — so
-[`_smiles.py`](https://github.com/Birfy/agentdescent/blob/main/examples/porous/_smiles.py)
+[`_smiles.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/porous/_smiles.py)
 implements the parts that decide validity:
 
 | Check | What it rejects |
@@ -175,7 +175,7 @@ finally reports is on those.
 has no prior: `futs.py` uses `1/len(nodes)` for every node, so the budget is
 spread evenly over a tree in which most nodes are finished or dead. A molecule
 carries evidence about whether it has anywhere left to go, and
-[`_prior.py`](https://github.com/Birfy/agentdescent/blob/main/examples/porous/_prior.py)
+[`_prior.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/porous/_prior.py)
 spends the budget on that instead:
 
 | Component | Reads |
@@ -313,7 +313,7 @@ print(run.tree.best().smiles, run.tree.best().score)
 
 To score with something real — a CSP pipeline, a trained property model, a
 docking run — replace `evaluate_smiles` in
-[`_score.py`](https://github.com/Birfy/agentdescent/blob/main/examples/porous/_score.py).
+[`_score.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/porous/_score.py).
 Nothing else in the search knows what the number means; `PorousTreeAggregator`
 only requires that larger is better and that an unusable candidate comes back as
 `-inf`. If the new scorer is expensive, raise `--workers` and run `--async`: the

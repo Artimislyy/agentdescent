@@ -1,7 +1,7 @@
 # Async — removing the round barrier
 
-*Modules:* [`agentdescent.async_evolve`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/async_evolve.py)
-· [`agentdescent.async_runtime`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/async_runtime.py)
+*Modules:* [`agentdescent.async_evolve`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/async_evolve.py)
+· [`agentdescent.async_runtime`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/async_runtime.py)
 · *API:* [`async_evolve`](api.md#barrier-free-evolution), [`AsyncAgentDescent`, `AsyncConfig`, `AsyncStats`](api.md#the-async-orchestrator)
 
 The synchronous loop runs a barrier: every worker steps, then one
@@ -180,7 +180,7 @@ print(stats.rollouts, stats.commits, stats.discarded_stale,
 `stragglers_checkpointed`, `oracle_used`, `wallclock` and a `timeline` of
 `(rollout, accuracy)` pairs — the raw material behind the
 [measured results](results.md) and
-[`examples/run_async.py`](https://github.com/Birfy/agentdescent/blob/main/examples/run_async.py).
+[`examples/run_async.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/run_async.py).
 
 ## Choosing sync or async
 

@@ -17,7 +17,7 @@ detecting stragglers. It's the concrete machinery behind the design's
 python -m examples.duration_scheduling
 ```
 
-Source: [`examples/duration_scheduling.py`](https://github.com/Birfy/agentdescent/blob/main/examples/duration_scheduling.py).
+Source: [`examples/duration_scheduling.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/duration_scheduling.py).
 
 ---
 

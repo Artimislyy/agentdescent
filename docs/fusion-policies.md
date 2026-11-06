@@ -1,7 +1,7 @@
 # Fusion policies — merging what survived
 
-*Module:* [`agentdescent.fusion`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/fusion.py),
-[`agentdescent.defaults`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/defaults.py)
+*Module:* [`agentdescent.fusion`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/fusion.py),
+[`agentdescent.defaults`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/defaults.py)
 · *Contract:* `FusionPolicy.select(artifact, diffs) -> (diff, applied, fused)`
 
 After conflict resolution the surviving diffs are pairwise non-contradicting,

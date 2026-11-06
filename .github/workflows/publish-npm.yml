@@ -12,7 +12,7 @@ name: publish-npm
 #   npm publish --access public        # signed in as a maintainer
 #
 # then on npmjs.com -> the package -> Settings -> Trusted Publisher, add:
-#   owner/repo = Birfy/agentdescent, workflow = publish-npm.yml
+#   owner/repo = ThinkFlowLab/agentdescent, workflow = publish-npm.yml
 #
 # After that this workflow publishes every release and no credential is stored.
 # Until then it will fail with an auth error, which is the honest outcome --

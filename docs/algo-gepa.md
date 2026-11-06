@@ -7,7 +7,7 @@ description: A runnable reproduction of GEPA (Reflective Prompt Evolution) with 
 > **Skill / prompt self-evolution.** Evolve an instruction prompt with a genetic,
 > reflective loop whose parent selection is a **per-instance Pareto frontier**.
 > Runs through [`evolve()`](evolution.md) with a custom `aggregator_factory`.
-> Example: [`examples/gepa/gepa_prompt_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/gepa/gepa_prompt_evolution.py).
+> Example: [`examples/gepa/gepa_prompt_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/gepa/gepa_prompt_evolution.py).
 >
 > **Spec form:** the mechanism ships in `agentdescent/algorithms/gepa.py` and a
 > spec can name it with `"algorithm": "gepa"` (registry fidelity
@@ -18,7 +18,7 @@ description: A runnable reproduction of GEPA (Reflective Prompt Evolution) with 
 |---|---|
 | **Paper** | *GEPA: Reflective Prompt Evolution Can Outperform RL* — Agrawal et al., 2025 ([arXiv:2507.19457](https://arxiv.org/abs/2507.19457)) |
 | **Upstream code** | [`gepa-ai/gepa`](https://github.com/gepa-ai/gepa) (also `dspy.GEPA`) |
-| **Example** | [`examples/gepa/gepa_prompt_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/gepa/gepa_prompt_evolution.py) |
+| **Example** | [`examples/gepa/gepa_prompt_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/gepa/gepa_prompt_evolution.py) |
 | **Domain** | **HotpotQA** (multi-hop QA, distractor), exact match |
 | **Layer** | L2 prompt (`blast_radius=0.2`) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
@@ -63,7 +63,7 @@ sample (raise `--workers`). The Pareto set is the held-out split.
 
 ## Plug-ins implemented
 
-In [`examples/gepa/gepa_prompt_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/gepa/gepa_prompt_evolution.py):
+In [`examples/gepa/gepa_prompt_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/gepa/gepa_prompt_evolution.py):
 
 | Plug-in | `evolve()` slot | What it does |
 |---|---|---|

@@ -310,7 +310,7 @@ small script so they cannot drift.
 
 ```
 .claude-plugin/plugin.json      name, version, description
-.claude-plugin/marketplace.json in the repo root so `/plugin marketplace add Birfy/agentdescent` works
+.claude-plugin/marketplace.json in the repo root so `/plugin marketplace add ThinkFlowLab/agentdescent` works
 skills/agentdescent/SKILL.md    the shared skill
 commands/evolve.md              /agentdescent:evolve <path> — a slash-command shortcut that
                                 invokes the skill with the argument prefilled

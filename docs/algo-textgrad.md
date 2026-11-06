@@ -9,13 +9,13 @@ description: A runnable microport of TextGrad's textual-gradient prompt optimiza
 > second call rewrites the variable from that critique, and the rewrite is kept
 > only if validation did not get worse (upstream's rule; the engine's gate is stricter, see Boundaries). Runs through the shared
 > [`MethodPolicy`](policies.md) runner. Example:
-> [`examples/textgrad/textgrad_prompt_optimization.py`](https://github.com/Birfy/agentdescent/blob/main/examples/textgrad/textgrad_prompt_optimization.py).
+> [`examples/textgrad/textgrad_prompt_optimization.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/textgrad/textgrad_prompt_optimization.py).
 
 | | |
 |---|---|
 | **Paper** | *Optimizing generative AI by backpropagating language model feedback* — Yuksekgonul et al., *Nature* 2025 ([doi:10.1038/s41586-025-08661-4](https://www.nature.com/articles/s41586-025-08661-4)); preprint *TextGrad: Automatic "Differentiation" via Text* ([arXiv:2406.07496](https://arxiv.org/abs/2406.07496)) |
 | **Upstream code** | [zou-group/textgrad@75e912e2](https://github.com/zou-group/textgrad/tree/75e912e210864b61999781778cdf756d4468120f) (MIT) |
-| **Example** | [`examples/textgrad/textgrad_prompt_optimization.py`](https://github.com/Birfy/agentdescent/blob/main/examples/textgrad/textgrad_prompt_optimization.py) |
+| **Example** | [`examples/textgrad/textgrad_prompt_optimization.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/textgrad/textgrad_prompt_optimization.py) |
 | **Domain** | **GSM8K** ([`openai/gsm8k`](https://huggingface.co/datasets/openai/gsm8k), `main`), 64/64/64 splits |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -89,7 +89,7 @@ then step.
 
 **Not yet measured.** This page lands with offline tests only; no live run is
 recorded, so there is deliberately no number here. When one is, it goes in
-[`bench/results/`](https://github.com/Birfy/agentdescent/tree/main/bench/results)
+[`bench/results/`](https://github.com/ThinkFlowLab/agentdescent/tree/main/bench/results)
 and in the
 [all-ports table](self-evolution-examples.md#measured-results-all-twenty-three).
 

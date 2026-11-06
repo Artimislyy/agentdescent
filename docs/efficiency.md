@@ -11,7 +11,7 @@ processes or hosts would.
 python -m examples.efficiency
 ```
 
-Source: [`examples/efficiency.py`](https://github.com/Birfy/agentdescent/blob/main/examples/efficiency.py).
+Source: [`examples/efficiency.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/efficiency.py).
 
 ---
 
@@ -365,7 +365,7 @@ at from the other direction.
     Read this table as evidence that the *harness* works — deterministic, budget
     matched in calls, quality on an unseen split, spread rather than point
     estimates. The real-model answer to
-    [#52](https://github.com/Birfy/agentdescent/issues/52)'s question now
+    [#52](https://github.com/ThinkFlowLab/agentdescent/issues/52)'s question now
     exists: the [runtime matrix](matrix-report.md) runs eleven ports against a
     live model under serial/sync/async scheduling — 1.36× end-to-end, 1.89×
     engine-window (n=33). This table and that one measure different substrates

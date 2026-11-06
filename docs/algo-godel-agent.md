@@ -8,13 +8,13 @@ description: A runnable reproduction of Godel Agent recursive runtime self-modif
 > self-improvement prompt that rewrites it, so the search rewrites its own
 > search. Runs through the shared [`MethodPolicy`](policies.md) runner, behind an
 > AST gate. Example:
-> [`examples/godel_agent/godel_agent_self_modify.py`](https://github.com/Birfy/agentdescent/blob/main/examples/godel_agent/godel_agent_self_modify.py).
+> [`examples/godel_agent/godel_agent_self_modify.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/godel_agent/godel_agent_self_modify.py).
 
 | | |
 |---|---|
 | **Paper** | *Gödel Agent: A Self-Referential Agent Framework for Recursive Self-Improvement* — Yin et al., 2024 ([arXiv:2410.04444](https://arxiv.org/abs/2410.04444)) |
 | **Upstream code** | [Arvid-pku/Godel_Agent@bbb50879](https://github.com/Arvid-pku/Godel_Agent/tree/bbb508796be31c7140cdfc7106efd830a1324242) |
-| **Example** | [`examples/godel_agent/godel_agent_self_modify.py`](https://github.com/Birfy/agentdescent/blob/main/examples/godel_agent/godel_agent_self_modify.py) |
+| **Example** | [`examples/godel_agent/godel_agent_self_modify.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/godel_agent/godel_agent_self_modify.py) |
 | **Domain** | **GSM-Hard** ([`reasoning-machines/gsm-hard`](https://huggingface.co/datasets/reasoning-machines/gsm-hard)), 64/64/64 shuffled splits; two AST-gated policy functions |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `self_edit_analogue` — [what the classes mean](port-fidelity.md) |
@@ -52,7 +52,7 @@ reflective merge on (the policy default, and
 proposals pass), **with** the framework gate (the default, and a declared
 substitution -- see below), `deepseek-v4-flash` at temperature 0.7, 64/64/64
 shuffled splits. Recorded in
-[`bench/results/godel-agent-self-modify.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/godel-agent-self-modify.json).
+[`bench/results/godel-agent-self-modify.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/godel-agent-self-modify.json).
 
 | seed | test quality | validation | accepted | invalid | calls |
 |---|---|---|---|---|---|

@@ -274,7 +274,7 @@ registration, not hard-coded.** To evolve something new, provide four things.
 ### 4.1 An `Evolvable`
 
 Implement the protocol from `agentdescent/evolvable.py`
-([reference: `RouterSkill`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/domains/router.py)):
+([reference: `RouterSkill`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/domains/router.py)):
 
 ```python
 from agentdescent import Contract, Diff, EvidenceCard

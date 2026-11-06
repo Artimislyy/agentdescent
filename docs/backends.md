@@ -1,6 +1,6 @@
 # Backends — a tool-using agent over a document
 
-*Module:* [`agentdescent.backends`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/backends.py)
+*Module:* [`agentdescent.backends`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/backends.py)
 · *API:* [`AgentBackend`, `document_agent`, `openhands`, `tool_loop_backend`, …](api.md#document-backends)
 
 [`Completion`](agents.md) is `prompt -> text`, and that is enough for a task

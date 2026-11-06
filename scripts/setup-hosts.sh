@@ -174,7 +174,7 @@ cat <<'NEXT'
 Then, per host:
 
   Claude Code   claude --plugin-dir ~/.agentdescent/plugins/claude-code
-  Codex         codex plugin marketplace add Birfy/agentdescent
+  Codex         codex plugin marketplace add ThinkFlowLab/agentdescent
                 codex plugin add agentdescent@agentdescent
   DSH           dsh --profile web --dump-config | grep agentdescent
   OpenCode      opencode mcp list

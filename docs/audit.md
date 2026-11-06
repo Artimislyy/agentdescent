@@ -1,6 +1,6 @@
 # Sparse audit — a cheap verifier against ground truth
 
-*Module:* [`agentdescent.audit`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/audit/__init__.py)
+*Module:* [`agentdescent.audit`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/audit/__init__.py)
 · *API:* [`AuditedReward`](api.md#the-sparse-audit-layer)
 · [`GoldAnswer`, `DeferredOracle`](api.md#audit-oracle-sources)
 · [`AuditStore`](api.md#the-audit-store)

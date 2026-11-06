@@ -3,11 +3,10 @@
 # No `version:`/`date-released:` here on purpose. `agentdescent/__init__.py` is
 # the only place the version lives -- see the note in pyproject.toml, written
 # where a duplicate had drifted to 0.7.0 while every wheel said 0.2.0. A copy
-# here would be a second source with nothing keeping it honest, and what this
-# file is for is citing the paper, which has no package version anyway.
+# here would be a second source with nothing keeping it honest.
 cff-version: 1.2.0
 message: >-
-  If you use AgentDescent, please cite the paper below.
+  If you use AgentDescent, please cite the software as below.
 title: AgentDescent
 type: software
 abstract: >-
@@ -19,8 +18,8 @@ authors:
   - family-names: Chen
     given-names: Danyang
     orcid: "https://orcid.org/0000-0002-5622-1545"
-repository-code: "https://github.com/Birfy/agentdescent"
-url: "https://birfy.github.io/agentdescent/"
+repository-code: "https://github.com/ThinkFlowLab/agentdescent"
+url: "https://thinkflowlab.github.io/agentdescent/"
 license: MIT
 keywords:
   - self-evolving agents
@@ -31,15 +30,3 @@ keywords:
   - bounded staleness
   - prompt optimization
   - skill learning
-preferred-citation:
-  type: article
-  title: >-
-    AgentDescent: Asynchronous Parallel Self-Evolution of LLM Agents by Merging
-    Conflicting Edits
-  authors:
-    - family-names: Chen
-      given-names: Danyang
-      orcid: "https://orcid.org/0000-0002-5622-1545"
-  year: 2026
-  doi: "10.5281/zenodo.22348027"
-  url: "https://doi.org/10.5281/zenodo.22348027"

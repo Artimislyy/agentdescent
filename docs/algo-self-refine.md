@@ -7,13 +7,13 @@ description: A runnable reproduction of Self-Refine iterative feedback refinemen
 > **Feedback-loop self-evolution.** One model generates, critiques its own
 > answer, and refines from the critique. Runs through the shared
 > [`MethodPolicy`](policies.md) runner. Example:
-> [`examples/self_refine/self_refine_feedback_loop.py`](https://github.com/Birfy/agentdescent/blob/main/examples/self_refine/self_refine_feedback_loop.py).
+> [`examples/self_refine/self_refine_feedback_loop.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/self_refine/self_refine_feedback_loop.py).
 
 | | |
 |---|---|
 | **Paper** | *Self-Refine: Iterative Refinement with Self-Feedback* — Madaan et al., 2023 ([arXiv:2303.17651](https://arxiv.org/abs/2303.17651)) |
 | **Upstream code** | [madaan/self-refine@9a206d41](https://github.com/madaan/self-refine/tree/9a206d41e5d2d0c241bb441f41eeadb945afaa55) |
-| **Example** | [`examples/self_refine/self_refine_feedback_loop.py`](https://github.com/Birfy/agentdescent/blob/main/examples/self_refine/self_refine_feedback_loop.py) |
+| **Example** | [`examples/self_refine/self_refine_feedback_loop.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/self_refine/self_refine_feedback_loop.py) |
 | **Domain** | **GSM8K** ([`openai/gsm8k`](https://huggingface.co/datasets/openai/gsm8k), `main`), 64/64/64 splits |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -47,7 +47,7 @@ No training of any kind.
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration), `deepseek-v4-flash` at
 temperature 0.7, on a 192-core Linux host. Recorded in
-[`bench/results/self-refine-gsm8k.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/self-refine-gsm8k.json).
+[`bench/results/self-refine-gsm8k.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/self-refine-gsm8k.json).
 
 | seed | test quality | validation | accepted | calls | wall |
 |---|---|---|---|---|---|

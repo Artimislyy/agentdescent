@@ -48,7 +48,7 @@ commands](plugin-quickstart.md) walks the whole path.
 | host | what it writes | how to load it |
 |---|---|---|
 | `dsh` | `~/.dsh/skills/agentdescent/SKILL.md` + `hooks.json`; an `@deepseek-ai/dsh-mcp-client` entry and the `hooks-claude-code` bridge appended to `~/.dsh/cordis.patch.yml` | restart `dsh`; check with `dsh --profile web --dump-config \| grep agentdescent` |
-| `claude-code` | a plugin directory at `~/.agentdescent/plugins/claude-code/` (`plugin.json`, skill, `/agentdescent:evolve`, `/agentdescent:algorithms`, `.mcp.json`, a `SessionStart` hook) | `claude --plugin-dir ~/.agentdescent/plugins/claude-code`, or `/plugin marketplace add Birfy/agentdescent` then `/plugin install agentdescent@agentdescent` |
+| `claude-code` | a plugin directory at `~/.agentdescent/plugins/claude-code/` (`plugin.json`, skill, `/agentdescent:evolve`, `/agentdescent:algorithms`, `.mcp.json`, a `SessionStart` hook) | `claude --plugin-dir ~/.agentdescent/plugins/claude-code`, or `/plugin marketplace add ThinkFlowLab/agentdescent` then `/plugin install agentdescent@agentdescent` |
 | `codex` | `~/.codex/skills/agentdescent/SKILL.md`; `/prompts:evolve` and `/prompts:algorithms` as `~/.codex/prompts/{evolve,algorithms}.md` (same bodies as Claude `/agentdescent:evolve` / `/agentdescent:algorithms`); an `[mcp_servers.agentdescent]` block appended to `~/.codex/config.toml` | restart Codex; check with `codex mcp list`. **Or skip `install` entirely** and use the plugin — see below |
 | `opencode` | `~/.config/opencode/skill/agentdescent/SKILL.md`; `/agentdescent/evolve` and `/agentdescent/algorithms` under `~/.config/opencode/command/agentdescent/` (legacy singular `command/`, nested to mirror Claude's namespaced slash); an `mcp.agentdescent` entry merged into `~/.config/opencode/opencode.jsonc` (into `opencode.json` beside it when your `opencode.jsonc` has comments; OpenCode merges the two) | restart OpenCode; check with `opencode mcp list` |
 | `grok-bot` | scaffold under `~/.agentdescent/plugins/grok-bot/` (`SKILL.md`, `HOST.md`, `mcp.example.json`) — **not** a one-click wire-up: Grok Bot has no public plugin API for local skill+stdio MCP; `HOST.md` names `algorithms list`/`show`/`run` and MCP discovery | read `HOST.md`; ask Grok Bot to save the skill as a user skill; drive runs with the CLI (`algorithms run` = init+plan), or run `agentdescent mcp --transport streamable-http` behind an HTTPS tunnel and add the URL as a custom MCP server. `doctor` reports `mcp n/a` when the scaffold is current |
@@ -144,7 +144,7 @@ this repository already publishes installs there in one command — and brings
 the MCP server with it, so none of the file edits above are needed:
 
 ```bash
-codex plugin marketplace add Birfy/agentdescent      # or a local checkout path
+codex plugin marketplace add ThinkFlowLab/agentdescent      # or a local checkout path
 codex plugin add agentdescent@agentdescent
 codex plugin list                                    # installed, enabled
 codex mcp list                                       # agentdescent ... enabled
@@ -174,7 +174,7 @@ run status into the chat — which is not what this integration does.
 ### DeepSeek Harness: a native plugin, or the files
 
 `install dsh` writes files and needs no npm. The alternative is the Cordis
-plugin in [`integrations/dsh-agentdescent`](https://github.com/Birfy/agentdescent/tree/main/integrations/dsh-agentdescent):
+plugin in [`integrations/dsh-agentdescent`](https://github.com/ThinkFlowLab/agentdescent/tree/main/integrations/dsh-agentdescent):
 
 ```bash
 dsh plugin --profile web add link:/path/to/dsh-agentdescent

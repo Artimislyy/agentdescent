@@ -11,7 +11,7 @@ shared ledger goes through it.
 
 ---
 
-*Module:* [`agentdescent.aggregator`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/aggregator.py)
+*Module:* [`agentdescent.aggregator`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/aggregator.py)
 · *API:* [`Aggregator`, `AggregatorConfig`, `MergeOutcome`, …](api.md#the-aggregator-the-optimizer)
 · *Neighbours:* [verifier](verifier.md) scores candidates · [ledger](ledger.md) commits them ·
 [staleness](staleness.md) decides what to do with an out-of-date diff ·

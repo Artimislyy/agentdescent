@@ -7,13 +7,13 @@ description: A runnable reproduction of AFlow agentic workflow search with soft 
 > **Workflow self-evolution.** Search the space of code-expressed agentic
 > workflows, with soft mixed selection over the top-k scored ones. Runs through
 > the shared [`MethodPolicy`](policies.md) runner. Example:
-> [`examples/aflow/aflow_workflow_search.py`](https://github.com/Birfy/agentdescent/blob/main/examples/aflow/aflow_workflow_search.py).
+> [`examples/aflow/aflow_workflow_search.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/aflow/aflow_workflow_search.py).
 
 | | |
 |---|---|
 | **Paper** | *AFlow: Automating Agentic Workflow Generation* — Zhang et al., ICLR 2025 ([arXiv:2410.10762](https://arxiv.org/abs/2410.10762)) |
 | **Upstream code** | [FoundationAgents/AFlow@3f457218](https://github.com/FoundationAgents/AFlow/tree/3f457218fc716093fe53f6df8a5d5e6379d66346) |
-| **Example** | [`examples/aflow/aflow_workflow_search.py`](https://github.com/Birfy/agentdescent/blob/main/examples/aflow/aflow_workflow_search.py) |
+| **Example** | [`examples/aflow/aflow_workflow_search.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/aflow/aflow_workflow_search.py) |
 | **Domain** | **GSM8K** ([`openai/gsm8k`](https://huggingface.co/datasets/openai/gsm8k), `main`), 64/64/64 splits |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -51,7 +51,7 @@ modifications and whether each helped — injected into the prompt.
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration), `deepseek-v4-flash` at
 temperature 0.7. Recorded in
-[`bench/results/aflow-gsm8k.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/aflow-gsm8k.json).
+[`bench/results/aflow-gsm8k.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/aflow-gsm8k.json).
 
 | seed | test quality | validation | accepted | calls | wall |
 |---|---|---|---|---|---|

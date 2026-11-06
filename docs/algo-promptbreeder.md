@@ -8,13 +8,13 @@ description: A runnable reproduction of PromptBreeder genetic prompt self-evolut
 > units with a binary tournament. Runs through the shared
 > [`MethodPolicy`](policies.md) runner, with the tournament as the
 > `aggregator_factory`. Example:
-> [`examples/promptbreeder/promptbreeder_genetic_prompts.py`](https://github.com/Birfy/agentdescent/blob/main/examples/promptbreeder/promptbreeder_genetic_prompts.py).
+> [`examples/promptbreeder/promptbreeder_genetic_prompts.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/promptbreeder/promptbreeder_genetic_prompts.py).
 
 | | |
 |---|---|
 | **Paper** | *Promptbreeder: Self-Referential Self-Improvement Via Prompt Evolution* — Fernando et al., 2023 ([arXiv:2309.16797](https://arxiv.org/abs/2309.16797)) |
 | **Upstream code** | paper only — no official released code |
-| **Example** | [`examples/promptbreeder/promptbreeder_genetic_prompts.py`](https://github.com/Birfy/agentdescent/blob/main/examples/promptbreeder/promptbreeder_genetic_prompts.py) |
+| **Example** | [`examples/promptbreeder/promptbreeder_genetic_prompts.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/promptbreeder/promptbreeder_genetic_prompts.py) |
 | **Domain** | **GSM8K** ([`openai/gsm8k`](https://huggingface.co/datasets/openai/gsm8k), `main`), 64/64/64 splits |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -60,7 +60,7 @@ measured on a 100-item training batch; the paper runs a population of 50 for
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration),
 `deepseek-v4-flash` at temperature 0.7. Recorded in
-[`bench/results/promptbreeder-gsm8k.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/promptbreeder-gsm8k.json).
+[`bench/results/promptbreeder-gsm8k.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/promptbreeder-gsm8k.json).
 
 | seed | test quality | validation | accepted | calls | wall |
 |---|---|---|---|---|---|

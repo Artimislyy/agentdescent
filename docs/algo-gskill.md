@@ -10,13 +10,13 @@ description: A mechanism microport of gskill — GEPA's optimize_anything learni
 > [`MethodPolicy`](policies.md) runner over a [`FileTree`](directory-evolution.md)
 > strategy with the `skill_dir` structural validator.
 > Example:
-> [`examples/gskill/gskill_repo_skill.py`](https://github.com/Birfy/agentdescent/blob/main/examples/gskill/gskill_repo_skill.py).
+> [`examples/gskill/gskill_repo_skill.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/gskill/gskill_repo_skill.py).
 
 | | |
 |---|---|
 | **Paper** | none — a GEPA application: the [blog post](https://gepa-ai.github.io/gepa/blog/2026/02/18/automatically-learning-skills-for-coding-agents/) and [guide](https://gepa-ai.github.io/gepa/guides/gskill/) (2026) |
 | **Upstream code** | [gepa-ai/gepa@f1cfdee](https://github.com/gepa-ai/gepa/tree/f1cfdee2856e9dc4b5b4dc5cc2e391d0aa20d819/src/gepa/gskill), `src/gepa/gskill` |
-| **Example** | [`examples/gskill/gskill_repo_skill.py`](https://github.com/Birfy/agentdescent/blob/main/examples/gskill/gskill_repo_skill.py) |
+| **Example** | [`examples/gskill/gskill_repo_skill.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/gskill/gskill_repo_skill.py) |
 | **Domain** | a vendored miniature repository (`kvtools`) with 12 injected bugs, 4/4/4 splits — **not** SWE-smith |
 | **Layer** | L2 skill (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -46,7 +46,7 @@ f2p failure and a p2p regression each score 0 and are reported differently.
 
 | Upstream mechanism | Where it lives here |
 |---|---|
-| SWE-smith instances | [`fixtures/bugs.json`](https://github.com/Birfy/agentdescent/blob/main/examples/gskill/fixtures/bugs.json): a mutation over the clean `fixtures/kvtools`, a problem statement, `FAIL_TO_PASS` ids; `PASS_TO_PASS` is every other test |
+| SWE-smith instances | [`fixtures/bugs.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/gskill/fixtures/bugs.json): a mutation over the clean `fixtures/kvtools`, a problem statement, `FAIL_TO_PASS` ids; `PASS_TO_PASS` is every other test |
 | The fitness function | `_fixtures.judge`: binary, verdicts `no_patch` / `f2p_failed` / `p2p_regression` / `all_passed` |
 | Mini-SWE-Agent rollout | `solve`: one model call that returns the repaired file; the skill is in its prompt |
 | Reflection on traces + test output | `propose`: problem, attempt, verdict and test output → `<EDITS>` on the skill tree |

@@ -7,13 +7,13 @@ description: A runnable reproduction of R-Zero Challenger/Solver co-evolution wi
 > **Co-evolution of two roles.** A Challenger writes questions at the Solver's
 > frontier and a Solver trains on majority-vote pseudo-labels. Runs through the
 > shared [`MethodPolicy`](policies.md) runner. Example:
-> [`examples/r_zero/r_zero_challenger_solver.py`](https://github.com/Birfy/agentdescent/blob/main/examples/r_zero/r_zero_challenger_solver.py).
+> [`examples/r_zero/r_zero_challenger_solver.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/r_zero/r_zero_challenger_solver.py).
 
 | | |
 |---|---|
 | **Paper** | *R-Zero: Self-Evolving Reasoning LLM from Zero Data* — Huang et al., 2025 ([arXiv:2508.05004](https://arxiv.org/abs/2508.05004)) |
 | **Upstream code** | [Chengsong-Huang/R-Zero@5699329d](https://github.com/Chengsong-Huang/R-Zero/tree/5699329d018d79535b7910abdedf5a6eebf355fd) |
-| **Example** | [`examples/r_zero/r_zero_challenger_solver.py`](https://github.com/Birfy/agentdescent/blob/main/examples/r_zero/r_zero_challenger_solver.py) |
+| **Example** | [`examples/r_zero/r_zero_challenger_solver.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/r_zero/r_zero_challenger_solver.py) |
 | **Domain** | self-generated cart arithmetic — 16 self-play slots + 16/16 frozen evaluation carts (deduction + abduction) |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `inference_analogue` — [what the classes mean](port-fidelity.md) |
@@ -50,7 +50,7 @@ revision; the paper says 25–75%). Both are trained with GRPO.
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration), four solver samples per
 generated question, `deepseek-v4-flash` at temperature 0.7. Recorded in
-[`bench/results/r-zero-challenger-solver.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/r-zero-challenger-solver.json).
+[`bench/results/r-zero-challenger-solver.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/r-zero-challenger-solver.json).
 
 | seed | test quality | validation | accepted | invalid | calls |
 |---|---|---|---|---|---|

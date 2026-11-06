@@ -1,8 +1,8 @@
 # Self-improvement loop — let the evidence decide what to improve next
 
-*Modules:* [`agentdescent.self_improve`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/self_improve.py),
-[`agentdescent.evidence`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/evidence.py),
-[`agentdescent.admit`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/admit.py)
+*Modules:* [`agentdescent.self_improve`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/self_improve.py),
+[`agentdescent.evidence`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/evidence.py),
+[`agentdescent.admit`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/admit.py)
 · *Issue:* #465
 
 The framework's rungs each know one thing: `portfolio` knows which decision

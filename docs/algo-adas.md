@@ -7,13 +7,13 @@ description: A runnable reproduction of ADAS (Meta Agent Search): evolve the age
 > **Harness self-evolution.** Evolve the *agentic system itself* — the control
 > flow that orchestrates the model. Runs through [`evolve()`](evolution.md) with a
 > custom `Strategy` + `aggregator_factory` at **L1** governance. Example:
-> [`examples/adas/adas_meta_agent_search.py`](https://github.com/Birfy/agentdescent/blob/main/examples/adas/adas_meta_agent_search.py).
+> [`examples/adas/adas_meta_agent_search.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/adas/adas_meta_agent_search.py).
 
 | | |
 |---|---|
 | **Paper** | *Automated Design of Agentic Systems* — Hu, Lu, Clune, 2024 ([arXiv:2408.08435](https://arxiv.org/abs/2408.08435)) |
 | **Upstream code** | [`ShengranHu/ADAS`](https://github.com/ShengranHu/ADAS) |
-| **Example** | [`examples/adas/adas_meta_agent_search.py`](https://github.com/Birfy/agentdescent/blob/main/examples/adas/adas_meta_agent_search.py) |
+| **Example** | [`examples/adas/adas_meta_agent_search.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/adas/adas_meta_agent_search.py) |
 | **Domain** | **MGSM** (Multilingual Grade-School Math) — saturated on a current model, so `--dataset gpqa` (GPQA Diamond, shipped in the ADAS repo) is what has headroom |
 | **Layer** | L1 harness (`blast_radius=0.6`) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
@@ -53,7 +53,7 @@ only the agent *substrate* is a safe DSL instead of raw `exec`.
 
 ## Plug-ins implemented
 
-In [`examples/adas/adas_meta_agent_search.py`](https://github.com/Birfy/agentdescent/blob/main/examples/adas/adas_meta_agent_search.py):
+In [`examples/adas/adas_meta_agent_search.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/adas/adas_meta_agent_search.py):
 
 | Plug-in | `evolve()` slot | What it does |
 |---|---|---|

@@ -9,13 +9,13 @@ description: EvoX Genesis (persistent recursive worlds) as pluggable AgentDescen
 > path, only acceptance moves the version. Runs through
 > [`evolve()`](evolution.md) as one `Strategy` and three `Policies` fields, with
 > **no engine change**. Example:
-> [`examples/genesis/genesis_recursive_worlds.py`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/genesis_recursive_worlds.py).
+> [`examples/genesis/genesis_recursive_worlds.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/genesis_recursive_worlds.py).
 
 | | |
 |---|---|
 | **Paper** | *Persistent Recursive Worlds Enable Autonomous Software Evolution* — Beichen Huang, Zhenyu Liang, Bowen Zheng, Ran Cheng, 2026 ([arXiv:2608.10450](https://arxiv.org/abs/2608.10450)) |
 | **Upstream code** | [`EMI-Group/genesis`](https://github.com/EMI-Group/genesis) @ v0.12.6 (Elixir, AGPL-3.0) |
-| **Example** | [`examples/genesis/genesis_recursive_worlds.py`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/genesis_recursive_worlds.py) |
+| **Example** | [`examples/genesis/genesis_recursive_worlds.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/genesis_recursive_worlds.py) |
 | **Domains** | Two compact formation runs, `--domain`: **minilang** (an integer expression language, 2 nodes deep, 4 files) and **stackvm** (a stack machine and its assembler, 4 nodes deep, 10 files), each grown from an implementation-empty repository against a frozen staged suite |
 | **Layer** | L2 (`blast_radius=0.2`) — the evaluator is outside the artifact |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -75,12 +75,12 @@ Every piece is a seam the engine already had. Nothing in `agentdescent/` changed
 
 | Plug-in | `evolve()` slot | What it does |
 |---|---|---|
-| [`SpatialContract`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_spatial.py) | `strategy=` | A directory, one key per path. An edit carries the path of the agent that made it, and an edit outside that subtree is dropped and **counted**. |
-| [`RecursiveDelegation`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_delegation.py) | `Policies(proposal=)` | One rollout is a whole episode tree at **one** version: manager → children → leaf executors → the parent's verdict → the merged edit set. |
-| [`OctopusConflict`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_octopus.py) | `Policies(conflict=)` | Three-way merges the contested values, so two agents editing two functions of one file both survive. Real overlaps fall through to the shipped rule. |
-| [`ParentJudge`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_judge.py) | `Policies(acceptance=)` | Upstream's monotone rule: *partial progress is accepted*; a regression is refused; a tie commits and sends more work to that subtree. |
-| [`Suite.review`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_suite.py) | `RecursiveDelegation(review=)` | The parent's own test run on **one child's** contribution, inside the episode — the tests and integration evidence of paper §3.3, which the acceptance gate cannot see because it only ever sees what the whole episode returned. |
-| [`LocalWorld` / `WorldLog`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_world.py) | — | `(v,p)` itself; the `CONTEXT.md` chain an entering agent is given; `routing()`, the table that decides where a manager may delegate; and the archive that outlives the agents. |
+| [`SpatialContract`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_spatial.py) | `strategy=` | A directory, one key per path. An edit carries the path of the agent that made it, and an edit outside that subtree is dropped and **counted**. |
+| [`RecursiveDelegation`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_delegation.py) | `Policies(proposal=)` | One rollout is a whole episode tree at **one** version: manager → children → leaf executors → the parent's verdict → the merged edit set. |
+| [`OctopusConflict`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_octopus.py) | `Policies(conflict=)` | Three-way merges the contested values, so two agents editing two functions of one file both survive. Real overlaps fall through to the shipped rule. |
+| [`ParentJudge`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_judge.py) | `Policies(acceptance=)` | Upstream's monotone rule: *partial progress is accepted*; a regression is refused; a tie commits and sends more work to that subtree. |
+| [`Suite.review`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_suite.py) | `RecursiveDelegation(review=)` | The parent's own test run on **one child's** contribution, inside the episode — the tests and integration evidence of paper §3.3, which the acceptance gate cannot see because it only ever sees what the whole episode returned. |
+| [`LocalWorld` / `WorldLog`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_world.py) | — | `(v,p)` itself; the `CONTEXT.md` chain an entering agent is given; `routing()`, the table that decides where a manager may delegate; and the archive that outlives the agents. |
 
 `--keyed-union` and `--engine-gate` turn the third and fourth rows back into the
 engine's own defaults, which is how the rows below were measured.
@@ -116,7 +116,7 @@ of size: **there is no oracle in its scoring path**.
 
 ### Two ways to score a formation run, and only one of them is honest about it
 
-The first three domains are scored by [`Suite`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_suite.py):
+The first three domains are scored by [`Suite`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_suite.py):
 a human writes a reference implementation, the loader runs it to compute the
 expected answer for every case, and a candidate is scored by matching. It is cheap,
 it is exact, and it is circular — you cannot ask a system to grow software you had
@@ -282,7 +282,7 @@ model arm can speak to that, and it is measured separately below.
 
 ### What the domains share
 
-Everything that is not the software itself lives in [`_suite.py`](https://github.com/Birfy/agentdescent/blob/main/examples/genesis/_suite.py):
+Everything that is not the software itself lives in [`_suite.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/genesis/_suite.py):
 the child-process harness, the loader, the frozen-file restore, the parent's
 integration check and the LLM actors. A domain is data on top of it — which is also
 why the second, third and fourth could be added without touching a single
@@ -1440,4 +1440,4 @@ python -m examples.genesis.genesis_recursive_worlds --write-repo /tmp/world    #
 `--dry-run` prints the plan with zero network access and no API key.
 
 Offline tests:
-[`tests/test_genesis_example.py`](https://github.com/Birfy/agentdescent/blob/main/tests/test_genesis_example.py).
+[`tests/test_genesis_example.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/tests/test_genesis_example.py).

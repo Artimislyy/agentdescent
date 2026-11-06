@@ -41,11 +41,11 @@ Copy an existing small card, register it, expose params / kinds / fidelity,
 add a thin doc page, and a changelog fragment. That is the whole PR.
 
 1. **Copy a pattern.** Smallest shipped preset:
-   [`archive_selection` in `agentdescent/algorithms/builtin.py`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/algorithms/builtin.py)
+   [`archive_selection` in `agentdescent/algorithms/builtin.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/algorithms/builtin.py)
    (parent sampling only). Slightly richer mechanism card:
-   [`ace.py`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/algorithms/ace.py).
+   [`ace.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/algorithms/ace.py).
    A fill-in scaffold lives at
-   [`agentdescent/algorithms/_TEMPLATE.py`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/algorithms/_TEMPLATE.py)
+   [`agentdescent/algorithms/_TEMPLATE.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/algorithms/_TEMPLATE.py)
    (not imported by the package — copy it, rename it, then wire the import).
 2. **Implement `build`.** Return
    `Overrides(policies=…, knobs=…, agg_config=…, notes=…)`. Policy slot names
@@ -135,6 +135,6 @@ Acceptance for this path: a newcomer can add a named algorithm and see it in
 
 ## Out of scope here
 
-* Growing the research catalog itself ([#384](https://github.com/Birfy/agentdescent/issues/384)).
+* Growing the research catalog itself ([#384](https://github.com/ThinkFlowLab/agentdescent/issues/384)).
 * Full MethodPolicy / `examples/` microports.
 * Engine changes (`evolve()`, aggregators, hosts).

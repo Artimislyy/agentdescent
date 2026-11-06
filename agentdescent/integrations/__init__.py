@@ -350,7 +350,7 @@ def plugin_manifest() -> Dict[str, object]:
                        "with a parallel, merge-based optimiser.",
         "version": _version(),
         "author": {"name": "AgentDescent"},
-        "homepage": "https://github.com/Birfy/agentdescent",
+        "homepage": "https://github.com/ThinkFlowLab/agentdescent",
         "keywords": ["evolution", "skills", "optimisation", "self-improvement"],
     }
 
@@ -466,7 +466,7 @@ def install_claude_code(home: str, w: _Writer) -> None:
     w.note(f"load it:   claude --plugin-dir {dest}")
     w.note("slash: /agentdescent:evolve <path> [cases.jsonl]")
     w.note("slash: /agentdescent:algorithms list|show|run …")
-    w.note("or, from the repository's marketplace: /plugin marketplace add Birfy/agentdescent "
+    w.note("or, from the repository's marketplace: /plugin marketplace add ThinkFlowLab/agentdescent "
            "&& /plugin install agentdescent@agentdescent")
 
 
@@ -599,7 +599,7 @@ def install_codex(home: str, w: _Writer) -> None:
     # plugin brings the MCP server with it -- one command instead of the two
     # edits above. Verified against codex-cli 0.153.4.
     w.note("or, in one command instead of the two edits above: "
-           "codex plugin marketplace add Birfy/agentdescent && "
+           "codex plugin marketplace add ThinkFlowLab/agentdescent && "
            "codex plugin add agentdescent@agentdescent")
 
 
@@ -940,7 +940,7 @@ def dsh_plugin_package() -> Dict[str, object]:
         "peerDependencies": {"@deepseek-ai/dsh-skill": "*"},
         "repository": {
             "type": "git",
-            "url": "git+https://github.com/Birfy/agentdescent.git",
+            "url": "git+https://github.com/ThinkFlowLab/agentdescent.git",
             "directory": "integrations/dsh-agentdescent",
         },
     }
@@ -985,7 +985,7 @@ DSH_PLUGIN_README = """# dsh-agentdescent
 
 Evolve skills, agent definitions, prompts, code and host plugins from inside
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), using
-[AgentDescent](https://github.com/Birfy/agentdescent).
+[AgentDescent](https://github.com/ThinkFlowLab/agentdescent).
 
 ```bash
 pip install "agentdescent[mcp]"            # the tools this plugin exposes
@@ -1126,7 +1126,7 @@ launcher will not reach the Bot from Cursor's backend.
   to check — not that a server is running.
 - `agentdescent uninstall grok-bot` removes only the files this install wrote.
 
-See also [docs/plugins.md](https://birfy.github.io/agentdescent/docs/plugins/).
+See also [docs/plugins.md](https://thinkflowlab.github.io/agentdescent/docs/plugins/).
 """
 
 

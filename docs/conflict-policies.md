@@ -1,7 +1,7 @@
 # Conflict policies — contradicting diffs
 
-*Module:* [`agentdescent.defaults`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/defaults.py),
-[`agentdescent.fusion`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/fusion.py)
+*Module:* [`agentdescent.defaults`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/defaults.py),
+[`agentdescent.fusion`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/fusion.py)
 · *Contract:* `ConflictPolicy.resolve(artifact, cards) -> (survivors, dropped)`
 
 Two diffs contradict when they write the same key with different values.

@@ -8,13 +8,13 @@ description: A runnable reproduction of OpenEvolve program evolution with MAP-El
 > a sandboxed evaluator supplies reward, and a MAP-Elites island archive keeps
 > the population. Runs through [`evolve()`](evolution.md) / `async_evolve()` with
 > a custom `Strategy` + `aggregator_factory` at **L1** governance. Example:
-> [`examples/openevolve/openevolve_program_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/openevolve/openevolve_program_evolution.py).
+> [`examples/openevolve/openevolve_program_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/openevolve/openevolve_program_evolution.py).
 
 | | |
 |---|---|
 | **Paper** | no paper — the port follows the released code (the technique is AlphaEvolve-shaped) |
 | **Upstream code** | [algorithmicsuperintelligence/openevolve@411fb59c](https://github.com/algorithmicsuperintelligence/openevolve/tree/411fb59c886c18704caaffb611e17cf9e7d824d2), `examples/function_minimization` + the database implementation |
-| **Example** | [`examples/openevolve/openevolve_program_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/openevolve/openevolve_program_evolution.py) |
+| **Example** | [`examples/openevolve/openevolve_program_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/openevolve/openevolve_program_evolution.py) |
 | **Domain** | the bundled function-minimization task, 8 evaluator seeds (6 train / 2 held out) + 6 disjoint test seeds |
 | **Layer** | L1 program (`blast_radius=0.6`, AST-gated and sandbox-isolated) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
@@ -111,9 +111,9 @@ cannot reach the network.
 | Replay | none; a single live engine run |
 
 The recorded output is
-[`bench/results/openevolve-quality-run.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/openevolve-quality-run.json).
+[`bench/results/openevolve-quality-run.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/openevolve-quality-run.json).
 The three-mode timing harness is still
-[`bench/openevolve_agentdescent.py`](https://github.com/Birfy/agentdescent/blob/main/bench/openevolve_agentdescent.py);
+[`bench/openevolve_agentdescent.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/openevolve_agentdescent.py);
 this page reports quality, and the cross-algorithm speedup numbers live in
 [efficiency.md](efficiency.md).
 

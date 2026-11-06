@@ -7,13 +7,13 @@ description: A runnable reproduction of Reflexion verbal reinforcement with boun
 > **Memory self-evolution.** Turn a failed trajectory into a verbal reflection,
 > append it to a bounded episodic memory, and retry with that memory in context.
 > Runs through the shared [`MethodPolicy`](policies.md) runner. Example:
-> [`examples/reflexion/reflexion_episodic_memory.py`](https://github.com/Birfy/agentdescent/blob/main/examples/reflexion/reflexion_episodic_memory.py).
+> [`examples/reflexion/reflexion_episodic_memory.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/reflexion/reflexion_episodic_memory.py).
 
 | | |
 |---|---|
 | **Paper** | *Reflexion: Language Agents with Verbal Reinforcement Learning* — Shinn et al., 2023 ([arXiv:2303.11366](https://arxiv.org/abs/2303.11366)) |
 | **Upstream code** | [noahshinn/reflexion@218cf0ef](https://github.com/noahshinn/reflexion/tree/218cf0ef1df84b05ce379dd4a8e47f17766733a0) |
-| **Example** | [`examples/reflexion/reflexion_episodic_memory.py`](https://github.com/Birfy/agentdescent/blob/main/examples/reflexion/reflexion_episodic_memory.py) |
+| **Example** | [`examples/reflexion/reflexion_episodic_memory.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/reflexion/reflexion_episodic_memory.py) |
 | **Domain** | **GSM-Hard** ([`reasoning-machines/gsm-hard`](https://huggingface.co/datasets/reasoning-machines/gsm-hard)), 64/64/64 shuffled splits |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -49,7 +49,7 @@ append-only and bounded to the last Ω entries (Ω=1–3 in the paper;
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration), `deepseek-v4-flash` at
 temperature 0.7. Recorded in
-[`bench/results/reflexion-gsmhard.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/reflexion-gsmhard.json).
+[`bench/results/reflexion-gsmhard.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/reflexion-gsmhard.json).
 
 | seed | test quality | validation | accepted | invalid | calls |
 |---|---|---|---|---|---|
@@ -69,7 +69,7 @@ shared memory asked to generalise is a question the paper does not ask.
 !!! note "Why GSM-Hard, and what the `invalid` column counts"
     **A memory fed by failures needs a domain that produces them.** On GSM8K
     this port accepted **0 of 80 on all three seeds**
-    ([the run](https://github.com/Birfy/agentdescent/blob/main/bench/results/reflexion-gsm8k.json)
+    ([the run](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/reflexion-gsm8k.json)
     is kept): held-out sat at 0.75–0.80, four rollouts in five succeeded and
     wrote nothing, and the failures that did occur shared no cause. GSM-Hard is
     the same 1319 questions with large numbers substituted — held-out starts at

@@ -12,7 +12,7 @@ module wired together. It evolves a **skill playbook** (accumulated lessons) on 
 | governance | `blast_radius=0.2` → the L2 skill layer |
 
 Source:
-[`examples/skill_evolution.py`](https://github.com/Birfy/agentdescent/blob/main/examples/skill_evolution.py).
+[`examples/skill_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skill_evolution.py).
 
 ```python
 from agentdescent import claude

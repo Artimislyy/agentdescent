@@ -33,7 +33,7 @@ def _mod():
 
 
 c = _mod()
-REPO = "Birfy/agentdescent"
+REPO = "ThinkFlowLab/agentdescent"
 ALL = ["agent-ready", "agent-working", "agent-pr", "hold", "risk:T0", "risk:T1", "risk:T2", "risk:T3"]
 NOW = c.parse_time("2026-10-19T12:00:00Z")
 
@@ -73,7 +73,7 @@ def test_config_names_the_maintainer_and_sane_limits():
 
 
 def test_closing_refs_reads_this_repository_only():
-    body = "Fixes #12\ncloses: #13\nResolved Birfy/agentdescent#14\nfixes other/repo#15\nsee #16"
+    body = "Fixes #12\ncloses: #13\nResolved ThinkFlowLab/agentdescent#14\nfixes other/repo#15\nsee #16"
     assert c.closing_refs(body, REPO) == [12, 13, 14]
 
 

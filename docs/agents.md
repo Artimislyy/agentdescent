@@ -18,7 +18,7 @@ Anything that maps a prompt to text is a completion — an LLM call, a tool-usin
 agent loop, a canned stub. Adapters build completions; higher layers turn a
 completion into whatever task interface they need.
 
-*Module:* [`agentdescent.agents`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/agents.py)
+*Module:* [`agentdescent.agents`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/agents.py)
 · *API:* [`Completion`, `claude`, `openai_compatible`, `cli_agent`, …](api.md#agents-and-models)
 · *See also:* [backends](backends.md) for document tasks, and
 [runners](directory-evolution.md) for giving an agent the evolving directory.

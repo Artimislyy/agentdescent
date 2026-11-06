@@ -10,13 +10,13 @@ description: A runnable microport of Dynamic Cheatsheet (DC-Cu), test-time memor
 > [ACE](algo-ace.md) cites and improves on with an explicit Reflector and
 > structured delta bullets. Runs through the shared [`MethodPolicy`](policies.md)
 > runner. Example:
-> [`examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py`](https://github.com/Birfy/agentdescent/blob/main/examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py).
+> [`examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py).
 
 | | |
 |---|---|
 | **Paper** | *Dynamic Cheatsheet: Test-Time Learning with Adaptive Memory* — Suzgun, Yuksekgonul, Bianchi, Jurafsky, Zou, 2025 ([arXiv:2504.07952](https://arxiv.org/abs/2504.07952)) |
 | **Upstream code** | [suzgunmirac/dynamic-cheatsheet@5cfe3c3](https://github.com/suzgunmirac/dynamic-cheatsheet/tree/5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9) — `DynamicCheatsheet_Cumulative` |
-| **Example** | [`examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py`](https://github.com/Birfy/agentdescent/blob/main/examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py) |
+| **Example** | [`examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/dynamic_cheatsheet/dynamic_cheatsheet_cumulative.py) |
 | **Domain** | **Game of 24** — 36 vendored puzzles (four integers in 1–13, each solvable), 12 / 12 / 12 train / held-out / test, fully offline |
 | **Layer** | L2 skill (`blast_radius=0.2`, declared on the `MethodPolicy`) |
 | **Fidelity** | `mechanism_microport` — [what the classes mean](port-fidelity.md) |
@@ -189,6 +189,6 @@ python -m examples.dynamic_cheatsheet.dynamic_cheatsheet_cumulative --yes --gate
 key**; the dataset is vendored, so `build` loads nothing from outside the
 repository.
 
-Offline tests: [`tests/test_dynamic_cheatsheet.py`](https://github.com/Birfy/agentdescent/blob/main/tests/test_dynamic_cheatsheet.py)
+Offline tests: [`tests/test_dynamic_cheatsheet.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/tests/test_dynamic_cheatsheet.py)
 and the matrix test in `tests/test_candidate_methods.py`, which runs the method
 in every scheduler without an API key.

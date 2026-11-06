@@ -1,6 +1,6 @@
 # Portfolio evolution — evolve the rule that governs the spend
 
-*Module:* [`agentdescent.portfolio_evolve`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/portfolio_evolve.py)
+*Module:* [`agentdescent.portfolio_evolve`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/portfolio_evolve.py)
 
 `portfolio_report` is a fixed, honest reallocation policy: grow the layers that
 pay, shrink the ones that do not, hold the ones with too little evidence. The

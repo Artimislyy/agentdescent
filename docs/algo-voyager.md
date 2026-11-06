@@ -8,13 +8,13 @@ description: A runnable reproduction of Voyager's embodied skill library with a 
 > curriculum, repairing failed programs from environment feedback. Runs through
 > the shared [`MethodPolicy`](policies.md) runner with `self_verify` on (the
 > critic). Example:
-> [`examples/voyager/voyager_skill_library.py`](https://github.com/Birfy/agentdescent/blob/main/examples/voyager/voyager_skill_library.py).
+> [`examples/voyager/voyager_skill_library.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/voyager/voyager_skill_library.py).
 
 | | |
 |---|---|
 | **Paper** | *Voyager: An Open-Ended Embodied Agent with Large Language Models* — Wang et al., 2023 ([arXiv:2305.16291](https://arxiv.org/abs/2305.16291)) |
 | **Upstream code** | [MineDojo/Voyager@55e45a88](https://github.com/MineDojo/Voyager/tree/55e45a880755d0c8c66ca7fb5fe7962ac8974f89) |
-| **Example** | [`examples/voyager/voyager_skill_library.py`](https://github.com/Birfy/agentdescent/blob/main/examples/voyager/voyager_skill_library.py) |
+| **Example** | [`examples/voyager/voyager_skill_library.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/voyager/voyager_skill_library.py) |
 | **Domain** | deterministic crafting world — 48 recipe goals, 16/16/16 splits |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `environment_analogue` — [what the classes mean](port-fidelity.md) |
@@ -54,7 +54,7 @@ reflective merge **off** and `self_verify` on (both this method's own
 declaration — the library overwrites a key, so a synthesised merge would not be
 the algorithm), `deepseek-v4-flash` at temperature 0.7. Recorded
 in
-[`bench/results/voyager-skill-library.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/voyager-skill-library.json).
+[`bench/results/voyager-skill-library.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/voyager-skill-library.json).
 
 | seed | test quality | validation | accepted | calls |
 |---|---|---|---|---|

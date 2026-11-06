@@ -10,18 +10,18 @@ description: A runnable reproduction of ERA, Google Research's empirical-softwar
 > by rank rather than by score — decides what to expand next. Runs through
 > [`evolve()`](evolution.md) / `async_evolve()` with a custom `Strategy` +
 > `aggregator_factory` at **L1** governance. Example:
-> [`examples/era/era_empirical_software.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_empirical_software.py).
+> [`examples/era/era_empirical_software.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_empirical_software.py).
 
 | | |
 |---|---|
 | **Paper** | *An AI system to help scientists write expert-level empirical software*, [arXiv:2509.06503](https://arxiv.org/abs/2509.06503) (Nature, 2026) |
 | **Upstream code** | [google-research/era@b836730](https://github.com/google-research/era/tree/b836730b5c000526af95116b1d0e2c60c8cf0a10), `implementation/futs.py` + `implementation/playground_s3e1.py` |
-| **Example** | [`examples/era/era_empirical_software.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_empirical_software.py) |
+| **Example** | [`examples/era/era_empirical_software.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_empirical_software.py) |
 | **Domain** | Kaggle Playground Series S3E1 (synthetic California housing), RMSE — upstream's own bundled task |
-| **Second task** | [`examples/era/era_hard_integrals.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_hard_integrals.py) — the paper's *numerical solution of integrals*, scored in correct significant digits |
-| **Third task** | [`examples/era/era_hypergeometric.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_hypergeometric.py) — `2F1` in double precision, against a 25-digit mpmath reference |
-| **Fourth task** | [`examples/era/era_llm_srbench.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_llm_srbench.py) — [LLM-SRBench](https://arxiv.org/abs/2504.10415) equation discovery, on the benchmark's own metrics |
-| **Fifth task** | [`examples/era/era_algotune.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_algotune.py) — [AlgoTune](https://github.com/oripress/AlgoTune) ([arXiv:2507.15887](https://arxiv.org/abs/2507.15887)), scored in **speedup** over each task's own reference, one tree per task |
+| **Second task** | [`examples/era/era_hard_integrals.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_hard_integrals.py) — the paper's *numerical solution of integrals*, scored in correct significant digits |
+| **Third task** | [`examples/era/era_hypergeometric.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_hypergeometric.py) — `2F1` in double precision, against a 25-digit mpmath reference |
+| **Fourth task** | [`examples/era/era_llm_srbench.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_llm_srbench.py) — [LLM-SRBench](https://arxiv.org/abs/2504.10415) equation discovery, on the benchmark's own metrics |
+| **Fifth task** | [`examples/era/era_algotune.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_algotune.py) — [AlgoTune](https://github.com/oripress/AlgoTune) ([arXiv:2507.15887](https://arxiv.org/abs/2507.15887)), scored in **speedup** over each task's own reference, one tree per task |
 | **Layer** | L1 program (`blast_radius=0.6`, AST-gated and sandbox-isolated) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
 
@@ -206,10 +206,10 @@ Upstream released `futs.py` and one task, `playground_s3e1.py`; there is no
 integrals implementation to port. So what is faithful here is the **search** —
 and the nine-family suite below is this repository's construction, stated as
 such wherever it is reported. It lives in
-[`examples/era/era_hard_integrals.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_hard_integrals.py),
+[`examples/era/era_hard_integrals.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_hard_integrals.py),
 and it runs on **the same search**: same flat-PUCT tree, same visit reservation,
 same aggregator, same governance layer, same sandbox profile. The seam is a
-[`Domain`](https://github.com/Birfy/agentdescent/blob/main/examples/era/_era_domain.py)
+[`Domain`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/_era_domain.py)
 — seed program, sandboxed evaluator, mutation prompt, metric name — and nothing
 algorithmic lives in it. `domain=None` is upstream's Kaggle task, so a caller
 who names no domain gets the port upstream ships.
@@ -367,7 +367,7 @@ third is scored against **an independent arbitrary-precision computation**, and
 it exists to answer a specific objection: *a benchmark nobody else has run
 proves nothing, because the people who built it also set the bar.*
 
-[`examples/era/era_hypergeometric.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_hypergeometric.py)
+[`examples/era/era_hypergeometric.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_hypergeometric.py)
 asks for a double-precision routine `hyp2f1(a, b, c, z)` — the Gauss
 hypergeometric function, real parameters, over a wide declared range. Three
 properties are what a leaderboard would otherwise have supplied.
@@ -428,7 +428,7 @@ against an arbitrary-precision reference. Two of the three run on suites
 constructed *here*, which is stated wherever they are reported and is the
 standing objection to both: the people who built the task also set the bar.
 
-[`examples/era/era_llm_srbench.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_llm_srbench.py)
+[`examples/era/era_llm_srbench.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_llm_srbench.py)
 answers that objection directly. It runs
 **[LLM-SRBench](https://arxiv.org/abs/2504.10415)** (ICML 2025 Oral) — a
 published benchmark for scientific equation discovery, built by other people,
@@ -551,7 +551,7 @@ beside it, for in-domain and OOD alike.
 
 The four tasks above optimise **accuracy**: lower RMSE, more correct digits, a
 closer equation.
-[`examples/era/era_algotune.py`](https://github.com/Birfy/agentdescent/blob/main/examples/era/era_algotune.py)
+[`examples/era/era_algotune.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/era_algotune.py)
 optimises **speed**, and holds accuracy fixed while doing it.
 
 [AlgoTune](https://github.com/oripress/AlgoTune) (Press et al.,
@@ -601,7 +601,7 @@ code, its measured speedup, and the per-problem timings behind that number.
 
 The root node *is* the reference implementation, lifted out of its `Task` class
 into a runnable program by
-[`derive_seed_program`](https://github.com/Birfy/agentdescent/blob/main/examples/era/_algotune_tasks.py):
+[`derive_seed_program`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/era/_algotune_tasks.py):
 the module's imports are kept, `solve` becomes a module-level function, every
 `self.x` it reads is lifted — a helper method into another function, an
 `__init__` constant into a module constant — and anything else raises rather than
@@ -687,7 +687,7 @@ runnable set.
 | Replay | none; a single live engine run |
 
 The recorded output is
-[`bench/results/era-quality-run.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-quality-run.json).
+[`bench/results/era-quality-run.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-quality-run.json).
 
 ### The result
 
@@ -755,9 +755,9 @@ depth 2, and `--staleness full` considered 6 cards and discarded none.
 | Replay | none; a single live engine run |
 
 The recorded output is
-[`bench/results/era-integrals-run.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-integrals-run.json),
+[`bench/results/era-integrals-run.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-integrals-run.json),
 and the winning program
-[`bench/results/era-integrals-run-best.py`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-integrals-run-best.py).
+[`bench/results/era-integrals-run-best.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-integrals-run-best.py).
 
 ### The result
 
@@ -839,7 +839,7 @@ times, and `--staleness full` considered 12 cards and discarded none.
 | Replay | none; a single live engine run |
 
 Recorded in
-[`bench/results/era-hyp2f1-run.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-hyp2f1-run.json).
+[`bench/results/era-hyp2f1-run.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-hyp2f1-run.json).
 
 ### The result, which is mostly a negative one
 
@@ -959,7 +959,7 @@ effect visible in the earlier rows was itself noise.
 
 48 expansions again, same model and sampling, `--workers 6` this time, scored
 against the 1000-point gate
-([`era-hyp2f1-run48-gate1000.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-hyp2f1-run48-gate1000.json)):
+([`era-hyp2f1-run48-gate1000.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-hyp2f1-run48-gate1000.json)):
 
 | | baseline | best found | |
 |---|---:|---:|---:|
@@ -1126,8 +1126,8 @@ problems**. A better proposer moves the middle of the distribution and does
 nothing for the tail.
 
 Result files:
-[`era-srbench-deepseek-transform.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-srbench-deepseek-transform.json),
-[`era-srbench-aligned-transform.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-srbench-aligned-transform.json).
+[`era-srbench-deepseek-transform.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-srbench-deepseek-transform.json),
+[`era-srbench-aligned-transform.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-srbench-aligned-transform.json).
 
 ### Symbolic accuracy, the column that separates discovery from fitting
 
@@ -1151,7 +1151,7 @@ that predict the held-out samples without being the equation.
 **The judge is `deepseek-v4-flash`, not the paper's GPT-4o.** A different judge is
 a different metric; the scorer records that in its own output and the number
 belongs beside the paper's column rather than inside it. Verdicts:
-[`era-srbench-deepseek-transform-symbolic.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-srbench-deepseek-transform-symbolic.json).
+[`era-srbench-deepseek-transform-symbolic.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-srbench-deepseek-transform-symbolic.json).
 
 ### Against the paper's own table
 
@@ -1282,7 +1282,7 @@ prior is what moves it.
 
 Three caveats travel with that aggregate, and the per-task write-up carries
 them in full:
-[`bench/results/era-algotune-model-prior.md`](https://github.com/Birfy/agentdescent/blob/main/bench/results/era-algotune-model-prior.md).
+[`bench/results/era-algotune-model-prior.md`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/era-algotune-model-prior.md).
 
 * **`lu_factorization`'s 4.464x is the reference's serialisation, not a faster
   factorisation** — it returns numpy arrays where the reference returns three
@@ -1312,7 +1312,7 @@ them in full:
   serialisation to skip here.
 
 Raw data: the eight
-[`bench/results/era-algotune-prior-*.json`](https://github.com/Birfy/agentdescent/tree/main/bench/results)
+[`bench/results/era-algotune-prior-*.json`](https://github.com/ThinkFlowLab/agentdescent/tree/main/bench/results)
 files and the winning program beside each.
 
 ## Run it

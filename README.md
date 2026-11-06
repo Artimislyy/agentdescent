@@ -1,19 +1,18 @@
 # AgentDescent
 
-**[Website & interactive demo](https://birfy.github.io/agentdescent/)** ·
-[Get started](https://birfy.github.io/agentdescent/install/) ·
-[Documentation](https://birfy.github.io/agentdescent/docs/)
+**[Website & interactive demo](https://thinkflowlab.github.io/agentdescent/)** ·
+[Get started](https://thinkflowlab.github.io/agentdescent/install/) ·
+[Documentation](https://thinkflowlab.github.io/agentdescent/docs/)
 
 > **Gradient descent — but the parameters are agents.** A parallel, asynchronous
 > framework for self-evolving agents (skills, prompts, harnesses) where **diffs
 > are the gradients** and **the aggregator is the optimizer**.
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22348027.svg)](https://doi.org/10.5281/zenodo.22348027)
 [![PyPI](https://img.shields.io/pypi/v/agentdescent)](https://pypi.org/project/agentdescent/)
-[![tests](https://github.com/Birfy/agentdescent/actions/workflows/tests.yml/badge.svg)](https://github.com/Birfy/agentdescent/actions/workflows/tests.yml)
-[![docs](https://img.shields.io/badge/docs-mkdocs--material-1f6feb)](https://birfy.github.io/agentdescent/)
+[![tests](https://github.com/ThinkFlowLab/agentdescent/actions/workflows/tests.yml/badge.svg)](https://github.com/ThinkFlowLab/agentdescent/actions/workflows/tests.yml)
+[![docs](https://img.shields.io/badge/docs-mkdocs--material-1f6feb)](https://thinkflowlab.github.io/agentdescent/)
 [![python](https://img.shields.io/badge/python-%E2%89%A53.9-1f6feb)](https://www.python.org/)
-[![license](https://img.shields.io/badge/license-MIT-3fb950)](https://github.com/Birfy/agentdescent/blob/main/LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-3fb950)](https://github.com/ThinkFlowLab/agentdescent/blob/main/LICENSE)
 
 *N* workers propose edits to a shared artifact **in parallel**; a barrier-free
 aggregator merges them into one version-controlled library. Serial
@@ -27,7 +26,7 @@ statistical acceptance and a transactional commit.
 ## What it measures
 
 Every row names the setting that produced it, and
-[the full results page](https://birfy.github.io/agentdescent/results/) also
+[the full results page](https://thinkflowlab.github.io/agentdescent/results/) also
 reports the runs where there was nothing left to learn.
 
 | | measured | setting |
@@ -37,9 +36,8 @@ reports the runs where there was nothing left to learn.
 | Wall-clock against a *faithful* serial control | median **6.8×** (three seeds, 3.1–9.5×) | GEPA on HotpotQA, *N*=4, 16 rollouts pinned |
 | The one-call path, end to end | held-out exact match **0.167 → 0.583** | 40 HotpotQA items, 12 held out |
 
-Quality is claimed only where the design can support it. The
-[paper](https://doi.org/10.5281/zenodo.22348027) reports intervals rather than
-*p*-values where a comparison cannot reach significance, and says so.
+Quality is claimed only where the design can support it: intervals rather than
+*p*-values where a comparison cannot reach significance, and it says so.
 
 ## How it works
 
@@ -47,7 +45,7 @@ Quality is claimed only where the design can support it. The
 diffs with evidence cards into a buffer; a single aggregator thread runs the
 five-stage merge pipeline and commits to a git-backed ledger; four pluggable
 seams sit under the components they select; the L0 governance layer gates the
-audit step.](https://raw.githubusercontent.com/Birfy/agentdescent/main/docs/assets/architecture.png)
+audit step.](https://raw.githubusercontent.com/ThinkFlowLab/agentdescent/main/docs/assets/architecture.png)
 
 **Solid, top:** the fixed data path. *N* workers roll out tasks against ledger
 snapshots and emit diffs with evidence cards; one aggregator thread runs the
@@ -63,9 +61,9 @@ anything to do at all is decided upstream, by the **key space** your strategy
 writes — edits on disjoint keys fuse, edits on the same key conflict. That is
 why the table above starts with a one-key artifact.
 
-The figure is the paper's, rendered from its TikZ source by
-[`tools/gen_architecture_figure.py`](tools/gen_architecture_figure.py) so it
-cannot drift from what the paper shows.
+The figure is rendered from its TikZ source by
+[`tools/gen_architecture_figure.py`](tools/gen_architecture_figure.py), so it
+is regenerable rather than a hand-edited binary.
 
 ## Install and run the offline demo
 
@@ -79,7 +77,7 @@ agentdescent demo
 Or, when developing from source, install your checkout:
 
 ```bash
-git clone https://github.com/Birfy/agentdescent && cd agentdescent
+git clone https://github.com/ThinkFlowLab/agentdescent && cd agentdescent
 pip install -e .
 agentdescent demo
 ```
@@ -116,7 +114,7 @@ export OPENAI_API_KEY=sk-...                      # your key for *that* endpoint
 
 `agentdescent doctor` reports what a machine has; the demo above and `pytest -q`
 need none of it.
-[Every provider, with its base URL →](https://birfy.github.io/agentdescent/agents/#configuring-your-provider-and-key)
+[Every provider, with its base URL →](https://thinkflowlab.github.io/agentdescent/agents/#configuring-your-provider-and-key)
 
 ```python
 from agentdescent import SingleSlot, evolve, openai_compatible, reflector, scorer, tasks_from
@@ -194,7 +192,7 @@ agentdescent doctor           # which CLIs and keys this machine has
 Grok Bot is a **scaffold**, not a one-click wire-up: `agentdescent install grok-bot`
 writes `SKILL.md` / `HOST.md` under `~/.agentdescent/plugins/grok-bot/`, and the
 MCP server is reached via `agentdescent mcp --transport streamable-http` behind an
-HTTPS tunnel. See [Use it from your agent](https://birfy.github.io/agentdescent/plugins/).
+HTTPS tunnel. See [Use it from your agent](https://thinkflowlab.github.io/agentdescent/plugins/).
 
 Say *"improve this prompt against these examples"* inside the agent. It runs
 `doctor`, writes a spec, **quotes the call count before starting**, waits for
@@ -209,8 +207,8 @@ host plugins themselves are evolvable, each rollout loaded into an isolated copy
 of the host, hooks and permission config frozen, with a recursion guard so a
 plugin evolving itself cannot start a nested run.
 
-[The plugin in three commands →](https://birfy.github.io/agentdescent/plugin-quickstart/)
-· [set it up and test it →](https://birfy.github.io/agentdescent/testing-guide/)
+[The plugin in three commands →](https://thinkflowlab.github.io/agentdescent/plugin-quickstart/)
+· [set it up and test it →](https://thinkflowlab.github.io/agentdescent/testing-guide/)
 
 ## What you can replace
 
@@ -241,7 +239,7 @@ cannot detect from a completed run.
 
 Mechanisms that need state the pipeline does not keep — an archive, per-instance
 score rows, an island pool — take the `aggregator_factory` exit instead.
-[How to fill a slot →](https://birfy.github.io/agentdescent/policy-guide/)
+[How to fill a slot →](https://thinkflowlab.github.io/agentdescent/policy-guide/)
 
 ## Twenty-three algorithm ports
 
@@ -264,53 +262,34 @@ change at all**.
 Fidelity is declared per port, follows each project's *released code* where it
 diverges from its paper, and analogues are not to be cited as benchmark
 reproductions. Every port has a `--dry-run` mode that needs no API key.
-[All twenty-three, with their measured results →](https://birfy.github.io/agentdescent/self-evolution-examples/)
+[All twenty-three, with their measured results →](https://thinkflowlab.github.io/agentdescent/self-evolution-examples/)
 
 ## Documentation
 
-Full docs render at **[birfy.github.io/agentdescent](https://birfy.github.io/agentdescent/)**.
+Full docs render at **[thinkflowlab.github.io/agentdescent](https://thinkflowlab.github.io/agentdescent/)**.
 
 | Start here | |
 |---|---|
-| [Quickstart — dataset to skill](https://birfy.github.io/agentdescent/quickstart-skill/) | One call: your data, how to score it, which model |
-| [Measured results](https://birfy.github.io/agentdescent/results/) | Every empirical claim with the setup that produced it |
-| [Architecture](https://birfy.github.io/agentdescent/architecture/) | Components, data flow, the two runtimes |
-| [Concepts](https://birfy.github.io/agentdescent/concepts/) | The training↔RSI analogy, staleness, governance |
+| [Quickstart — dataset to skill](https://thinkflowlab.github.io/agentdescent/quickstart-skill/) | One call: your data, how to score it, which model |
+| [Measured results](https://thinkflowlab.github.io/agentdescent/results/) | Every empirical claim with the setup that produced it |
+| [Architecture](https://thinkflowlab.github.io/agentdescent/architecture/) | Components, data flow, the two runtimes |
+| [Concepts](https://thinkflowlab.github.io/agentdescent/concepts/) | The training↔RSI analogy, staleness, governance |
 
 | Going further | |
 |---|---|
-| [Evolving anything](https://birfy.github.io/agentdescent/evolution/) · [Strategies](https://birfy.github.io/agentdescent/strategies/) | Evolve any artifact by writing its `Strategy` |
-| [Choosing policies](https://birfy.github.io/agentdescent/policies/) · [Using the slots](https://birfy.github.io/agentdescent/policy-guide/) | The decision plane, and how to write for it |
-| [Agents & LLMs](https://birfy.github.io/agentdescent/agents/) · [Datasets](https://birfy.github.io/agentdescent/dataloader/) | The provider layer and the data layer |
-| [Parallelism](https://birfy.github.io/agentdescent/parallelism/) · [Execution](https://birfy.github.io/agentdescent/execution/) · [Sandboxes](https://birfy.github.io/agentdescent/sandboxes/) | Where rollouts run, and how they are isolated |
-| [Use it from your agent](https://birfy.github.io/agentdescent/plugins/) · [Testing it](https://birfy.github.io/agentdescent/testing-guide/) | The plugin surface, and how to verify each host |
-| [Efficiency](https://birfy.github.io/agentdescent/efficiency/) · [Runtime matrix](https://birfy.github.io/agentdescent/matrix-overview/) | Measured scaling and the scheduler comparison |
-| [Molecule search — porous crystals](https://birfy.github.io/agentdescent/porous-molecules/) | A domain application: flat-PUCT tree search over molecules, with a validity gate and a real `P(s,a)` |
+| [Evolving anything](https://thinkflowlab.github.io/agentdescent/evolution/) · [Strategies](https://thinkflowlab.github.io/agentdescent/strategies/) | Evolve any artifact by writing its `Strategy` |
+| [Choosing policies](https://thinkflowlab.github.io/agentdescent/policies/) · [Using the slots](https://thinkflowlab.github.io/agentdescent/policy-guide/) | The decision plane, and how to write for it |
+| [Agents & LLMs](https://thinkflowlab.github.io/agentdescent/agents/) · [Datasets](https://thinkflowlab.github.io/agentdescent/dataloader/) | The provider layer and the data layer |
+| [Parallelism](https://thinkflowlab.github.io/agentdescent/parallelism/) · [Execution](https://thinkflowlab.github.io/agentdescent/execution/) · [Sandboxes](https://thinkflowlab.github.io/agentdescent/sandboxes/) | Where rollouts run, and how they are isolated |
+| [Use it from your agent](https://thinkflowlab.github.io/agentdescent/plugins/) · [Testing it](https://thinkflowlab.github.io/agentdescent/testing-guide/) | The plugin surface, and how to verify each host |
+| [Efficiency](https://thinkflowlab.github.io/agentdescent/efficiency/) · [Runtime matrix](https://thinkflowlab.github.io/agentdescent/matrix-overview/) | Measured scaling and the scheduler comparison |
+| [Molecule search — porous crystals](https://thinkflowlab.github.io/agentdescent/porous-molecules/) | A domain application: flat-PUCT tree search over molecules, with a validity gate and a real `P(s,a)` |
 
 ## Citing
 
-The paper — *AgentDescent: Asynchronous Parallel Self-Evolution of LLM Agents by
-Merging Conflicting Edits* — gives the design, a closed-form condition for when
-merging can fire at all, and a live-model evaluation with every generating script
-named.
-
-```bibtex
-@article{chen2026agentdescent,
-  title  = {{AgentDescent}: Asynchronous Parallel Self-Evolution of {LLM} Agents
-            by Merging Conflicting Edits},
-  author = {Chen, Danyang},
-  year   = {2026},
-  doi    = {10.5281/zenodo.22348027}
-}
-```
-
-LaTeX source and the built PDF live on the
-[`paper`](https://github.com/Birfy/agentdescent/tree/paper/paper) branch, not
-here: the write-up and the code change on different clocks. Per-result raw data
-is in [`bench/results/`](bench/results/) for most results; the
-merge-versus-selection sweeps are re-measurable from the command the paper names
-rather than recomputable, because their per-run data was not retained — the paper
-says so too.
+Use GitHub's **Cite this repository** button, which reads
+[`CITATION.cff`](CITATION.cff). Per-result raw data is in
+[`bench/results/`](bench/results/) for most results.
 
 ## Scope
 

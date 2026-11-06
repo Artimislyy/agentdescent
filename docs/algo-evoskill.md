@@ -7,7 +7,7 @@ description: A runnable reproduction of EvoSkill automated skill discovery: lear
 > **Skill-library self-evolution.** Discover reusable `SKILL.md` skills from
 > execution failures, governed by a bounded top-K frontier. Runs through
 > [`evolve()`](evolution.md) with a custom `Strategy` + `aggregator_factory`.
-> Example: [`examples/evoskill/evoskill_skill_discovery.py`](https://github.com/Birfy/agentdescent/blob/main/examples/evoskill/evoskill_skill_discovery.py).
+> Example: [`examples/evoskill/evoskill_skill_discovery.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/evoskill/evoskill_skill_discovery.py).
 
 > **Spec form:** the mechanism ships in
 > `agentdescent/algorithms/evoskill.py`; a spec can name
@@ -34,7 +34,7 @@ description: A runnable reproduction of EvoSkill automated skill discovery: lear
 |---|---|
 | **Paper** | *EvoSkill: Automated Skill Discovery for Coding Agents* — Alzubi et al., 2026 ([arXiv:2603.02766](https://arxiv.org/abs/2603.02766)) |
 | **Upstream code** | [`sentient-agi/EvoSkill`](https://github.com/sentient-agi/EvoSkill) |
-| **Example** | [`examples/evoskill/evoskill_skill_discovery.py`](https://github.com/Birfy/agentdescent/blob/main/examples/evoskill/evoskill_skill_discovery.py) |
+| **Example** | [`examples/evoskill/evoskill_skill_discovery.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/evoskill/evoskill_skill_discovery.py) |
 | **Domain** | **OfficeQA** (U.S. Treasury Bulletins), deterministic numeric scorer — **FinQA** without HF access, which is what the measured rows below ran on |
 | **Layer** | L2 skill (`blast_radius=0.2`) |
 | **Fidelity** | `benchmark_faithful` — [what the classes mean](port-fidelity.md) |
@@ -86,8 +86,8 @@ Traced from the repo (`src/loop/runner.py`, `src/registry/manager.py`,
 
 ## Plug-ins implemented
 
-In [`examples/evoskill/evoskill_skill_discovery.py`](https://github.com/Birfy/agentdescent/blob/main/examples/evoskill/evoskill_skill_discovery.py)
-(+ [`agentdescent/backends.py`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/backends.py)):
+In [`examples/evoskill/evoskill_skill_discovery.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/evoskill/evoskill_skill_discovery.py)
+(+ [`agentdescent/backends.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/backends.py)):
 
 | Plug-in | `evolve()` slot | What it does |
 |---|---|---|

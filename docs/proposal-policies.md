@@ -1,6 +1,6 @@
 # Proposal policies — evidence into proposals
 
-*Module:* [`agentdescent.policies`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/policies.py)
+*Module:* [`agentdescent.policies`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/policies.py)
 · *Contract:* `ProposalPolicy.propose(ctx: ProposalContext) -> Sequence[str]`
 
 The seam between a rollout's outcome and the proposal the strategy turns into

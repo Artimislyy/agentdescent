@@ -62,7 +62,7 @@ python -m examples.ace.ace_context_evolution --model claude-haiku-4-5 --async   
 ### The eleven microports and analogues
 
 All eleven are `MethodPolicy` definitions over
-[`examples/_method_runner.py`](https://github.com/Birfy/agentdescent/blob/main/examples/_method_runner.py),
+[`examples/_method_runner.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/_method_runner.py),
 so they share a runner, a budget contract and a command line. Port author:
 `cyanneko`.
 
@@ -107,7 +107,7 @@ above would make that table's opening sentence false.
 ### The shared command line
 
 Every port's shared flags have one definition, in
-[`add_standard_args`](https://github.com/Birfy/agentdescent/blob/main/examples/_common.py),
+[`add_standard_args`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/_common.py),
 and the behaviour behind each lives there too — a flag declared centrally and
 honoured locally is how a port grows a `--yes` it never reads.
 
@@ -172,7 +172,7 @@ docstring — never hidden.
 ### The MethodPolicy command line
 
 The eleven declarative ports share
-[`build_parser`](https://github.com/Birfy/agentdescent/blob/main/examples/_method_runner.py),
+[`build_parser`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/_method_runner.py),
 so their command line is the same on all eleven: the shared flags above plus
 `--workers`, `--candidates` (a synonym for `--budget-rollouts`),
 `--no-reflective-merge`, `--staleness`, `--temperature`, `--max-tokens` and

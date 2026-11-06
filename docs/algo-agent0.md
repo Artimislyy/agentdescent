@@ -8,13 +8,13 @@ description: A runnable reproduction of Agent0 tool-integrated curriculum co-evo
 > Executor's frontier and rewards tool use; the Executor answers them
 > stop-and-go through a sandboxed calculator. Runs through the shared
 > [`MethodPolicy`](policies.md) runner. Example:
-> [`examples/agent0/agent0_tool_curriculum.py`](https://github.com/Birfy/agentdescent/blob/main/examples/agent0/agent0_tool_curriculum.py).
+> [`examples/agent0/agent0_tool_curriculum.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/agent0/agent0_tool_curriculum.py).
 
 | | |
 |---|---|
 | **Paper** | *Agent0: Unleashing Self-Evolving Agents from Zero Data via Tool-Integrated Reasoning* — 2025 ([arXiv:2511.16043](https://arxiv.org/abs/2511.16043)) |
 | **Upstream code** | [aiming-lab/Agent0@f775b510](https://github.com/aiming-lab/Agent0/tree/f775b5101e62fe92976831adf4a21a38fcc0a767) |
-| **Example** | [`examples/agent0/agent0_tool_curriculum.py`](https://github.com/Birfy/agentdescent/blob/main/examples/agent0/agent0_tool_curriculum.py) |
+| **Example** | [`examples/agent0/agent0_tool_curriculum.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/agent0/agent0_tool_curriculum.py) |
 | **Domain** | self-generated cart arithmetic with a sandboxed calculator — 16 self-play slots + 16/16 frozen evaluation carts |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `inference_analogue` — [what the classes mean](port-fidelity.md) |
@@ -51,7 +51,7 @@ interpreter in stop-and-go fashion.
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration), four executor samples per
 generated task, `deepseek-v4-flash` at temperature 0.7. Recorded in
-[`bench/results/agent0-tool-curriculum.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/agent0-tool-curriculum.json).
+[`bench/results/agent0-tool-curriculum.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/agent0-tool-curriculum.json).
 
 | seed | test quality | validation | accepted | invalid | calls |
 |---|---|---|---|---|---|

@@ -158,7 +158,7 @@ Two routes. The plugin is one command and brings the MCP server with it; Codex
 reads the same plugin format and marketplace as Claude Code:
 
 ```bash
-codex plugin marketplace add /path/to/agentdescent   # or Birfy/agentdescent
+codex plugin marketplace add /path/to/agentdescent   # or ThinkFlowLab/agentdescent
 codex plugin add agentdescent@agentdescent
 codex plugin list                 # agentdescent@agentdescent  installed, enabled
 codex mcp list                    # agentdescent ... enabled

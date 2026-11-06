@@ -1,7 +1,7 @@
 # Meta-evolution — evolving the slots of `evolve()`
 
-*Module:* [`agentdescent.meta`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/meta.py)
-· *Example:* [`examples/metasearch/`](https://github.com/Birfy/agentdescent/tree/main/examples/metasearch)
+*Module:* [`agentdescent.meta`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/meta.py)
+· *Example:* [`examples/metasearch/`](https://github.com/ThinkFlowLab/agentdescent/tree/main/examples/metasearch)
 · *Design record:* [design-meta-evolution.md](design-meta-evolution.md)
 
 Every decision `evolve()` makes is a field of [`Policies`](policies.md), and
@@ -141,7 +141,7 @@ rule.
 A rollout is one whole inner search, so a sweep of three workers costs about
 half an hour — budget the outer loop in *sweeps of wall clock*, not in rounds.
 
-**`seeds=[0]`, not `[0, 1, 2]`.** The recorded run passed three seeds and they were three copies of one comparison: on a domain where the inner run is a function of the value, the seed randomises nothing. Spend that budget on more *problems* instead — the reasoning is in [the result page](https://github.com/Birfy/agentdescent/blob/main/bench/results/metasearch-selection-srbench.md).
+**`seeds=[0]`, not `[0, 1, 2]`.** The recorded run passed three seeds and they were three copies of one comparison: on a domain where the inner run is a function of the value, the seed randomises nothing. Spend that budget on more *problems* instead — the reasoning is in [the result page](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/metasearch-selection-srbench.md).
 
 ## From the CLI and the host plugins
 
@@ -193,13 +193,13 @@ where it is expensive — that is scored once per value. Three experiments ship,
 
 | script | slot | inner problem | needs |
 |---|---|---|---|
-| [`bench/metasearch_slots.py`](https://github.com/Birfy/agentdescent/blob/main/bench/metasearch_slots.py) | `task_sampler` | a whole inner `evolve()` evolving an instruction on a slice of GSM-Hard / GSM8K | a model, nothing else |
-| [`bench/metasearch_algotune.py`](https://github.com/Birfy/agentdescent/blob/main/bench/metasearch_algotune.py) | `selection` | an ERA tree search on one AlgoTune task, scored in speedup | a model, a sandbox |
-| [`examples/metasearch/_harbor.py`](https://github.com/Birfy/agentdescent/tree/main/examples/metasearch) | `selection` | an ERA tree search over patches to a Harbor science task | a model, a container, an agent |
+| [`bench/metasearch_slots.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/metasearch_slots.py) | `task_sampler` | a whole inner `evolve()` evolving an instruction on a slice of GSM-Hard / GSM8K | a model, nothing else |
+| [`bench/metasearch_algotune.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/metasearch_algotune.py) | `selection` | an ERA tree search on one AlgoTune task, scored in speedup | a model, a sandbox |
+| [`examples/metasearch/_harbor.py`](https://github.com/ThinkFlowLab/agentdescent/tree/main/examples/metasearch) | `selection` | an ERA tree search over patches to a Harbor science task | a model, a container, an agent |
 
 The example itself does stage 0 offline on a synthetic landscape (a seeded
 family to evolve on, a harder one never seen), and its boundary is stated in
-[`examples/metasearch/README.md`](https://github.com/Birfy/agentdescent/blob/main/examples/metasearch/README.md).
+[`examples/metasearch/README.md`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/metasearch/README.md).
 
 `meta_validate` scores the value before and after on problems disjoint from the
 outer run, paired by seed, and `transfer_ratio` reads target gain over source
@@ -245,10 +245,10 @@ which way to go; the domains want opposite things and the search finds each.
 
 | result | what it says |
 |---|---|
-| [Evolving the tree search itself](https://github.com/Birfy/agentdescent/blob/main/bench/results/metasearch-tree.md) | **positive, synthetic.** +0.0227 source / +0.0120 target over 3 seeds; lands on the Pareto front of the hand-tuned PUCT family, from a seed that is off it |
-| [A search rule on real scientific data](https://github.com/Birfy/agentdescent/blob/main/bench/results/metasearch-selection-srbench.md) | **positive, real data.** LLM-SRBench `lsr_synth`: 5 wins / 0 losses / 4 ties over nine held-out paired comparisons, sign test p = 0.031 — and the rule moves in the *opposite* direction to the synthetic one, as predicted in advance |
-| [Choosing a domain to evolve on](https://github.com/Birfy/agentdescent/blob/main/bench/results/metasearch-domain-selection.md) | **the method, and every null.** Four properties a domain must supply, three checks that cost one inner run apiece, and what each domain tried here actually supplied — AlgoTune (irreparable: the timing *is* the feedback) and SWE-bench-Science (three properties out of four; the fourth needs the agent phase) included |
-| [A benchmark x slot matrix](https://github.com/Birfy/agentdescent/blob/main/bench/results/metasearch-slots.md) | **mixed.** Seven cells on `task_sampler` and `acceptance`; four commit, unseen gains +0.02 to +0.04, none negative once the inner budget is adequate |
+| [Evolving the tree search itself](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/metasearch-tree.md) | **positive, synthetic.** +0.0227 source / +0.0120 target over 3 seeds; lands on the Pareto front of the hand-tuned PUCT family, from a seed that is off it |
+| [A search rule on real scientific data](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/metasearch-selection-srbench.md) | **positive, real data.** LLM-SRBench `lsr_synth`: 5 wins / 0 losses / 4 ties over nine held-out paired comparisons, sign test p = 0.031 — and the rule moves in the *opposite* direction to the synthetic one, as predicted in advance |
+| [Choosing a domain to evolve on](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/metasearch-domain-selection.md) | **the method, and every null.** Four properties a domain must supply, three checks that cost one inner run apiece, and what each domain tried here actually supplied — AlgoTune (irreparable: the timing *is* the feedback) and SWE-bench-Science (three properties out of four; the fourth needs the agent phase) included |
+| [A benchmark x slot matrix](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/metasearch-slots.md) | **mixed.** Seven cells on `task_sampler` and `acceptance`; four commit, unseen gains +0.02 to +0.04, none negative once the inner budget is adequate |
 
 ## The product surface: `meta_run`
 

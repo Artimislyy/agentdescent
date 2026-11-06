@@ -7,13 +7,13 @@ description: A runnable reproduction of SICA, the self-improving coding agent th
 > **Self-edit.** An archive of agent iterations; the best performer edits its own
 > Python source and is re-benchmarked. Runs through the shared
 > [`MethodPolicy`](policies.md) runner, behind an AST gate. Example:
-> [`examples/sica/sica_self_edit.py`](https://github.com/Birfy/agentdescent/blob/main/examples/sica/sica_self_edit.py).
+> [`examples/sica/sica_self_edit.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/sica/sica_self_edit.py).
 
 | | |
 |---|---|
 | **Paper** | *A Self-Improving Coding Agent* — Robeyns et al., 2025 ([arXiv:2504.15228](https://arxiv.org/abs/2504.15228)) |
 | **Upstream code** | [MaximeRobeyns/self_improving_coding_agent@ed8275dc](https://github.com/MaximeRobeyns/self_improving_coding_agent/tree/ed8275dca4d3c5dbf77229964351fe9b424797dc) |
-| **Example** | [`examples/sica/sica_self_edit.py`](https://github.com/Birfy/agentdescent/blob/main/examples/sica/sica_self_edit.py) |
+| **Example** | [`examples/sica/sica_self_edit.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/sica/sica_self_edit.py) |
 | **Domain** | **GSM-Hard** ([`reasoning-machines/gsm-hard`](https://huggingface.co/datasets/reasoning-machines/gsm-hard)), 64/64/64 shuffled splits; one AST-gated policy function |
 | **Layer** | L1 (`blast_radius=0.6`, set by the shared runner) |
 | **Fidelity** | `self_edit_analogue` — [what the classes mean](port-fidelity.md) |
@@ -48,7 +48,7 @@ either). The selected agent then edits its own source and is re-benchmarked.
 Three seeds, `async_pipeline`, 80 rollouts each, 8 workers, `--staleness full`,
 reflective merge on (this method's own declaration), `deepseek-v4-flash` at
 temperature 0.7, 64/64/64 shuffled splits. Recorded in
-[`bench/results/sica-self-edit.json`](https://github.com/Birfy/agentdescent/blob/main/bench/results/sica-self-edit.json).
+[`bench/results/sica-self-edit.json`](https://github.com/ThinkFlowLab/agentdescent/blob/main/bench/results/sica-self-edit.json).
 
 | seed | test quality | validation | accepted | invalid | calls |
 |---|---|---|---|---|---|

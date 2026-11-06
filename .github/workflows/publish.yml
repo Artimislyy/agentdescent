@@ -2,7 +2,7 @@ name: publish
 
 # Publish to PyPI via Trusted Publishing (OIDC) — no API token stored.
 # Setup (once): on PyPI add a "pending publisher" for this repo with
-#   owner/repo = Birfy/agentdescent, workflow = publish.yml, environment = pypi
+#   owner/repo = ThinkFlowLab/agentdescent, workflow = publish.yml, environment = pypi
 #   (https://pypi.org/manage/account/publishing/).
 # Then publishing = creating a GitHub Release (or running this workflow manually).
 

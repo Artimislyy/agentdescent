@@ -1,6 +1,6 @@
 # The data model — what a gradient is here
 
-*Module:* [`agentdescent.evolvable`](https://github.com/Birfy/agentdescent/blob/main/agentdescent/evolvable.py)
+*Module:* [`agentdescent.evolvable`](https://github.com/ThinkFlowLab/agentdescent/blob/main/agentdescent/evolvable.py)
 · *API:* [`Evolvable`, `Diff`, `EvidenceCard`, `Contract`, `VersionVector`](api.md#the-data-model)
 
 Four types carry everything that flows through the system. They are small on

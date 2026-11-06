@@ -7,7 +7,7 @@ are very welcome.
 ## Development setup
 
 ```bash
-git clone https://github.com/Birfy/agentdescent
+git clone https://github.com/ThinkFlowLab/agentdescent
 cd agentdescent
 pip install -e ".[dev]"     # installs NumPy plus the pytest/PyYAML/Markdown development tools
 ```
@@ -19,7 +19,7 @@ Python ≥ 3.9 is required.
 From a fresh checkout, the shortest environment and behavior check is:
 
 ```bash
-git clone https://github.com/Birfy/agentdescent
+git clone https://github.com/ThinkFlowLab/agentdescent
 cd agentdescent
 pip install -e ".[dev]"
 pytest -q
