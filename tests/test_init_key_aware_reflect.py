@@ -122,3 +122,67 @@ def test_plan_reflect_key_warning_lists_the_key_that_is_set(tmp_path, monkeypatc
     [warning] = cli._unusable_refs(spec)
     assert "needs OPENAI_API_KEY" in warning
     assert "ARK_API_KEY is set" in warning and "api_key_env" in warning
+
+
+@pytest.mark.parametrize("kind", ["skill_dir", "agent_dir", "agent_code", "plugin"])
+@pytest.mark.parametrize("key_env,extra", [
+    ("ARK_API_KEY", []),
+    ("CUSTOM_API_KEY", ["--key-env", "CUSTOM_API_KEY"]),
+    ("OPENAI_API_KEY", []),
+])
+def test_directory_init_keeps_reflector_and_worker_provider_consistent(
+        tmp_path, monkeypatch, capsys, kind, key_env, extra):
+    monkeypatch.setenv(key_env, "test-key")
+    if extra:
+        # An explicit key must win over an inferred provider key.
+        monkeypatch.setenv("ARK_API_KEY", "test-ark-key")
+    spec, _ = _init(tmp_path, monkeypatch, capsys, "--kind", kind,
+                    "--model", "test-model", "--base-url", "https://provider.example/v1",
+                    *extra)
+    provider_path = spec["agent"]["env"]["OPENCODE_CONFIG"]
+    with open(provider_path, encoding="utf-8") as fh:
+        provider = json.load(fh)["provider"]["custom"]
+    assert provider["options"] == {
+        "baseURL": "https://provider.example/v1", "apiKey": "{env:%s}" % key_env}
+    expected = {"ref": "openai_compatible", "model": "test-model",
+                "default_base_url": "https://provider.example/v1"}
+    if key_env != "OPENAI_API_KEY":
+        expected["api_key_env"] = key_env
+    assert spec["reflect"] == expected
+    assert spec["agent"]["ref"] == "opencode"
+    assert spec["agent"]["extra_args"] == ["-m", "custom/test-model"]
+
+
+def test_algorithms_run_agent_dir_keeps_inferred_reflector(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARK_API_KEY", "test-key")
+    target = tmp_path / "agent"
+    target.mkdir()
+    (target / "AGENTS.md").write_text("Answer the question.\n")
+    cases = tmp_path / "cases.jsonl"
+    cases.write_text('{"prompt": "q", "gold": "a"}\n' * 8)
+    assert cli.main(["algorithms", "run", "archive_selection", str(target), str(cases),
+                     "--kind", "agent_dir", "--agent", "opencode", "--model", "test-model",
+                     "--base-url", "https://provider.example/v1", "--out", "spec.json"]) == 0
+    capsys.readouterr()
+    spec = json.loads((tmp_path / "spec.json").read_text())
+    assert spec["reflect"] == {"ref": "openai_compatible", "model": "test-model",
+                               "api_key_env": "ARK_API_KEY",
+                               "default_base_url": "https://provider.example/v1"}
+    with open(spec["agent"]["env"]["OPENCODE_CONFIG"], encoding="utf-8") as fh:
+        provider = json.load(fh)["provider"]["custom"]
+    assert provider["options"]["apiKey"] == "{env:ARK_API_KEY}"
+
+
+@pytest.mark.parametrize("kind,worker", [
+    ("skill_dir", {"ref": "claude_code", "extra_args": ["--permission-mode", "acceptEdits"]}),
+    ("agent_dir", {"ref": "claude_code"}),
+])
+def test_directory_reflector_preserves_claude_permission_mode(kind, worker):
+    spec = cli.starter_spec("project", kind=kind, agent="claude_code", agent_explicit=True,
+                            model="test-model", key_env="CUSTOM_API_KEY",
+                            base_url="https://provider.example/v1")
+    assert spec["agent"] == worker
+    assert spec["reflect"] == {"ref": "openai_compatible", "model": "test-model",
+                               "api_key_env": "CUSTOM_API_KEY",
+                               "default_base_url": "https://provider.example/v1"}

@@ -367,6 +367,8 @@ def starter_spec(path: str, *, kind: Optional[str] = None, data: Optional[str] =
         if agent == "claude_code":
             spec["agent"] = {"ref": "claude_code",
                              "extra_args": ["--permission-mode", "acceptEdits"]}
+    if kind == "agent_dir":
+        spec["reflect"] = dict(llm)
     if kind == "agent_code":
         spec["entrypoint"] = ["python", "main.py"]
         spec["reflect"] = dict(llm)
