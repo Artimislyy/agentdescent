@@ -2700,6 +2700,54 @@ def audit_trace_payload(run_id: str, *, archive: Optional[str] = None,
                       for l in report.links]}
 
 
+def cmd_compile_skill(a: argparse.Namespace) -> int:
+    """``agentdescent compile-skill`` -- compile a skill and verify it."""
+    from .skill_compiler import SkillCompilerError, compile_skill
+    from .surface_common import atomic_write_text, load_json, resolve_ref
+
+    try:
+        with open(a.skill, encoding="utf-8") as handle:
+            source = handle.read()
+        compiler = resolve_ref(a.compiler, name="compiler")
+        if not callable(compiler):
+            raise SkillCompilerError("compiler must resolve to a callable")
+        tests = [resolve_ref(ref, name="test") for ref in a.test]
+        for test in tests:
+            if not callable(test):
+                raise SkillCompilerError("every --test must resolve to a callable")
+        reference = (resolve_ref(a.reference, name="reference")
+                     if a.reference else None)
+        if reference is not None and not callable(reference):
+            raise SkillCompilerError("reference must resolve to a callable")
+        cases = load_json(a.cases, name="cases") if a.cases else ()
+        if not isinstance(cases, (list, tuple)):
+            raise SkillCompilerError("--cases must be a JSON array")
+        skill_id = (a.skill_id or
+                    os.path.splitext(os.path.basename(a.skill))[0])
+        compiled = compile_skill(
+            skill_id, source, compiler, tests=tests,
+            reference=reference, cases=cases)
+        payload = compiled.to_dict()
+        if a.out:
+            if compiled.status == "compiled":
+                payload["out"] = atomic_write_text(a.out, compiled.code)
+            else:
+                payload["out"] = None
+    except (SkillCompilerError, OSError, ValueError) as error:
+        return _surface_error(a, error)
+    if a.json:
+        _out(payload, as_json=True)
+    else:
+        print(f"skill: {payload['skill_id']}  status: {payload['status']}")
+        print(f"tests: {payload['tests_passed']}/{payload['tests_total']}  "
+              f"equivalence: {payload['equivalence']}")
+        if payload["reason"]:
+            print(f"reason: {payload['reason']}")
+        if payload.get("out"):
+            print(f"code: {payload['out']}")
+    return 0
+
+
 def cmd_traces(a: argparse.Namespace) -> int:
     """``agentdescent traces`` -- digest raw traces or drill into one slice."""
     from .surface_common import atomic_write_json
@@ -4284,6 +4332,24 @@ def build_parser() -> argparse.ArgumentParser:
                     help="failure signature id from `traces digest`")
     sp.add_argument("--limit", type=int, default=50)
     sp.set_defaults(fn=cmd_traces)
+
+    s = sub.add_parser(
+        "compile-skill", help="compile a skill into a tested function")
+    s.add_argument("--skill", required=True, help="skill document to compile")
+    s.add_argument("--skill-id", default=None, dest="skill_id",
+                   help="id used in the result (default: the file stem)")
+    s.add_argument("--compiler", required=True,
+                   help="module:attribute returning the compiled source")
+    s.add_argument("--test", action="append", required=True,
+                   help="module:attribute test callable (repeatable)")
+    s.add_argument("--reference", default=None,
+                   help="module:attribute reference callable")
+    s.add_argument("--cases", default=None,
+                   help="JSON array of single-argument cases")
+    s.add_argument("--out", default=None,
+                   help="write the compiled source here when it passes")
+    s.set_defaults(fn=cmd_compile_skill)
+
 
     s = sub.add_parser("doctor", help="which agents, keys and optional pieces are available")
     s.add_argument("--home", help="the host's home directory (default: the real one)")
