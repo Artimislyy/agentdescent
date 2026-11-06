@@ -4206,14 +4206,15 @@ ReflectiveFusion(
     verifier: Any = None,
     max_chars: int = 8000,
     max_proposals: int = 6,
-    validate: Optional[Callable[[Any], Any]] = None
+    validate: Optional[Callable[[Any], Any]] = None,
+    trust_union: bool = False
 ) -> None
 ```
 
 | method | what it does |
 |---|---|
 | `bind(verifier: Any) -> None` | Receive the engine's verifier, if the caller did not supply one. |
-| `select(artifact: Evolvable, diffs: List[Diff]) -> Tuple[Diff, Evolvable, bool]` | Build the union and hand it straight to the acceptance gate. |
+| `select(artifact: Evolvable, diffs: List[Diff]) -> Tuple[Diff, Evolvable, bool]` | Build the union, rank it against parents (unless `trust_union`). |
 
 ### `reflective_merge(complete, **kwargs) -> Dict[str, Any]`
 

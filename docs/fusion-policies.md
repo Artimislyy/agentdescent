@@ -13,7 +13,7 @@ contest, and whether anyone pays a ranking evaluation.
 | Policy | Rule | Reach for it when |
 |---|---|---|
 | `DefaultFusion` | union of complementary diffs (`ops.update`), straight to the gate; with `tournament=True` it first ranks every single against the union on the cheap layer | the default. The tournament is the only instrument that answers "does merging average the improvements away?" — a per-workload diagnostic, not a tax |
-| `ReflectiveFusion(complete)` | asks a model to write the union of *contested* values — one model call, one gate evaluation, **no ranking of anything**; falls back to `DefaultFusion` when synthesis fails | text-valued keys where dropping a contradiction loses real work. Measured 52% cheaper in model calls on a matched workload. **Not** for code or strict-JSON values: the synthesized value bypasses the strategy's validator |
+| `ReflectiveFusion(complete)` | asks a model to write the union of *contested* values, then **ranks it against parent singles** on the cheap layer before the gate (`trust_union=True` skips ranking); falls back to `DefaultFusion` when synthesis fails | text-valued keys where dropping a contradiction loses real work. **Not** for code or strict-JSON values: the synthesized value bypasses the strategy's validator |
 
 ```python
 evolve(tasks, reward, agent=agent, n_workers=4,
@@ -95,20 +95,17 @@ fails (that would ship some workers' contributions and silently drop the rest,
 which looks like success); and a dead backend falls back rather than raising —
 fusion sits on the commit path of every round.
 
-!!! danger "There is no tournament on this path, and that is the trade"
-    The union goes **straight to the acceptance gate**. Measured on a workload
-    where both paths reach the same final quality: **55 model calls against
-    114** — 52% cheaper, because ranking every candidate was the largest cost in
-    a merge and nothing here ranks anything.
+!!! tip "Default: rank the union against its parents (#766)"
+    After synthesis the cheap layer scores every parent single and the union.
+    Only a union that **strictly** beats the best parent is handed to the
+    acceptance gate. That stops a mashed merge from committing just because it
+    still beats the seed while losing held-out cases a stronger parent already
+    got right.
 
-    | | |
-    |---|---|
-    | **acceptable** | the union can commit while being worse than the best single would have been. It can still never commit a **regression** — the gate scores it on the full held-out set and runs the Beta test and the regression guard, untouched |
-    | **gone** | `best_single_score`, and with it the answer to *"does merging just average the improvements away?"* Nothing scores a single, so every trial is `ranked=False`, `fusion_stats()` reports them as `unranked`, and `win_rate` is `None` |
-
-    A union that was never compared has not won anything, and the statistics
-    cannot pretend otherwise. To **measure** whether merging helps, use the
-    shipped `DefaultFusion` on a multi-key artifact instead.
+    `trust_union=True` restores the older cheap path (union straight to the
+    gate, `ranked=False`, no win rate). Measured ~52% cheaper in model calls on
+    a matched workload, but it can commit a merge worse than the best parent.
+    Prefer the default unless you are deliberately replaying that trade.
 
 !!! warning "It needs two policies, which is why `reflective_merge` returns a pair"
     Conflict resolution is **step 2** and fusion is **step 3**, so `DefaultConflict`
@@ -117,9 +114,8 @@ fusion sits on the commit path of every round.
     workloads it was written for, and correctly declines to merge it with itself.
     `KeepContradictions` is the partner that leaves them for step 3.
 
-The one path that still ranks is the fallback: a dead backend, an empty or
-oversized answer, or one that merely repeats an input falls through to
-`DefaultFusion` rather than losing the round's work — counted as
+Synthesis failure still falls through to `DefaultFusion`: a dead backend, an
+empty or oversized answer, or one that merely repeats an input — counted as
 `synthesis_failed`, apart from `contradiction`, which means no model was asked.
 
 ---

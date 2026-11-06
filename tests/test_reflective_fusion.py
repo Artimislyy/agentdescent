@@ -70,8 +70,9 @@ def test_reflective_fusion_commits_a_union_where_the_default_cannot():
         return "instruction\n" + "\n".join(golds)
 
     stats = _evolve(policies=Policies(**reflective_merge(merger))).fusion_stats()
-    assert stats.unranked > 0, "no union was ever built"
-    assert stats.contested == 0, "nothing is ranked on this path, by design"
+    assert stats.trials > 0, "no merge was ever attempted"
+    # Default ranks the union against parents (#766); a good union contests.
+    assert stats.contested + stats.unranked + stats.synthesis_failed > 0
 
 
 # -- it must not be able to cheat -------------------------------------------
@@ -215,9 +216,11 @@ def test_installing_the_fusion_alone_is_the_mistake_it_looks_like():
     """
     alone = _evolve(policies=Policies(fusion=ReflectiveFusion(lambda p: "merged")))
     assert alone.fusion_stats().unranked == 0, "never given more than one diff"
+    assert alone.fusion_stats().contested == 0, "never given more than one diff"
 
     paired = _evolve(policies=Policies(**reflective_merge(lambda p: "merged")))
-    assert paired.fusion_stats().unranked > 0
+    # Default ranks; a synthesised candidate that wins or loses still contested.
+    assert paired.fusion_stats().contested + paired.fusion_stats().unranked > 0
 
 
 def test_the_prompt_asks_for_a_union_of_deltas_not_a_rewrite():
@@ -334,12 +337,111 @@ def test_the_synthesis_is_one_call_per_tournament_not_per_candidate():
     result = _evolve(policies=Policies(
         **reflective_merge(lambda p: asked.append(p) or "instruction\nmerged")))
     stats = result.fusion_stats()
-    assert stats.unranked > 0, "the mechanism has to have fired at all"
+    assert stats.trials > 0 and len(asked) > 0, "the mechanism has to have fired at all"
     assert len(asked) <= stats.trials, (
         f"{len(asked)} synthesis calls over {stats.trials} tournaments: it is "
         "being asked more than once per merge")
 
 
 # -- trust_union: the big saving, and what it costs --------------------------
+
+
+def test_a_union_worse_than_the_best_parent_does_not_forward():
+    """#766: the gate alone only asks 'beat the seed', so a mashed union that
+    still clears the baseline can regress held-out vs a stronger parent.
+
+    Ranking parents on the cheap layer before the gate is what stops that.
+    """
+    from agentdescent.evolvable import Diff
+
+    class Art:
+        id = "x"
+        state = {"instruction": "seed"}
+
+        def apply(self, diff):
+            out = Art()
+            out.state = dict(self.state)
+            out.state.update(diff.ops)
+            out._score = {
+                "seed": 0.2,
+                "weak": 0.4,
+                "strong": 0.9,
+                "mashed": 0.5,
+            }[out.state["instruction"]]
+            return out
+
+    fusion = ReflectiveFusion(lambda p: "mashed")
+    fusion.bind(type("V", (), {
+        "cheap_eval": staticmethod(lambda a: getattr(a, "_score", 0.2)),
+    })())
+    a = Diff(diff_id="a", target="x", ops={"instruction": "weak"})
+    b = Diff(diff_id="b", target="x", ops={"instruction": "strong"})
+    chosen, _, synthesized = fusion.select(Art(), [a, b])
+    assert not synthesized
+    assert chosen.ops["instruction"] == "strong"
+    trial = fusion.trials[-1]
+    assert trial.ranked is True
+    assert trial.winner == "single"
+    assert trial.best_single_score == 0.9
+    assert trial.synthesized_score == 0.5
+
+
+def test_trust_union_skips_parent_ranking():
+    """The opt-in cheap path: union goes to the gate with ranked=False."""
+    from agentdescent.evolvable import Diff
+
+    class Art:
+        id = "x"
+        state = {"instruction": "seed"}
+
+        def apply(self, diff):
+            return self
+
+    fusion = ReflectiveFusion(lambda p: "mashed", trust_union=True)
+    fusion.bind(type("V", (), {
+        "cheap_eval": staticmethod(lambda a: (_ for _ in ()).throw(
+            AssertionError("trust_union must not cheap_eval"))),
+    })())
+    a = Diff(diff_id="a", target="x", ops={"instruction": "weak"})
+    b = Diff(diff_id="b", target="x", ops={"instruction": "strong"})
+    chosen, _, synthesized = fusion.select(Art(), [a, b])
+    assert synthesized
+    assert chosen.ops["instruction"] == "mashed"
+    assert fusion.trials[-1].ranked is False
+    assert fusion.trials[-1].winner == "synthesized"
+
+
+def test_a_union_that_beats_every_parent_is_forwarded():
+    from agentdescent.evolvable import Diff
+
+    class Art:
+        id = "x"
+        state = {"instruction": "seed"}
+
+        def apply(self, diff):
+            out = Art()
+            out.state = dict(self.state)
+            out.state.update(diff.ops)
+            out._score = {
+                "seed": 0.1,
+                "weak": 0.4,
+                "strong": 0.6,
+                "best-union": 0.95,
+            }[out.state["instruction"]]
+            return out
+
+    fusion = ReflectiveFusion(lambda p: "best-union")
+    fusion.bind(type("V", (), {
+        "cheap_eval": staticmethod(lambda a: getattr(a, "_score", 0.1)),
+    })())
+    a = Diff(diff_id="a", target="x", ops={"instruction": "weak"})
+    b = Diff(diff_id="b", target="x", ops={"instruction": "strong"})
+    chosen, _, synthesized = fusion.select(Art(), [a, b])
+    assert synthesized
+    assert chosen.ops["instruction"] == "best-union"
+    trial = fusion.trials[-1]
+    assert trial.ranked is True
+    assert trial.winner == "synthesized"
+    assert trial.synthesized_score == 0.95
 
 

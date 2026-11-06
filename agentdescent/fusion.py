@@ -12,35 +12,22 @@ model to write one value keeping what each proposal contributed, for the keys th
 diffs actually disagree on -- keys they agree on stay the plain union, because a
 model asked to merge values that do not disagree can only make them worse.
 
-**There is no tournament.** The union goes straight to the acceptance gate. That
-is a deliberate design decision and it is worth being precise about what it
-buys and what it costs.
+**Default: rank the union against its parents.** After synthesis the cheap
+layer scores every parent single and the union; only a union that *strictly*
+beats the best parent is handed to the acceptance gate. That closes the
+measured failure where a mashed union cleared the seed while losing held-out
+cases a stronger parent already got right (#766).
 
-*Buys:* measured on a workload where both paths reach the same final quality,
-55 model calls against 114 -- **52% cheaper**. Ranking every candidate was the
-single largest cost in a merge, and nothing here ranks anything.
+``trust_union=True`` restores the older cheap path: the union goes straight to
+the gate with ``ranked=False`` (no ``best_single_score``, no win rate). That
+path was measured ~52% cheaper in model calls on a matched workload, but it
+can commit a merge worse than the best parent whenever the merge still beats
+the seed. Prefer the default unless you are deliberately replaying that
+trade.
 
-*Costs, and they are not the same size:*
-
-**Acceptable.** The union can commit while being worse than the best single
-proposal would have been. It can still never commit a *regression*: the gate
-scores it on the full held-out set, runs the Beta test and the regression guard,
-and none of that is touched. The bar drops from "beat the best proposal" to
-"beat the artifact you started from".
-
-**Load-bearing, and gone.** `best_single_score` is what answers *"does merging
-just average the improvements away?"* -- the sharpest objection to this whole
-design -- and nothing here scores a single, so there is no answer to record.
-Every trial carries ``ranked=False``, `fusion_stats()` reports them as
-``unranked`` and keeps them out of the win-rate denominator, and `win_rate` is
-`None`. **A union that was never compared has not won anything, and the
-statistics cannot pretend otherwise.** Anyone trying to *measure* whether merging
-helps needs the shipped `DefaultFusion` on a multi-key artifact instead.
-
-The one path that still ranks is the fallback: when the model cannot be used --
-a dead backend, an empty or oversized answer, or one that merely repeats an
-input -- the merge falls through to `DefaultFusion` rather than losing the
-round's work.
+The synthesis-failure fallback still ranks via `DefaultFusion`: a dead
+backend, an empty or oversized answer, or one that merely repeats an input
+falls through rather than losing the round's work.
 
     from agentdescent import Policies, evolve
     from agentdescent.fusion import reflective_merge
@@ -138,11 +125,17 @@ class ReflectiveFusion:
 
     def __init__(self, complete, *, verifier: Any = None,
                  max_chars: int = 8_000, max_proposals: int = 6,
-                 validate: Optional[Callable[[Any], Any]] = None) -> None:
+                 validate: Optional[Callable[[Any], Any]] = None,
+                 trust_union: bool = False) -> None:
         if max_proposals < 2:
             raise ValueError("synthesising needs at least two proposals")
         self.complete = complete
         self.verifier = verifier
+        #: When ``True``, skip the parent ranking pass and hand the synthesised
+        #: union straight to the acceptance gate (``ranked=False``). Default
+        #: ``False`` so a union that loses to a stronger parent cannot commit
+        #: just because it still beats the seed (#766).
+        self.trust_union = trust_union
         #: The synthesised value is written by a model and reaches the ledger
         #: without passing the trust region, which filters *cards* before the
         #: merge. So it is bounded here; a reflector that echoes its own prompt
@@ -169,8 +162,9 @@ class ReflectiveFusion:
         #: control measured 2.7-2.8x the model calls of a merged run at no gain
         #: in quality.
         self.validate = validate
-        #: One record per merge. They carry `ranked=False`, so `fusion_stats()`
-        #: reports them as unranked rather than as wins or losses.
+        #: One record per merge. Ranked trials carry real scores; the
+        #: ``trust_union`` path records ``ranked=False`` so `fusion_stats()`
+        #: keeps those out of the win-rate denominator.
         self.trials: List[FusionTrial] = []
 
     def bind(self, verifier: Any) -> None:
@@ -284,12 +278,16 @@ class ReflectiveFusion:
 
     def select(self, artifact: Evolvable,
                diffs: List[Diff]) -> Tuple[Diff, Evolvable, bool]:
-        """Build the union and hand it straight to the acceptance gate.
+        """Build the union, rank it against parents (unless ``trust_union``).
 
-        No ranking happens here at all -- not of the singles, not of the union.
-        The gate scores the union on the full held-out set, runs the Beta test
-        and the regression guard, and decides. See the class docstring for what
-        that gives up.
+        Default path: cheap-eval every parent single and the synthesised union;
+        hand the gate only a union that *strictly* beats the best parent. That
+        is the fix for #766 -- the gate alone only asks "beat the seed", which
+        still lets a mashed union regress held-out vs a stronger parent.
+
+        ``trust_union=True`` skips that pass and commits the union unranked, the
+        older cheap trade. Synthesis failure still falls through to
+        ``DefaultFusion``.
         """
         if len(diffs) <= 1:
             only = diffs[0]
@@ -298,25 +296,63 @@ class ReflectiveFusion:
 
         union = self._union_of(artifact, diffs)
         if union is not None:
-            self._record(artifact, diffs, "", ranked=False)
-            return union, artifact.apply(union), True
+            if self.trust_union or self.verifier is None:
+                self._record(artifact, diffs, "", ranked=False)
+                return union, artifact.apply(union), True
+            return self._rank_against_parents(artifact, diffs, union)
 
         # The model could not be used -- a dead backend, an empty or oversized
         # answer, or one that merely repeated an input. Falling through to the
-        # shipped tournament costs a ranking pass, and it is the only thing here
-        # that ever does; losing the round's work instead would be worse than
-        # paying for it on the rare merge where synthesis fails.
+        # shipped tournament costs a ranking pass; losing the round's work
+        # instead would be worse than paying for it on the rare merge where
+        # synthesis fails.
         self._record(artifact, diffs, "synthesis-failed", ranked=False)
         return self._fallback.select(artifact, diffs)
 
-    def _record(self, artifact, diffs, reason: str, *, ranked: bool) -> None:
-        """One trial per merge, carrying no verdict.
+    def _rank_against_parents(
+            self, artifact: Evolvable, diffs: Sequence[Diff],
+            union: Diff) -> Tuple[Diff, Evolvable, bool]:
+        """Pick the synthesised union only when it strictly beats every parent.
 
-        `best_single_score` is what answers "does merging just average the
-        improvements away", and nothing here scores a single -- so these trials
-        are `ranked=False` and `fusion_stats()` keeps them out of the win-rate
-        denominator. A union that was never compared has not won anything, and
-        the statistics must not be able to pretend otherwise.
+        Mirrors ``DefaultFusion(tournament=True)``: ``max`` keeps the first of
+        equal scores, so a mere tie loses to the parent. Scores land on
+        ``fused_score`` (for ``FusionTrial.gain`` / contested) and
+        ``synthesized_score`` (how the candidate was built).
+        """
+        applied = [artifact.apply(d) for d in diffs]
+        scored: List[Tuple[float, Diff, Evolvable, bool]] = [
+            (self.verifier.cheap_eval(candidate), d, candidate, False)
+            for d, candidate in zip(diffs, applied)
+        ]
+        union_cand = artifact.apply(union)
+        synth_score = self.verifier.cheap_eval(union_cand)
+        scored.append((synth_score, union, union_cand, True))
+
+        best = max(scored, key=lambda c: c[0])
+        singles = [c[0] for c in scored if not c[3]]
+        baseline = self.verifier.cheap_eval(artifact)
+        best_single = max(singles) if singles else baseline
+        if best[0] <= baseline:
+            winner = "neither"
+        else:
+            winner = "synthesized" if best[3] else "single"
+        self.trials.append(FusionTrial(
+            artifact_id=getattr(artifact, "id", ""),
+            n_candidates=len(diffs),
+            best_single_score=best_single,
+            baseline_score=baseline,
+            fused_score=synth_score,
+            synthesized_score=synth_score,
+            winner=winner,
+            reason="",
+            ranked=True))
+        return best[1], best[2], best[3]
+
+    def _record(self, artifact, diffs, reason: str, *, ranked: bool) -> None:
+        """One trial per merge when nothing was compared (or comparison skipped).
+
+        Used for the single-candidate short-circuit, synthesis failure, and the
+        ``trust_union`` path. Ranked merges go through ``_rank_against_parents``.
         """
         self.trials.append(FusionTrial(
             artifact_id=getattr(artifact, "id", ""), n_candidates=len(diffs),
