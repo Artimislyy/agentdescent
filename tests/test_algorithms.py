@@ -57,6 +57,28 @@ def test_get_unknown_names_the_available_ones():
         algorithms.get("nope")
 
 
+def test_get_unknown_examples_port_names_the_checkout_tip():
+    # #801: a documented examples/ port is not a typo — tip the docs + checkout path.
+    with pytest.raises(AlgorithmError, match=r"examples/ research port \(docs/algo-reflexion\.md\)"):
+        algorithms.get("reflexion", where="show")
+    with pytest.raises(AlgorithmError, match=r"python -m examples\.textgrad"):
+        algorithms.get("TextGrad", where="run")  # case fold
+    with pytest.raises(AlgorithmError, match=r"docs/algo-self-refine\.md"):
+        algorithms.get("self-refine", where="show")  # hyphen fold
+    # Junk names stay tip-free so the available list is the whole answer.
+    with pytest.raises(AlgorithmError) as ei:
+        algorithms.get("nope")
+    assert "examples/ research port" not in str(ei.value)
+
+
+def test_mcp_describe_tips_examples_only_ports():
+    from agentdescent.mcp import Tools
+
+    err = Tools(None).describe_algorithm("self-refine")["error"]
+    assert "docs/algo-self-refine.md" in err and "examples/ research port" in err
+    assert "examples/ research port" not in Tools(None).describe_algorithm("nope")["error"]
+
+
 def test_duplicate_registration_is_refused():
     with pytest.raises(ValueError, match="already registered"):
         algorithms.register(algorithms.get("rrsi"))

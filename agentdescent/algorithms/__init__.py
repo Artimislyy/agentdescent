@@ -184,6 +184,17 @@ ENTRY_POINT_GROUP = "agentdescent.algorithms"
 _EXTERNAL_ERRORS: Dict[str, str] = {}
 _external_loaded = False
 
+#: Documented ``examples/`` research-port slugs that are *not* named Algorithm
+#: cards. ``algorithms show`` / ``run`` / MCP describe only accept registered
+#: cards; naming one of these after reading the ports docs is a common miss
+#: (#801). Keep in sync with ``docs/algo-*.md`` minus the registered cards.
+_EXAMPLES_ONLY_PORTS = frozenset({
+    "absolute_zero", "adas", "aflow", "agent0", "dynamic_cheatsheet", "era",
+    "genesis", "godel_agent", "gskill", "openevolve", "promptbreeder",
+    "r_zero", "reflexion", "self_refine", "sica", "skillweaver", "textgrad",
+    "voyager",
+})
+
 
 def register(algorithm: Algorithm, *, replace: bool = False) -> Algorithm:
     """Add an algorithm. A second registration of a name is an error, not a shadow."""
@@ -250,10 +261,28 @@ def get(name: Any, *, where: str = "algorithm") -> Algorithm:
             raise AlgorithmError(f"{where}: algorithm {broken!r} failed to load: "
                                  f"{_EXTERNAL_ERRORS[broken]}")
     if not isinstance(name, str) or name not in _REGISTRY:
-        raise AlgorithmError(
-            f"{where}: unknown algorithm {name!r}; available: {sorted(_REGISTRY)} "
-            "(see `agentdescent algorithms list`)")
+        raise AlgorithmError(_unknown_algorithm_message(where, name))
     return _REGISTRY[name]
+
+
+def _unknown_algorithm_message(where: str, name: Any) -> str:
+    """Error text for an unknown algorithm name (#801).
+
+    Always lists the registered cards. When ``name`` folds to a documented
+    examples-only research port, add a one-line tip so the user is not left
+    thinking the port name was a typo.
+    """
+    msg = (f"{where}: unknown algorithm {name!r}; available: {sorted(_REGISTRY)} "
+           "(see `agentdescent algorithms list`)")
+    if not isinstance(name, str):
+        return msg
+    slug = _fold(name)
+    if slug not in _EXAMPLES_ONLY_PORTS:
+        return msg
+    doc = f"docs/algo-{slug.replace('_', '-')}.md"
+    return (f"{msg}. {slug!r} is an examples/ research port ({doc}), not a "
+            "named Algorithm card — run it from a source checkout "
+            f"(`python -m examples.{slug}…`), or pick a registered name above")
 
 
 def listing(kind: Optional[str] = None, *,
