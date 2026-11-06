@@ -8,7 +8,7 @@ chosen candidate.
 :class:`PopulationAggregator` subclasses the shipped
 :class:`~agentdescent.aggregator.Aggregator` -- staleness, conflict, fusion,
 statistical acceptance and promotion all run unchanged -- and adds three things
-around it: it archives every distinct committed head with its held-out score,
+around it: it archives every distinct committed head with its held-out score and per-task score vector,
 asks the selection policy which archived candidate the next batch should mutate,
 and commits that candidate back to the right branch.
 
@@ -78,6 +78,30 @@ def _state_size(state: Dict[str, str]) -> int:
     unmeasured candidate into a free one.
     """
     return sum(len(str(k)) + len(str(v)) for k, v in state.items())
+
+
+def _per_task_scores(verifier, artifact):
+    """Mean held-out score and the per-task vector selection policies need.
+
+    ``ParetoFrontier`` (and any paper parent rule that needs per-instance
+    domination) reads ``Candidate.per_task``. The archive used to keep only the
+    mean, so those policies could not run on the Policies path and authors were
+    forced onto ``aggregator_factory=``. Scoring each held-out task once both
+    fills that map and yields the mean the archive already stored — the same
+    decomposition GEPA's pool uses.
+    """
+    held = list(getattr(verifier, "held_out", ()) or ())
+    eval_fn = getattr(verifier, "eval_fn", None)
+    if not held or not callable(eval_fn):
+        score = float(eval_fn(artifact, held)) if callable(eval_fn) else 0.0
+        return score, {}
+    per_task = {}
+    for task in held:
+        tid = str(getattr(task, "id", task))
+        per_task[tid] = float(eval_fn(artifact, [task]))
+    score = sum(per_task.values()) / len(per_task)
+    return score, per_task
+
 
 
 class PopulationAggregator(Aggregator):
@@ -163,9 +187,10 @@ class PopulationAggregator(Aggregator):
             # Seed / pre-selection admits keep parent=None; a later mutation of
             # a selected parent records that tip (#275).
             parent = self._branch_parent.get(branch)
-        # The gate has just evaluated a committed candidate on the full
-        # held-out set, so this is a cache hit, not a new evaluation.
-        score = self.verifier.eval_fn(artifact, list(self.verifier.held_out))
+        # Per-task rows first: ParetoFrontier and lineage policies need them,
+        # and the mean the archive already stored is exactly their average
+        # under a decomposable eval_fn (the GEPA pool's assumption too).
+        score, per_task = _per_task_scores(self.verifier, artifact)
         with self._archive_lock:
             # ``version`` is the archive's node id, and every lineage lookup
             # (``parent``, ``_branch_parent``, ``_bump_selected``, FlatPuct's
@@ -183,6 +208,7 @@ class PopulationAggregator(Aggregator):
             self._archive.append({
                 "state": dict(getattr(artifact, "state", {}) or {}),
                 "score": float(score),
+                "per_task": dict(per_task),
                 "version": node,
                 "selected": 0,
                 "parent": (int(parent) if parent is not None else None),
@@ -229,6 +255,7 @@ class PopulationAggregator(Aggregator):
                           version=int(entry["version"]),
                           state=dict(entry["state"]),
                           score=float(entry["score"]),
+                          per_task=dict(entry.get("per_task") or {}),
                           selected=int(entry["selected"]),
                           parent=(int(entry["parent"])
                                   if entry.get("parent") is not None
@@ -538,9 +565,20 @@ class PopulationAggregator(Aggregator):
                 continue
             try:
                 parent_raw = entry.get("parent", None)
+                raw_pt = entry.get("per_task") or {}
+                per_task = {}
+                if isinstance(raw_pt, dict):
+                    for tk, tv in raw_pt.items():
+                        try:
+                            per_task[str(tk)] = float(tv)
+                        except (TypeError, ValueError):
+                            continue
                 restored.append({
                     "state": dict(st),
                     "score": float(entry.get("score", 0.0)),
+                    # Pre-#806 checkpoints have no per_task → empty map; Pareto
+                    # then refuses honestly rather than inventing scores.
+                    "per_task": per_task,
                     "version": int(entry.get("version", 0)),
                     "selected": int(entry.get("selected", 0)),
                     # Pre-#275 checkpoints have no parent field → roots.

@@ -402,7 +402,7 @@ class ParetoFrontier(SingleHead):
         anything a survivor dominates, sampled in proportion to how many
         instances each survivor still wins. One draw per call, repeated for
         every worker, because Algorithm 2 selects *a* parent per iteration.
-        Needs ``Candidate.per_task`` and an rng.
+        Needs ``Candidate.per_task`` and an rng. Under ``evolve()``, ``PopulationAggregator`` fills that map on admit (#806).
     ``per_instance``
         Plain Pareto: a candidate survives when nothing else dominates it, and
         the survivors are walked round-robin. Close to GEPA and not GEPA -- it

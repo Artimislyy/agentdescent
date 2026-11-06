@@ -24,7 +24,7 @@ ledger commit that rewrites the head.**
 | Aggregator | What it adds | Where |
 |---|---|---|
 | `Aggregator` | the shipped pipeline: dedupe, staleness, conflict, fusion, statistical acceptance, transactional commit, promotion | `agentdescent.aggregator` |
-| `PopulationAggregator(Aggregator)` | an archive of every distinct committed head (with held-out score) + any standard `SelectionPolicy` picking the next parent, committed back to dev; `finalize()` lands the archive's best | `agentdescent.population` — **not** something you install yourself: `Policies(selection=…)` installs it, on both drivers ([selection](selection.md)) |
+| `PopulationAggregator(Aggregator)` | an archive of every distinct committed head (held-out mean **and** per-task score vector) + any standard `SelectionPolicy` picking the next parent, committed back to dev; `finalize()` lands the archive's best. Per-task rows let `ParetoFrontier` ride the Policies path without a factory (#806) | `agentdescent.population` — **not** something you install yourself: `Policies(selection=…)` installs it, on both drivers ([selection](selection.md)) |
 | `ParetoAggregator` | GEPA's pool with per-instance score rows and Algorithm-2 frontier sampling | `examples/gepa/` |
 | `DGMArchiveAggregator` | DGM's keep-all archive with `sigmoid(perf) × 1/(1+children)` parent selection | `examples/dgm/` |
 | `MetaSearchAggregator` | ADAS's keep-all archive over agent designs (head rule: shipped `Beam(1)`) | `examples/adas/` |
