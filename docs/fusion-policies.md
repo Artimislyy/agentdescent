@@ -13,7 +13,7 @@ contest, and whether anyone pays a ranking evaluation.
 | Policy | Rule | Reach for it when |
 |---|---|---|
 | `DefaultFusion` | union of complementary diffs (`ops.update`), straight to the gate; with `tournament=True` it first ranks every single against the union on the cheap layer | the default. The tournament is the only instrument that answers "does merging average the improvements away?" — a per-workload diagnostic, not a tax |
-| `ReflectiveFusion(complete)` | asks a model to write the union of *contested* values, then **ranks it against parent singles** on the cheap layer before the gate (`trust_union=True` skips ranking); falls back to `DefaultFusion` when synthesis fails | text-valued keys where dropping a contradiction loses real work. **Not** for code or strict-JSON values: the synthesized value bypasses the strategy's validator |
+| `ReflectiveFusion(complete)` | asks a model to write the union of *contested* values (with compact parent score/rationale in the prompt; select-one on incompatible taxonomies), then **ranks it against parent singles** on the cheap layer before the gate (`trust_union=True` skips ranking); falls back to `DefaultFusion` when synthesis fails | text-valued keys where dropping a contradiction loses real work. **Not** for code or strict-JSON values: the synthesized value bypasses the strategy's validator |
 
 ```python
 evolve(tasks, reward, agent=agent, n_workers=4,
@@ -69,11 +69,12 @@ Do this:
 2. Output CURRENT with every one of those changes applied together.
 ```
 
-That is an operation whose result can be checked, and it needs only what a
-`FusionPolicy` receives — the current value and the competing ones. Fusion never
-sees the evidence cards, so "what was each proposal fixing" is not available and
-deriving the deltas from CURRENT is what makes it unnecessary rather than
-missing.
+That is an operation whose result can be checked. Fusion still never receives
+evidence cards, but proposal blocks now carry compact Diff metadata (cheap
+score when the verifier is bound, plus rationale) so the model can prefer a
+stronger parent (#767). When proposals redefine the same taxonomy or enum
+incompatibly, the prompt requires picking **one** coherent parent section
+instead of OR-concatenating conflicting labels.
 
 Verified on `GLM-5.2` with three real GEPA-style rewrites of one instruction:
 

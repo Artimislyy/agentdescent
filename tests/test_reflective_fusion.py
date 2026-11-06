@@ -228,14 +228,101 @@ def test_the_prompt_asks_for_a_union_of_deltas_not_a_rewrite():
     that happens to cover the same ground. "Work out what each proposal changed
     relative to CURRENT, then apply all of those changes" is an operation whose
     result can be checked, and it needs only what a FusionPolicy actually has --
-    the current value and the competing ones, never the evidence cards.
+    the current value, competing ones, and compact Diff metadata (not cards).
     """
     from agentdescent.fusion import MERGE_PROMPT
 
     filled = MERGE_PROMPT.format(current="C", proposals="PROPOSAL 1\n---\nP\n---\n")
     assert "UNION" in filled
     assert "CHANGED relative to CURRENT" in filled
+    assert "Do NOT OR-concatenate" in filled
+    assert "select the stronger coherent rewrite" in filled
     assert "{" not in filled and "}" not in filled, "every placeholder is filled"
+
+
+def test_synthesise_prompt_includes_parent_score_and_rationale():
+    """#767: MERGE_PROMPT must see compact parent score/rationale, not raw cards."""
+    seen = []
+
+    def capture(prompt):
+        seen.append(prompt)
+        return "base. CHECK BOTH. BE SHORT. CLEAR."
+
+    fusion = ReflectiveFusion(capture)
+    fusion.bind(type("V", (), {
+        "cheap_eval": staticmethod(lambda a: 0.42),
+    })())
+    out = fusion._synthesise(
+        "base.",
+        ["base. CHECK BOTH.", "base. BE SHORT."],
+        metas=[
+            {"score": 0.4, "rationale": "fix priority labels"},
+            {"score": 0.9, "rationale": "clearer mild/cold bounds"},
+        ],
+    )
+    assert out is not None
+    assert len(seen) == 1
+    prompt = seen[0]
+    assert "PROPOSAL 1 (score=0.4; rationale=fix priority labels)" in prompt
+    assert "PROPOSAL 2 (score=0.9; rationale=clearer mild/cold bounds)" in prompt
+    assert "Do NOT OR-concatenate" in prompt
+
+
+def test_union_of_passes_diff_rationale_and_score_into_prompt():
+    """End-to-end through _union_of: Diff.rationale + verifier score reach complete()."""
+    from agentdescent.evolvable import Diff
+
+    seen = []
+
+    class Art:
+        id = "x"
+        state = {"instruction": "seed"}
+
+        def apply(self, diff):
+            out = Art()
+            out.state = dict(self.state)
+            out.state.update(diff.ops)
+            out._score = {"weak": 0.3, "strong": 0.8, "seed": 0.1}.get(
+                out.state.get("instruction"), 0.5)
+            return out
+
+    fusion = ReflectiveFusion(lambda p: seen.append(p) or "merged-ok-unique")
+    fusion.bind(type("V", (), {
+        "cheap_eval": staticmethod(lambda a: getattr(a, "_score", 0.1)),
+    })())
+    a = Diff(diff_id="a", target="x", ops={"instruction": "weak"},
+             rationale="weak taxonomy rewrite")
+    b = Diff(diff_id="b", target="x", ops={"instruction": "strong"},
+             rationale="stronger coherent vocab")
+    union = fusion._union_of(Art(), [a, b])
+    assert union is not None
+    assert union.ops["instruction"] == "merged-ok-unique"
+    assert len(seen) == 1
+    assert "score=0.3" in seen[0] and "weak taxonomy rewrite" in seen[0]
+    assert "score=0.8" in seen[0] and "stronger coherent vocab" in seen[0]
+
+
+def test_trust_union_does_not_cheap_eval_for_prompt_metadata():
+    """trust_union must stay free of ranking calls, including prompt scores."""
+    from agentdescent.evolvable import Diff
+
+    class Art:
+        id = "x"
+        state = {"instruction": "seed"}
+
+        def apply(self, diff):
+            return self
+
+    fusion = ReflectiveFusion(lambda p: "mashed-unique-text", trust_union=True)
+    fusion.bind(type("V", (), {
+        "cheap_eval": staticmethod(lambda a: (_ for _ in ()).throw(
+            AssertionError("trust_union must not cheap_eval for prompt meta"))),
+    })())
+    a = Diff(diff_id="a", target="x", ops={"instruction": "weak"},
+             rationale="only rationale")
+    b = Diff(diff_id="b", target="x", ops={"instruction": "strong"})
+    union = fusion._union_of(Art(), [a, b])
+    assert union is not None
 
 
 def test_the_union_is_verified_against_the_thing_it_replaces():

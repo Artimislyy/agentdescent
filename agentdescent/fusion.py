@@ -18,6 +18,11 @@ beats the best parent is handed to the acceptance gate. That closes the
 measured failure where a mashed union cleared the seed while losing held-out
 cases a stronger parent already got right (#766).
 
+**Synthesis prompt (#767).** Contested one-key rewrites also pass compact
+parent score (when the verifier is bound) and rationale into ``MERGE_PROMPT``,
+and the prompt forbids OR-concatenating incompatible taxonomies / enums —
+the model must pick one coherent parent section instead of mashing labels.
+
 ``trust_union=True`` restores the older cheap path: the union goes straight to
 the gate with ``ranked=False`` (no ``best_single_score``, no win rate). That
 path was measured ~52% cheaper in model calls on a matched workload, but it
@@ -48,7 +53,7 @@ import random
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .defaults import DefaultFusion
-from .evolvable import Diff, Evolvable, combined_rationale
+from .evolvable import Diff, Evolvable, combined_rationale, rationale_paragraph
 from .policies import FusionTrial
 
 __all__ = ["MERGE_PROMPT", "KeepContradictions", "ReflectiveFusion",
@@ -59,9 +64,10 @@ __all__ = ["MERGE_PROMPT", "KeepContradictions", "ReflectiveFusion",
 #: a rewrite. "Write one version that keeps every improvement" invites a fresh
 #: composition that happens to cover the same ground; "work out what each
 #: proposal changed relative to CURRENT, then apply all of those changes" is an
-#: operation with a checkable result, and it is derivable from exactly what a
-#: `FusionPolicy` has -- the current value and the competing ones. Nothing here
-#: needs the evidence cards, which fusion does not receive.
+#: operation with a checkable result, and it is derivable from what a
+#: `FusionPolicy` has -- the current value, the competing ones, and compact
+#: parent metadata (cheap score when the verifier is bound, plus rationale).
+#: Evidence cards themselves are still not passed (#767).
 MERGE_PROMPT = """\
 Several independent improvements were made to the same text, each fixing a
 different failure. Produce their UNION.
@@ -77,9 +83,16 @@ Do this:
 2. Output CURRENT with every one of those changes applied together.
 
 Rules:
-- Every change introduced by any proposal must survive into your output.
+- Compatible changes from every proposal must survive into your output.
 - Introduce nothing that no proposal introduced.
-- If two proposals changed the same point incompatibly, keep the more specific one.
+- If two proposals changed the same point incompatibly -- especially mutually
+  exclusive taxonomies, enums, priority labels, or vocabularies -- pick ONE
+  coherent parent for that section. Prefer the clearer / higher-scoring
+  proposal when a score is shown. Do NOT OR-concatenate or mash conflicting
+  labels into one list.
+- When proposals are full one-key rewrites that redefine the same schema
+  incompatibly, select the stronger coherent rewrite rather than concatenating
+  both schemas.
 - Output only the merged text: no preamble, no explanation, no markers.
 """
 
@@ -198,18 +211,88 @@ class ReflectiveFusion:
         contested = {k: v for k, v in seen.items() if len(v) > 1}
         return agreed, contested
 
-    def _synthesise(self, current: Any, proposals: Sequence[Any]) -> Optional[str]:
+    @staticmethod
+    def _format_proposals(
+            proposals: Sequence[Any],
+            metas: Optional[Sequence[Optional[Dict[str, Any]]]] = None) -> str:
+        """Render PROPOSAL blocks, optionally with compact score/rationale headers.
+
+        Metadata is Diff-side only (fusion never receives evidence cards). A
+        missing score or empty rationale simply omits that field (#767).
+        """
+        lines: List[str] = []
+        for i, p in enumerate(proposals):
+            header = f"PROPOSAL {i + 1}"
+            meta = None
+            if metas is not None and i < len(metas):
+                meta = metas[i]
+            if meta:
+                bits: List[str] = []
+                score = meta.get("score")
+                if isinstance(score, (int, float)) and score == score:  # not NaN
+                    bits.append(f"score={float(score):.4g}")
+                rat = str(meta.get("rationale") or "").strip()
+                if rat:
+                    bits.append(f"rationale={rat}")
+                if bits:
+                    header = f"{header} ({'; '.join(bits)})"
+            lines.append(f"{header}\n---\n{p}\n---\n")
+        return "\n".join(lines)
+
+    def _parent_metas(
+            self, artifact: Evolvable, diffs: Sequence[Diff],
+            key: str, values: Sequence[Any]) -> List[Dict[str, Any]]:
+        """Compact per-proposal metadata aligned with ``values`` for ``key``.
+
+        Scores come from the cheap verifier when bound and ``trust_union`` is
+        off (so the unranked path stays free of ranking calls). Rationales are
+        taken from the Diff that proposed each value.
+        """
+        score_by_id: Dict[str, float] = {}
+        if self.verifier is not None and not self.trust_union:
+            for d in diffs:
+                try:
+                    score_by_id[d.diff_id] = float(
+                        self.verifier.cheap_eval(artifact.apply(d)))
+                except Exception:  # noqa: BLE001 - metadata is best-effort
+                    continue
+        metas: List[Dict[str, Any]] = []
+        for v in values:
+            matching = [d for d in diffs if d.ops.get(key) == v]
+            rationale = ""
+            score: Optional[float] = None
+            for d in matching:
+                if not rationale:
+                    rationale = rationale_paragraph(
+                        getattr(d, "rationale", "") or "", cap=200)
+                if d.diff_id in score_by_id:
+                    s = score_by_id[d.diff_id]
+                    score = s if score is None else max(score, s)
+            metas.append({"score": score, "rationale": rationale})
+        return metas
+
+    def _synthesise(
+            self, current: Any, proposals: Sequence[Any],
+            metas: Optional[Sequence[Optional[Dict[str, Any]]]] = None,
+    ) -> Optional[str]:
         """One merged value, or ``None`` if anything at all went wrong.
 
         Every rejection path returns ``None`` rather than raising: this runs on
         the commit path of every round, and a merge that dies because a model was
         slow is worse than a merge that did not improve.
+
+        ``metas`` is optional per-proposal score/rationale aligned with
+        ``proposals`` (#767). Truncation to ``max_proposals`` keeps metas in
+        lockstep with the kept values.
         """
-        kept = [p for p in proposals if p is not None][:self.max_proposals]
+        pairs = [(p, (metas[i] if metas is not None and i < len(metas) else None))
+                 for i, p in enumerate(proposals) if p is not None]
+        pairs = pairs[:self.max_proposals]
+        kept = [p for p, _ in pairs]
+        kept_metas = [m for _, m in pairs]
         if len(kept) < 2:
             return None
-        listed = "\n".join(
-            f"PROPOSAL {i + 1}\n---\n{p}\n---\n" for i, p in enumerate(kept))
+        listed = self._format_proposals(kept, kept_metas)
         try:
             merged = self.complete(MERGE_PROMPT.format(
                 current="" if current is None else current, proposals=listed))
@@ -251,7 +334,8 @@ class ReflectiveFusion:
         ops: Dict[str, Any] = dict(agreed)
         state = getattr(artifact, "state", {}) or {}
         for key, values in contested.items():
-            merged = self._synthesise(state.get(key), values)
+            metas = self._parent_metas(artifact, diffs, key, values)
+            merged = self._synthesise(state.get(key), values, metas=metas)
             if merged is None:
                 return None
             ops[key] = merged
