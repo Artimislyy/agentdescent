@@ -46,8 +46,8 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
 from . import runstore
-from .evolvespec import (KINDS, EvolveSpec, SpecError, compose, estimate, load_spec,
-                         _POLICY_SLOTS)
+from .evolvespec import (KINDS, EvolveSpec, SpecError, budget_round_overshoot_warning,
+                         compose, estimate, load_spec, _POLICY_SLOTS)
 
 __all__ = ["main", "doctor_report", "starter_spec"]
 
@@ -1594,7 +1594,8 @@ _MIN_TASKS_FOR_SPLIT = 4
 _MIN_TASKS_MSG = "need at least 4 tasks to split train/held-out"
 
 
-def plan_payload(spec: EvolveSpec, *, usd_per_call: Optional[float] = None) -> Dict[str, Any]:
+def plan_payload(spec: EvolveSpec, *, usd_per_call: Optional[float] = None,
+                 budget_usd: Optional[float] = None) -> Dict[str, Any]:
     comp = compose(spec)
     warnings = _unusable_refs(spec)
     selection = _selection_not_merging(comp)
@@ -1633,6 +1634,10 @@ def plan_payload(spec: EvolveSpec, *, usd_per_call: Optional[float] = None) -> D
     hard_errors.extend(_missing_cli_messages(spec))
     hard_errors.extend(_placeholder_messages(spec))
     hard_errors.extend(_bare_opencode_gateway_messages(spec))
+    est = estimate(comp, usd_per_call=usd_per_call)
+    budget_warn = budget_round_overshoot_warning(est, budget_usd, usd_per_call)
+    if budget_warn and budget_warn not in warnings:
+        warnings.append(budget_warn)
     payload = {"ok": not hard_errors, "spec": spec.to_dict(), "tasks": n_tasks,
             "warnings": warnings,
             "artifact_id": spec.artifact_id(),
@@ -1641,7 +1646,7 @@ def plan_payload(spec: EvolveSpec, *, usd_per_call: Optional[float] = None) -> D
                                   else type(v).__name__)
                               for k, v in comp.kwargs.items()},
             **({"algorithm": comp.algorithm} if comp.algorithm else {}),
-            "estimate": estimate(comp, usd_per_call=usd_per_call), "notes": comp.notes}
+            "estimate": est, "notes": comp.notes}
     if hard_errors:
         payload["error"] = "; ".join(hard_errors)
     return payload
@@ -1679,7 +1684,8 @@ def cmd_plan(a: argparse.Namespace) -> int:
         # spec that fails to compile already gets (#648).
         spec = load_spec(a.spec)
         _apply_algorithm_flag(spec, a)
-        payload = plan_payload(spec, usd_per_call=a.usd_per_call)
+        payload = plan_payload(spec, usd_per_call=a.usd_per_call,
+                                budget_usd=getattr(a, 'budget', None))
     except (SpecError, ValueError) as e:
         # JSON only on request; otherwise the same `error: ...` line on stderr
         # that an unreadable spec file already gets (#551).
@@ -1708,6 +1714,20 @@ def _warn_unusable(spec: EvolveSpec) -> None:
         print(f"warning: {line}", file=sys.stderr)
 
 
+def _warn_budget_round(comp, budget_usd: Optional[float],
+                       usd_per_call: Optional[float]) -> Optional[str]:
+    """Print the seed+one-round budget overshoot warning (#764); return it.
+
+    Shared by CLI ``evolve`` and MCP ``start`` so a host that skips ``plan``
+    still hears that ``--budget`` only binds between rounds.
+    """
+    est = estimate(comp, usd_per_call=usd_per_call)
+    line = budget_round_overshoot_warning(est, budget_usd, usd_per_call)
+    if line:
+        print(f"warning: {line}", file=sys.stderr)
+    return line
+
+
 def cmd_evolve(a: argparse.Namespace) -> int:
     try:
         spec = load_spec(a.spec)
@@ -1721,6 +1741,7 @@ def cmd_evolve(a: argparse.Namespace) -> int:
     # Same gate as plan / MCP start: missing CLI binary must not report started (#346).
     require_cli_on_path(spec)
     _warn_unusable(spec)
+    _warn_budget_round(comp, a.budget, a.usd_per_call)
     rd = runstore.create(spec.to_dict(), store=a.store)
     if a.detach:
         # The child composes again and rewrites `notes`, but only once it is up;
@@ -4288,6 +4309,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "merges --param with the spec's params)")
     s.add_argument("--param", action="append", default=[], metavar="KEY=VALUE",
                    help="algorithm parameter for --algorithm, repeatable")
+    s.add_argument("--budget", type=float,
+                   help="dollar budget you intend to pass to evolve (needs "
+                        "--usd-per-call); warns when one round can overshoot it")
     s.add_argument("--usd-per-call", type=float, dest="usd_per_call")
     s.set_defaults(fn=cmd_plan)
 

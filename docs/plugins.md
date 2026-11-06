@@ -645,6 +645,9 @@ false` in the spec to record nothing; `show` then has no `samples` key.
 A dollar budget (`--budget` with `--usd-per-call`, or `budget_usd` on `start`)
 uses `evolve(stop_when=)`: the run stops between rounds once
 `calls × price` crosses the line and reports the spend it actually incurred.
+One round (plus the seed held-out scan) can overshoot by up to its call bound;
+`plan` / `evolve` / MCP `start` warn when the budget is already below that
+bound so the first round alone can blow past it.
 
 ## Evolving the plugins themselves
 

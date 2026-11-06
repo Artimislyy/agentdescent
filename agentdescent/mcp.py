@@ -38,7 +38,8 @@ from . import __version__, runstore
 from .cli import (NESTED_ENV, apply_from_payload, apply_payload, doctor_report,
                  plan_payload, require_cli_on_path, require_resume_host_on_path,
                  show_payload, status_payload)
-from .evolvespec import EvolveSpec, SpecError, compose
+from .evolvespec import (EvolveSpec, SpecError, budget_round_overshoot_warning,
+                         compose, estimate)
 
 __all__ = ["DEFAULT_HTTP_HOST", "DEFAULT_HTTP_PORT", "RESCAN_ALLOW_ENV", "STREAMABLE_HTTP_REQUIRES", "TRANSPORTS",
            "Tools", "TOOL_DESCRIPTIONS", "build_server", "is_loopback_host",
@@ -109,8 +110,10 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
         "Validate an EvolveSpec and estimate its cost WITHOUT running anything. Resolves "
         "every agent/scorer/policy reference and loads the data, so a wrong field fails "
         "here with its name. Returns the composed evolve() arguments, the task count, an "
-        "upper bound on agent calls per round and in total, and notes. When the spec has "
-        "an `algorithm`, the resolved name/params are echoed. Show the user the spec and "
+        "upper bound on agent calls per round and in total, and notes. Pass budget_usd "
+        "with usd_per_call to hear when the seed+one-round bound already exceeds the "
+        "budget (budget is only checked between rounds). When the spec has an "
+        "`algorithm`, the resolved name/params are echoed. Show the user the spec and "
         "the estimate and get a yes before calling start."),
     "start": (
         "Start an evolution run in the background and return its run_id at once. The run "
@@ -508,12 +511,13 @@ class Tools:
                               "start with `spec`")
         return result
 
-    def plan(self, spec: Dict[str, Any], usd_per_call: Optional[float] = None) -> Dict[str, Any]:
+    def plan(self, spec: Dict[str, Any], usd_per_call: Optional[float] = None,
+             budget_usd: Optional[float] = None) -> Dict[str, Any]:
         try:
             # Relative paths mean "where this server was launched"; the detached
             # run has a different cwd, so they are resolved here, once.
             return plan_payload(EvolveSpec.from_dict(spec).absolutise(),
-                                usd_per_call=usd_per_call)
+                                usd_per_call=usd_per_call, budget_usd=budget_usd)
         except SpecError as e:
             return {"ok": False, "error": str(e)}
 
@@ -576,6 +580,10 @@ class Tools:
             require_cli_on_path(es)
         except SpecError as e:
             return {"ok": False, "error": str(e)}
+        # Same seed+one-round budget warning plan emits (#764); hosts that skip
+        # plan still hear that budget_usd only binds between rounds.
+        budget_warn = budget_round_overshoot_warning(
+            estimate(comp, usd_per_call=usd_per_call), budget_usd, usd_per_call)
         rd = runstore.create(es.to_dict(), store=self.store)
         # Recorded before the child is up, so the reply below and the first
         # `status` poll carry what `plan` said -- a too-small held-out set among
@@ -589,7 +597,7 @@ class Tools:
                                  env=self.host_model_env())
         except runstore.RunStoreError as e:
             return {"ok": False, "error": str(e), "run_id": rd.run_id, "dir": rd.path}
-        return {"ok": True, "run_id": rd.run_id, "state": st.state, "pid": st.pid,
+        out = {"ok": True, "run_id": rd.run_id, "state": st.state, "pid": st.pid,
                 "dir": rd.path, "notes": rd.status().notes,
                 # Whether a `host_model` reference in this spec can work. A run
                 # that silently could not borrow the session's model would
@@ -599,6 +607,9 @@ class Tools:
                                      else (self.host_cli or None)),
                 **({} if (self.bridge or self.host_cli)
                    else {"host_model_unavailable": self.bridge_error})}
+        if budget_warn:
+            out["warnings"] = [budget_warn]
+        return out
 
     def apply(self, run_id: Optional[str] = None, to: Optional[str] = None,
               dry_run: bool = False, backup: bool = True, *,
@@ -1176,8 +1187,9 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
                                 agent, model, base_url, key_env, out, usd_per_call)
 
     @server.tool(description=TOOL_DESCRIPTIONS["plan"])
-    def plan(spec: Dict[str, Any], usd_per_call: Optional[float] = None) -> Dict[str, Any]:
-        return t.plan(spec, usd_per_call)
+    def plan(spec: Dict[str, Any], usd_per_call: Optional[float] = None,
+             budget_usd: Optional[float] = None) -> Dict[str, Any]:
+        return t.plan(spec, usd_per_call, budget_usd)
 
     # `start` and `resume` are the two tools that launch a process, so they are
     # the two that take a Context. The annotation is set after the definition

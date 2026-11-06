@@ -256,8 +256,10 @@ Two habits worth keeping from the first run:
   count it prints is the upper bound you are agreeing to.
 * `--budget 5 --usd-per-call 0.02` on the first real run. A dollar budget
   needs a per-call price (the engine counts calls; a tool-using agent's price
-  is not known in advance). Together they stop at five dollars rather than
-  discovering the cost afterwards.
+  is not known in advance). The run stops **between rounds** once
+  `calls × price` crosses the line; one round (plus the seed scan) can still
+  overshoot by up to its call bound — `plan --budget … --usd-per-call …`
+  warns when that bound already exceeds the budget.
 
 ## Where to go next
 

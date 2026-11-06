@@ -73,6 +73,7 @@ __all__ = [
     "Composition",
     "EvolveSpec",
     "SpecError",
+    "budget_round_overshoot_warning",
     "compose",
     "estimate",
     "load_spec",
@@ -1421,3 +1422,35 @@ def estimate(comp: Composition, *, usd_per_call: Optional[float] = None) -> Dict
         out["assumptions"].append(
             "no per-call price known for this agent; pass usd_per_call to price it")
     return out
+
+
+def budget_round_overshoot_warning(
+    est: Dict[str, Any],
+    budget_usd: Optional[float],
+    usd_per_call: Optional[float],
+) -> Optional[str]:
+    """Warn when a dollar budget can be blown by the seed + first round (#764).
+
+    ``--budget`` / ``budget_usd`` is checked between rounds via
+    ``evolve(stop_when=)``, so one round (plus the seed held-out scan) can
+    overshoot by up to its call bound. Prefer this warning over inventing an
+    in-round hard stop. Reuses :func:`estimate`'s ``seed_score_calls`` and
+    ``calls_per_round`` math.
+    """
+    if budget_usd is None or usd_per_call is None or usd_per_call <= 0:
+        return None
+    per_round = sum(est["calls_per_round"].values())
+    first_bound = int(est["seed_score_calls"]) + per_round
+    first_usd = first_bound * usd_per_call
+    if budget_usd >= first_usd:
+        return None
+    # Keep money readable: drop trailing zeros without inventing precision.
+    def _money(v: float) -> str:
+        return f"{v:g}"
+
+    return (
+        f"budget ${_money(budget_usd)} is below the seed+one-round upper bound "
+        f"(~{first_bound} calls × ${_money(usd_per_call)}/call ≈ "
+        f"${_money(first_usd)}); budget is only checked between rounds, so one "
+        f"round can overshoot by up to its call bound"
+    )
