@@ -1,7 +1,7 @@
 # The runtime matrix
 
 The runtime matrix asks one question of the eleven
-[`MethodPolicy` ports](self-evolution-examples.md#the-eleven-microports-and-analogues):
+[`MethodPolicy` ports](self-evolution-examples.md#the-methodpolicy-microports-and-analogues):
 **what does changing only the scheduler do?** Same method, same candidate and
 proposal-call budget, three runtimes:
 

@@ -16,12 +16,9 @@ Python ≥ 3.9 is required.
 
 ## Shortest verification path
 
-From a fresh checkout, the shortest environment and behavior check is:
+From that checkout, the shortest environment and behavior check is:
 
 ```bash
-git clone https://github.com/ThinkFlowLab/agentdescent
-cd agentdescent
-pip install -e ".[dev]"
 pytest -q
 python -m examples.run_demo
 ```

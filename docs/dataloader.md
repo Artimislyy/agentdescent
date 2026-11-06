@@ -5,8 +5,8 @@
 > deliberately separate from the evolution engine — *which* benchmark you evolve
 > against has nothing to do with the framework — and every
 > dataset-backed [self-evolution example](self-evolution-examples.md) loads its data
-> through it (the eight benchmark-faithful ports; the eleven MethodPolicy ports
-> run bundled deterministic domains instead).
+> through it (the eight benchmark-faithful ports, and the MethodPolicy ports on
+> GSM8K and GSM-Hard; the others run bundled deterministic domains).
 
 The examples each need a public benchmark (FiNER, HotpotQA, SearchQA, MGSM,
 SWE-bench Verified, OfficeQA). Rather than re-implement HuggingFace paging and

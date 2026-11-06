@@ -518,7 +518,7 @@ section naming exactly what its compact or substituted domain gives up, and a
 `!!! danger` block for every defect found in it and fixed — which is the same
 *paper says / released code does / this port follows* audit, written where the
 port is. Start from the
-[table of all eleven](self-evolution-examples.md#the-eleven-microports-and-analogues);
+[MethodPolicy table](self-evolution-examples.md#the-methodpolicy-microports-and-analogues);
 their measured results are
 [in one place](self-evolution-examples.md#measured-results-all-twenty-three), and the
 scheduler comparison they exist for is the [runtime matrix](matrix-overview.md).

@@ -4,7 +4,7 @@ site_name: AgentDescent
 # named method -- were in none of these pages' metadata.
 site_description: >-
   A parallel, asynchronous framework for self-evolving LLM agents, with runnable
-  reproductions of twenty published self-evolution algorithms.
+  reproductions of twenty-three published self-evolution algorithms.
 # Required for canonical URLs, an absolute-URL sitemap, and the social cards
 # below -- without it mkdocs emits neither, and the social plugin warns.
 site_url: https://thinkflowlab.github.io/agentdescent/
@@ -57,13 +57,12 @@ nav:
   - Documentation: docs.md
   - Getting started:
     - Install and first run: install.md
+    - Start here — the plugin, step by step: plugin-quickstart.md
+    - Use it from your agent (DSH / Claude Code / Codex / OpenCode / Grok Bot): plugins.md
+    - Set it up and test it: testing-guide.md
     - Quickstart — dataset to skill: quickstart-skill.md
     - Quickstart — evolve a directory: quickstart-directory.md
     - Quickstart — evolve an agent's code: quickstart-agent-code.md
-    - Start here — the plugin in three commands: plugin-quickstart.md
-    - Use it from your agent (DSH / Claude Code / Codex / OpenCode): plugins.md
-    - Set it up and test it: testing-guide.md
-    - Testing the plugins: testing-the-plugins.md
   - Core concepts:
     - Concepts: concepts.md
     - Architecture: architecture.md
@@ -165,11 +164,11 @@ nav:
     - Joint multi-slot evolution: joint-meta.md
     - Solver-challenger self-play: selfplay.md
   - Self-evolution algorithms:
+    - Overview — twenty-three ports: self-evolution-examples.md
     - Named algorithms (spec / plugin): algorithms.md
     - Register a named Algorithm card: algorithm-authoring.md
     - Algorithm tournament: tournament.md
     - Campaign — iterate a spec: campaign.md
-    - Overview: self-evolution-examples.md
     - Porting checklist: porting-checklist.md
     - MethodPolicy porting checklist: porting-methodpolicy.md
     - Port fidelity: port-fidelity.md

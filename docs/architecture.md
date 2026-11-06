@@ -266,8 +266,8 @@ for round in range(R):
     aggregator.step()                            # <-- barrier: one sweep per round
 ```
 
-Deterministic and easy to reason about. Used for the RQ1 (merge-vs-fork) and
-RQ2 (staleness sweep) experiments.
+Deterministic and easy to reason about. Used for the merge-vs-fork and
+staleness-sweep experiments.
 
 ### 4.2 Asynchronous stage orchestration — `AsyncAgentDescent` (async_runtime.py)
 

@@ -18,9 +18,9 @@ def test_install_guide_names_the_current_number_of_dry_run_ports():
 
     headings = (
         "### The eight benchmark-faithful ports",
-        "### The eleven microports and analogues",
+        "### The MethodPolicy microports and analogues",
         "### Added since: Dynamic Cheatsheet, the ACE precursor",
-        "### The twenty-first: Genesis, at the standard seams",
+        "### Genesis, at the standard seams",
     )
     sections = []
     for heading in headings:

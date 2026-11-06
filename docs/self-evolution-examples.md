@@ -19,14 +19,14 @@ bypasses the engine, and they reach it three ways:
   custom `aggregator_factory=`, with their parent/gate rules extracted as named
   policy classes at the standard seams ([selection](selection.md),
   [acceptance](acceptance-policies.md));
-* the **eleven microports and analogues** are declarative
+* the **thirteen microports and analogues** in the table below are declarative
   [`MethodPolicy`](policies.md) definitions over one shared runner — their
   mechanisms plug in as `Policies(...)` fields, their artifacts as shared
   [strategies](strategies.md), and the [runtime matrix](matrix-overview.md)
   measures them under all three schedulers;
 * **Dynamic Cheatsheet** is one more `MethodPolicy` definition, listed
-  [on its own](#added-since-dynamic-cheatsheet-the-ace-precursor) so the table
-  above keeps describing what it was measured with;
+  [on its own](#added-since-dynamic-cheatsheet-the-ace-precursor) because its
+  domain and acceptance rule differ;
 * **Genesis** is neither: a custom `strategy=` like the first group, a
   `mechanism_microport` fidelity class like the second, and its whole algorithm
   installed through `Policies(proposal=, acceptance=, conflict=)` — the case that
@@ -59,12 +59,15 @@ python -m examples.ace.ace_context_evolution --model claude-haiku-4-5 --async   
 | **OpenEvolve** (Program Evolution) | cyanneko | program (L1) | Function minimization | `strategy` + `aggregator_factory=` MAP-Elites islands | [→](algo-openevolve.md) |
 | **ERA** (Empirical Research Assistance) | chendanyang | program (L1) | Kaggle Playground S3E1 (RMSE) | `strategy` + `aggregator_factory=` FUTS tree, `selection.FlatPuct` | [→](algo-era.md) |
 
-### The eleven microports and analogues
+### The MethodPolicy microports and analogues
 
-All eleven are `MethodPolicy` definitions over
+All thirteen are `MethodPolicy` definitions over
 [`examples/_method_runner.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/_method_runner.py),
 so they share a runner, a budget contract and a command line. Port author:
-`cyanneko`.
+`cyanneko` unless the row says otherwise. The first eleven rows are the ones
+the [runtime matrix](matrix-overview.md) and the
+[measured table](#the-eleven-on-one-runner-and-one-budget) cover; gskill and
+TextGrad were added after that measurement.
 
 | Algorithm | Fidelity class | Domain | Mechanism seams | Page |
 |---|---|---|---|---|
@@ -84,8 +87,8 @@ so they share a runner, a budget contract and a command line. Port author:
 
 ### Added since: Dynamic Cheatsheet, the ACE precursor
 
-One more `MethodPolicy` microport, listed on its own so the table above keeps
-describing the eleven it was measured with. It runs in the same
+One more `MethodPolicy` microport, listed on its own because its domain
+and acceptance rule differ from the table above. It runs in the same
 [runtime matrix](matrix-overview.md) (`bench.candidate_methods`) and shares the
 same runner and command line.
 
@@ -93,7 +96,7 @@ same runner and command line.
 |---|---|---|---|---|
 | **Dynamic Cheatsheet** (DC-Cu) | `mechanism_microport` | Game of 24 (36 vendored puzzles, offline) | whole-value `CheatsheetSlot`; label-free curator; online `CommitEveryUpdate` acceptance or `--gated`; `blast_radius=0.2` | [→](algo-dynamic-cheatsheet.md) |
 
-### The twenty-first: Genesis, at the standard seams
+### Genesis, at the standard seams
 
 One port is a mechanism microport that is **not** a `MethodPolicy`: its algorithm
 is a recursion, so it installs as a proposal policy rather than as a declaration
@@ -128,7 +131,7 @@ honoured locally is how a port grows a `--yes` it never reads.
 
 The iteration count is deliberately *not* standardised: `--rounds` (ACE, GEPA),
 `--generations` (ADAS, DGM), `--iterations` (EvoSkill, OpenEvolve, ERA), `--steps`
-(SkillOpt) and `--candidates` (the eleven) each keep their own vocabulary, which
+(SkillOpt) and `--candidates` (the MethodPolicy ports) each keep their own vocabulary, which
 for the eight is part of being a faithful port. `--budget-rollouts` maps onto
 whichever one a port uses, so a sweep can pin every arm with one flag.
 
@@ -157,7 +160,7 @@ simply sets `--iterations`.
 Every example takes `--dry-run`, which prints its configuration and returns
 **without a model call and without an API key**. Whether it also avoids the
 network depends on which runner it is on: the eight return before any dataset is
-touched, and say so (`Data: deferred`). The eleven build their `MethodPolicy`
+touched, and say so (`Data: deferred`). The MethodPolicy ports build their `MethodPolicy`
 first, so a port whose domain is a real benchmark — PromptBreeder, AFlow,
 Self-Refine, Reflexion, SICA, Gödel Agent — loads and caches its split during a
 dry run, and prints that it did.
@@ -171,9 +174,9 @@ docstring — never hidden.
 
 ### The MethodPolicy command line
 
-The eleven declarative ports share
+The fourteen declarative ports (the table above plus Dynamic Cheatsheet) share
 [`build_parser`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/_method_runner.py),
-so their command line is the same on all eleven: the shared flags above plus
+so their command line is the same on all of them: the shared flags above plus
 `--workers`, `--candidates` (a synonym for `--budget-rollouts`),
 `--no-reflective-merge`, `--staleness`, `--temperature`, `--max-tokens` and
 `--timeout`. Two ports add one switch of their own — Reflexion's
@@ -188,7 +191,7 @@ departure.
 | `--val-cap` | **not offered.** These ports freeze train/held-out/test in `build()`, before the parser is consulted, so it now fails as an unrecognised argument rather than parsing and moving nothing |
 
 The first three used to be declared by `add_standard_args` and never passed to
-`run_port`, so on these eleven a run that set all three was byte-identical to one
+`run_port`, so on these ports a run that set all three was byte-identical to one
 that set none — the same defect as Gödel Agent's `--gateless`, which five
 documents described while the parser rejected it. All four are now wired or
 withdrawn, and `tests/test_method_runner_flags.py` enumerates the parser and
@@ -302,7 +305,7 @@ that establish the port works end to end, not a comparison.
 | [OpenEvolve](algo-openevolve.md#measured-results-function-minimization) | function minimization | combined score 0.9638 → **1.4995** against a 1.5 ceiling, held-out seeds | async N=4, 24 rollouts |
 | [ERA](algo-era.md#measured-results-playground-s3e1) | Kaggle Playground S3E1 | test RMSE 0.7297 → **0.5913** (−19.0%) on 2,476 unseen rows; 7-node tree, all valid | async N=3, 6 expansions |
 
-### The twenty-first, on two formation runs
+### Genesis, on two formation runs
 
 The repository starts with no implementation in it, so "before" is 0.000 by
 construction rather than by a weak baseline. Model rows are three seeds at
@@ -346,6 +349,13 @@ grounded local verifier with no gold labels — but only as inference analogues:
 a benchmark-faithful label-free port (real RL updates, real task domains)
 remains open. The reflection family now carries TextGrad's textual-gradient
 step too ([TextGrad](algo-textgrad.md): offline-tested, not yet measured live).
+
+### In progress: RRSI
+
+[RRSI](algo-rrsi.md) (regularized harness self-improvement) is a mechanism
+microport whose round selection and cost rule are ported and offline-tested and
+which is callable as the named algorithm `rrsi`; it has no measured row yet, so
+it is not counted in the twenty-three.
 
 ### Deferred pending released code
 

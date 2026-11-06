@@ -1,16 +1,16 @@
-# Start here — install the plugin and see it work
+# Start here — the plugin, step by step
 
 The rest of these docs assume you already have a dataset, a provider key and an
 agent CLI. This page assumes none of that. It is the shortest path from *"I
 just heard about this"* to *an evolution that actually ran on your machine*, and
 then to the plugin living inside your agent.
 
-Three commands, in order. Nothing here costs money and nothing needs an API key
-until step 3.
+Four steps, in order. Nothing here costs money and nothing needs an API key
+until step 4.
 
 ## 1. Install
 
-Install **0.8.0** from PyPI with its MCP extra:
+Install **0.9.0** from PyPI with its MCP extra:
 
 ```bash
 pip install "agentdescent[mcp]>=0.9.0"
@@ -266,9 +266,7 @@ Two habits worth keeping from the first run:
 * [Use it from your agent](plugins.md) — the full plugin surface: every spec
   field, the MCP tools, where runs live, and evolving the plugins themselves.
 * [Set it up and test it](testing-guide.md) — one script that installs
-  AgentDescent and wires up every agent CLI you have, then the whole test
-  path in order.
-* [Testing the plugins](testing-the-plugins.md) — how to verify each host, and
-  what no test can confirm.
+  AgentDescent and wires up every agent CLI you have, how to verify each host,
+  and what no test can confirm.
 * [Quickstart — dataset to skill](quickstart-skill.md) — the same thing from
   Python, if you would rather write the twelve lines yourself.

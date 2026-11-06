@@ -114,7 +114,7 @@ def test_resources_are_json(store, tmp_path):
 
 def test_standalone_mcp_guide_lists_every_registered_tool():
     guide = (
-        Path(__file__).resolve().parents[1] / "docs" / "testing-the-plugins.md"
+        Path(__file__).resolve().parents[1] / "docs" / "testing-guide.md"
     ).read_text()
     expected = re.search(r"Expected tools: `([^`]+)`", guide)
     assert expected is not None

@@ -12,36 +12,14 @@ The design record — why it is shaped this way and what was considered — is
 
 ## Install
 
-Install **0.8.0** from PyPI:
+First time? [Start here — the plugin, step by step](plugin-quickstart.md) covers
+installing, the offline demo and the Python 3.9 caveat; this section is the
+reference for what each host gets.
 
 ```bash
-pip install "agentdescent[mcp]>=0.9.0"                 # the MCP server needs this extra (and Python >= 3.10)
-agentdescent demo                      # a complete evolution, offline, no key
-agentdescent doctor                    # which agent CLIs, keys and optional pieces are here
-agentdescent install dsh               # or: claude-code, codex, opencode, grok-bot (scaffold; needs a tunnel, not one-click)
+pip install "agentdescent[mcp]>=0.9.0"   # the MCP server needs this extra (and Python >= 3.10)
+agentdescent install dsh                 # or: claude-code, codex, opencode, grok-bot
 ```
-
-Or clone the repository as described in [install and first run](install.md) and
-install the MCP extra from that checkout:
-
-```bash
-pip install -e ".[mcp]"
-```
-
-Research demos beyond `agentdescent demo` use the
-[source examples](install.md#source-examples).
-
-The MCP SDK requires Python >= 3.10; AgentDescent supports 3.9. On 3.9 the
-extra installs nothing and the tool surface is unavailable — the CLI verbs are
-the whole API, which is what the shipped `SKILL.md` falls back to. `doctor` and
-`install` both say so rather than letting it surface as a host reporting
-`CONNECTION_CLOSED`.
-
-If you have never run one, do `demo` before `install`: it builds a skill that is
-wrong on purpose, twelve cases with known answers and a local program as the
-agent, then runs the real loop — same staging, ledger, workers, merge and
-held-out gate, only the model replaced. [Start here — the plugin in three
-commands](plugin-quickstart.md) walks the whole path.
 
 `install` writes the shared skill and the host's manifest, and nothing else:
 
@@ -78,20 +56,15 @@ leaves no files here, so it reads `missing` and the hint names that route too.
 Only presence is checked: a launcher pinned to an interpreter that has since
 been deleted still reads `ok`.
 
-Supported hosts today are DeepSeek Harness (`dsh`), Claude Code, Codex,
-OpenCode, and a **Grok Bot scaffold** (`agentdescent install grok-bot`). The
-Grok Bot path writes the shared skill plus `HOST.md` / `mcp.example.json`
-under `~/.agentdescent/plugins/grok-bot/`; it does **not** edit a host config,
-because Grok Bot has no public one-click plugin API for local skill directories
-or stdio MCP (custom connectors need public HTTPS). For those, run
-`agentdescent mcp --transport streamable-http` (loopback, port 8000, path
-`/mcp`) and expose it through an HTTPS tunnel; the server has no auth, and a
-non-loopback `--host` needs `--allow-remote`. If the port cannot be bound
-(already in use, for example) the command prints one line naming the port and
-exits 4 before announcing any URL, so pick another `--port` (exit 3 stays
-reserved for a missing or too-old MCP SDK, 2 for a refused `--host`). `doctor` reports
-`mcp n/a` for that host when the scaffold is current. A future one-click route
-(if/when a host-native API appears) is still tracked on #165.
+**Grok Bot over HTTP.** The scaffold edits no host config, because Grok Bot has
+no public one-click plugin API for local skill directories or stdio MCP (custom
+connectors need public HTTPS). Run `agentdescent mcp --transport streamable-http`
+(loopback, port 8000, path `/mcp`) and expose it through an HTTPS tunnel; the
+server has no auth, and a non-loopback `--host` needs `--allow-remote`. If the
+port cannot be bound the command prints one line naming the port and exits 4
+before announcing any URL, so pick another `--port` (exit 3 stays reserved for a
+missing or too-old MCP SDK, 2 for a refused `--host`). A future one-click route
+is tracked on [#165](https://github.com/ThinkFlowLab/agentdescent/issues/165).
 
 ### Uninstall
 
@@ -755,7 +728,7 @@ result = comp.run()            # == evolve(comp.tasks, comp.reward, **comp.kwarg
 
 ## Next
 
-* [Testing the plugins](testing-the-plugins.md) — what to run for each host,
+* [Set it up and test it](testing-guide.md) — what to run for each host,
   and what no test can tell you
 * [Quickstart — evolve a directory](quickstart-directory.md) — the Python call
   the `skill_dir` kind composes

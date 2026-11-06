@@ -376,10 +376,11 @@ MCP server starts with no provider credentials, `doctor` reports every reflector
 as unavailable, and nothing else explains why. `install dsh` therefore prints the
 variables it forwarded and `doctor` checks for the scrubbed set explicitly.
 
-**Tier B, native Cordis plugin `dsh-agentdescent` (later, optional).** A small
+**Tier B, native Cordis plugin `dsh-agentdescent` (shipped, optional).** A small
 TypeScript package installable with
-`dsh plugin --profile web add github:Birfy/dsh-agentdescent#main` that does what
-config alone cannot:
+`dsh plugin --profile web add link:$PWD/integrations/dsh-agentdescent` (it ships in
+this repository under `integrations/dsh-agentdescent/`; there is no separate
+GitHub repo) that does what config alone cannot:
 
 * registers the skill through `ctx.skills.registerProvider()` and the MCP
   server through the same `mcp-client` plugin, so one `add` installs everything;

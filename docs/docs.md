@@ -72,5 +72,5 @@ algorithms. Each returns `schema_version: 1` and fails closed under `--json`.
 
 **Reference and host integration.**
 [API reference](api.md) · [Agents](agents.md) · [Plugins](plugins.md) ·
-[Plugin quickstart](plugin-quickstart.md) · [Testing guide](testing-guide.md) ·
-[Testing the plugins](testing-the-plugins.md) · [Usage](usage.md).
+[Plugin quickstart](plugin-quickstart.md) · [Set it up and test it](testing-guide.md) ·
+[Usage](usage.md).

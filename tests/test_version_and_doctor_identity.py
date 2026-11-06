@@ -66,7 +66,7 @@ def test_the_docs_tell_a_host_to_compare_the_two():
     from agentdescent.integrations import skill_text
 
     assert "`version`" in skill_text() and "`executable`" in skill_text()
-    with open(os.path.join(ROOT, "docs", "testing-the-plugins.md"), encoding="utf-8") as fh:
+    with open(os.path.join(ROOT, "docs", "testing-guide.md"), encoding="utf-8") as fh:
         assert "`version` and `executable`" in fh.read()
 
 

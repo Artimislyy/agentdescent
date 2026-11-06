@@ -186,7 +186,7 @@ Each is a real `Strategy` you can read and reuse:
 
 ## Examples-level strategies
 
-The eleven MethodPolicy ports ride four shared strategies in
+The first eleven MethodPolicy ports ride four shared strategies in
 [`examples/_method_policy.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/_method_policy.py) —
 the same seam, packaged with validation (an unparseable proposal is counted and
 produces no diff):

@@ -193,7 +193,7 @@ onto the current policy, then reused."
 !!! tip "Why artifacts tolerate staleness better than parameters"
     A stale gradient is simply lost. A stale *diff* can be rebased and its
     evidence card re-verified. That structural difference is the framework's
-    claimed advantage over parameter-space RL (design spec, RQ2), and the rebase
+    claimed advantage over parameter-space RL (the staleness sweep), and the rebase
     half of it is what `evolve()` actually implements.
 
 !!! warning "Settled evidence is retained, not yet reused"

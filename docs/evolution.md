@@ -304,7 +304,7 @@ each is a real `Strategy` you can read and reuse:
 | `HarnessStrategy` | [DGM](algo-dgm.md) | a coding-agent harness's capability set (a proposal adds one) |
 | `OpenEvolveStrategy` | [OpenEvolve](algo-openevolve.md) | one evolved program each proposal replaces, behind a validity gate |
 
-The eleven MethodPolicy ports ride four shared strategies — `ValidatedSlot`,
+The first eleven MethodPolicy ports ride four shared strategies — `ValidatedSlot`,
 `FieldSlots`, `WindowedMemory`, `SkillLibrary` — see
 [examples-level strategies](strategies.md#examples-level-strategies).
 
