@@ -252,8 +252,10 @@ class ProposalContext:
     #: The artifact version this proposal is based on -- what staleness is
     #: measured against once the proposal takes a while to come back.
     base_version: int = 0
-    #: How many proposals the caller would like. The default policy ignores it
-    #: and returns at most one; asking for more is a different algorithm.
+    #: How many proposals the caller would like. Under ``evolve()`` the
+    #: adapter sets this from ``getattr(policy, "k", 1)`` and ingests every
+    #: returned string as its own evidence card (#808). A policy that samples
+    #: k variants should set ``.k`` and return up to that many strings.
     k: int = 1
     #: Proposals this worker already made, newest last. Empty unless the policy
     #: asked to be given them.

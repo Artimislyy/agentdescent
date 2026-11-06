@@ -382,15 +382,22 @@ def test_the_sync_path_still_honours_an_executor():
     assert seen, "evolve() stopped routing rollouts through a supplied executor"
 
 
-def test_a_multi_proposal_policy_is_refused_rather_than_truncated():
-    """Keeping the first of k would make a sampling algorithm look like it ran
-    when only a fraction of it did."""
+def test_a_multi_proposal_policy_ingests_each_variant():
+    """k>1 returns used to raise; now each string becomes its own evidence card (#808)."""
     class ThreeAtATime:
-        def propose(self, ctx): return ["a", "b", "c"]
+        k = 3
+        seen_k = []
 
-    from agentdescent.evolution import ProposalContractError
-    with pytest.raises(ProposalContractError, match="one proposal per rollout"):
-        _run_evolve(policies=Policies(proposal=ThreeAtATime()))
+        def propose(self, ctx):
+            ThreeAtATime.seen_k.append(ctx.k)
+            # Distinct strings so AppendRules can form distinct diffs.
+            return [f"p{i}-{ctx.task.id}" for i in range(3)]
+
+    ThreeAtATime.seen_k = []
+    result = _run_evolve(policies=Policies(proposal=ThreeAtATime()),
+                         self_verify=False)
+    assert result.error is None, result.error
+    assert ThreeAtATime.seen_k and ThreeAtATime.seen_k[0] == 3
 
 
 def test_a_single_proposal_policy_is_equivalent_to_the_callable():

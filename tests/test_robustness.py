@@ -38,12 +38,22 @@ def test_empty_proposals_are_ignored_not_committed(value):
     assert res.error is None            # not an error, just nothing to learn
 
 
-@pytest.mark.parametrize("value", [42, {"a": 1}, ["x"], 3.5, object()])
+@pytest.mark.parametrize("value", [42, {"a": 1}, 3.5, object(), [1, 2]])
 def test_non_text_proposals_raise_a_clear_contract_error(value):
-    """Previously this surfaced as "'int' object has no attribute 'strip'"."""
+    """Previously this surfaced as "'int' object has no attribute 'strip'".
+
+    A list of strings is now a valid multi-proposal return (#808); non-text
+    values (and sequences of them) stay a contract error.
+    """
     with pytest.raises(ProposalContractError) as e:
         _run(lambda r, t, o, s: value)
-    assert "must return a string or None" in str(e.value)
+    assert "string" in str(e.value).lower()
+
+
+def test_a_list_of_strings_is_a_valid_multi_proposal():
+    """The old suite treated ``["x"]`` as non-text; #808 ingests it."""
+    res = _run(lambda r, t, o, s: ["rule-a", "rule-b"], self_verify=False)
+    assert res.error is None, res.error
 
 
 def test_a_runaway_proposal_is_rejected_by_the_trust_region():

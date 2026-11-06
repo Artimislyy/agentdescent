@@ -851,13 +851,19 @@ def async_evolve(
                         # o1-style test-time scaling: see evolve() for the reasoning.
                         if call_budget is not None:
                             call_budget.allocate(score, governor.remaining_fraction())
-                        proposal = _checked_proposal(
+                        proposals = _checked_proposal(
                             eng.propose(art.render(), task, output, score), task)
-                        if proposal:
+                        # One evidence card per proposal (#808); self_verify × k
+                        # when enabled.
+                        if proposals:
                             strat = eng.artifact_strategies.get(aid, eng.strategy)
-                            diff = strat.to_diff(art.state, proposal,
-                                                 f"w{wid}", art_v, aid)
-                            if diff is not None:
+                            for p_i, proposal in enumerate(proposals):
+                                author = (f"w{wid}" if len(proposals) == 1
+                                          else f"w{wid}/p{p_i}")
+                                diff = strat.to_diff(art.state, proposal,
+                                                     author, art_v, aid)
+                                if diff is None:
+                                    continue
                                 # Optional local self-verify: re-run the trajectory with the
                                 # diff applied for a before/after signal. Faithful repos that
                                 # only score the candidate on held-out (e.g. EvoSkill) pass

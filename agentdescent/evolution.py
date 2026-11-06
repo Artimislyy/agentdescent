@@ -284,12 +284,33 @@ class RewardContractError(ContractError, ValueError):
 
 
 def _checked_proposal(value, task: "Task"):
-    """``propose`` may return text or ``None``; anything else is a caller error."""
-    if value is None or isinstance(value, str):
-        return value
+    """Normalise ``propose`` output to a list of proposal strings (#808).
+
+    A callable may return ``None``, one string, or a sequence of strings. A
+    ``ProposalPolicy`` that samples k variants returns a sequence; each entry
+    becomes its own evidence card. Non-text values are still a contract error.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value else []
+    if isinstance(value, (list, tuple)):
+        out = []
+        for i, item in enumerate(value):
+            if item is None:
+                continue
+            if not isinstance(item, str):
+                raise ProposalContractError(
+                    f"propose(task={task.id!r}, ...) returned a sequence whose "
+                    f"item {i} is {type(item).__name__} ({item!r:.40}); each "
+                    "proposal must be a string")
+            if item:
+                out.append(item)
+        return out
     raise ProposalContractError(
         f"propose(task={task.id!r}, ...) returned {type(value).__name__} "
-        f"({value!r:.40}); it must return a string or None")
+        f"({value!r:.40}); it must return a string, a sequence of strings, "
+        "or None")
 
 
 def _checked_reward(value, task: "Task") -> float:
@@ -863,12 +884,14 @@ _ASYNC_WIRED_POLICIES = tuple(p for p in _WIRED_POLICIES if p != "executor")
 
 
 def _propose_via_policy(policy, settled_reader=None):
-    """Adapt a `ProposalPolicy` back to the engine's one-proposal contract.
+    """Adapt a `ProposalPolicy` to the engine's propose callable (#808).
 
-    A policy that returns several is refused rather than truncated: the engine
-    turns one proposal into one diff per rollout, so quietly keeping the first
-    would discard work the policy did and make a k-sampling algorithm look like
-    it ran when only a fraction of it did.
+    The Protocol returns ``Sequence[str]`` and ``ProposalContext.k`` says how
+    many variants the caller wants. The adapter passes ``k`` (from
+    ``getattr(policy, "k", 1)``) and returns every non-empty string the policy
+    produced — one string for the single-proposal case, a list when ``k > 1`` —
+    so the worker can ingest one evidence card per proposal. Truncating would
+    make a k-sampling algorithm look like it ran when only a fraction did.
 
     ``settled_reader`` is an optional mutable cell ``[callable]``, set later by
     the engine after the aggregator is built, that returns the recent settled
@@ -877,23 +900,35 @@ def _propose_via_policy(policy, settled_reader=None):
     """
     from .policies import ProposalContext
 
+    try:
+        k = int(getattr(policy, "k", 1) or 1)
+    except (TypeError, ValueError):
+        k = 1
+    if k < 1:
+        k = 1
+
     def propose(rendered, task, output, reward):
         rejected = ()
         if settled_reader is not None and settled_reader[0] is not None:
             rejected = settled_reader[0](task, n=3)
         out = list(policy.propose(ProposalContext(
             rendered=rendered, task=task, output=output, reward=reward,
-            rejected=rejected)))
-        if len(out) > 1:
-            # A caller-contract violation, not a backend failure: raised as one so
-            # it travels the channel the engine already has for "this run is
-            # meaningless" rather than being folded into `error` as a transient
-            # and retried.
-            raise ProposalContractError(
-                f"the engine consumes one proposal per rollout; this policy "
-                f"returned {len(out)}, and keeping the first would silently drop "
-                f"{len(out) - 1}. Batched rollouts are what makes k > 1 usable.")
-        return out[0] if out else None
+            k=k, rejected=rejected)))
+        cleaned = []
+        for i, item in enumerate(out):
+            if item is None:
+                continue
+            if not isinstance(item, str):
+                raise ProposalContractError(
+                    f"ProposalPolicy.propose returned a non-string at index {i} "
+                    f"({type(item).__name__})")
+            if item:
+                cleaned.append(item)
+        if not cleaned:
+            return None
+        if len(cleaned) == 1:
+            return cleaned[0]
+        return cleaned
 
     return propose
 
@@ -3917,82 +3952,90 @@ def evolve(
                     print(f"round {r:>3}  worker {unit.worker} propose failed: "
                           f"{type(e).__name__}: {str(e)[:100]}")
                 return
-            proposal = _checked_proposal(raw_proposal, task)
-            if not proposal:
+            proposals = _checked_proposal(raw_proposal, task)
+            if not proposals:
                 return
+            # One evidence card per proposal: a k-sampling ProposalPolicy's
+            # variants each pay self_verify (when on) and reach the aggregator
+            # on their own (#808).
             strat = eng.artifact_strategies.get(aid, strategy)
-            diff = strat.to_diff(mine.state, proposal, f"w{unit.worker}", mine_v, aid)
-            if diff is None:
-                return
-            # Tensor parallelism means each worker owns a disjoint *section* of the
-            # artifact, which is what makes the merge a conflict-free union. The
-            # plan assigns the section; enforce it here, or the guarantee is only a
-            # comment: without this every worker could edit the same hot key and TP
-            # degenerated into differently-sharded DP. Extras are whole-artifact
-            # proposals, so the check applies to the primary only.
-            if unit.section is not None and aid == artifact_id:
-                outside = [k for k in diff.ops
-                           if section_map.get(k) != unit.section]
-                if outside:
-                    # Counted, not swallowed. These never reach the aggregator, so
-                    # no MergeReport can mention them: without this a TP run that
-                    # dropped most of its proposals was indistinguishable from one
-                    # whose reflector had nothing useful to say -- opposite fixes.
-                    with tp_lock:
-                        section_violations[0] += 1
-                    if verbose:
-                        print(f"round {r:>3}  worker {unit.worker} proposed "
-                              f"{outside[0]!r}, outside its section {unit.section}")
-                    return
-            # The self-verify rollout doubles the cost of every proposal, so it is
-            # opt-out here exactly as it is on the async path. The governor can
-            # also turn it off mid-run when the token budget is nearly spent:
-            # the delta it produces feeds the acceptance test's tie-breaker
-            # (``observe_delta``), never the commit gates, so skipping it costs
-            # ranking precision on the advantage signal and nothing else.
-            # With an allocator installed the decision becomes per-candidate:
-            # once the budget is tight it spends the self-verify rollout only on
-            # candidates its value model expects to commit (see
-            # :mod:`agentdescent.allocator`).
-            if self_verify and governor.candidate_worth(_allocator_context(
-                    diff, adv, score, getattr(mine, "blast_radius", 0.2))):
-                t_self = time.time()
-                # The candidate's render is computed once and used for both the
-                # rollout and the record, so the trajectory and the measurement
-                # agree by construction.
-                rendered_after = mine.apply(diff).render()
-                after_output = run(rendered_after, task)
-                after = _checked_reward(reward(task, after_output), task)
-                delta = after - score
-                # The self-verify re-run is itself evidence: it is the first
-                # measurement of the *candidate*, against the same task, and a
-                # learning consumer reads it exactly because it predates the
-                # gate's own (cheaper) view. The boundary record carries the
-                # provider's output, not just the score -- the same contract as
-                # the rollout path.
-                self_trace = eng._record_rollout(
-                    artifact_id=aid, rendered=rendered_after, task=task,
-                    base_version={aid: mine_v}, purpose="self_verify",
-                    output=after_output, reward=after, wallclock=time.time() - t_self,
-                    worker_id=f"w{unit.worker}")
-            else:
-                delta = 0.0
-                self_trace = None
-            aggregator.ingest(EvidenceCard(
-                diff=diff, base_version={aid: mine_v}, touched=[aid],
-                before_after_delta=delta, trajectory_refs=[task],
-                branch=mine_branch,
-                # The records that justify this card, when recording is on: the
-                # rollout that produced the diff and the self-verify re-run.
-                # Each entry is None-safe -- None means "recording off / dedupe /
-                # write failed", and a consumer reads the empty tuple that way.
-                trace_ids=tuple(t for t in (trace, self_trace) if t is not None),
-                # Recorded always, acted on by nobody unless a policy from
-                # `agentdescent.advantage` is installed. It is arithmetic over
-                # two numbers the round already has, and a signal that is only
-                # computed when something consumes it can never be looked at to
-                # decide whether anything should.
-                advantage=adv))
+            for p_i, proposal in enumerate(proposals):
+                author = (f"w{unit.worker}" if len(proposals) == 1
+                          else f"w{unit.worker}/p{p_i}")
+                diff = strat.to_diff(mine.state, proposal, author, mine_v, aid)
+                if diff is None:
+                    continue
+                # Tensor parallelism means each worker owns a disjoint *section* of the
+                # artifact, which is what makes the merge a conflict-free union. The
+                # plan assigns the section; enforce it here, or the guarantee is only a
+                # comment: without this every worker could edit the same hot key and TP
+                # degenerated into differently-sharded DP. Extras are whole-artifact
+                # proposals, so the check applies to the primary only.
+                if unit.section is not None and aid == artifact_id:
+                    outside = [k for k in diff.ops
+                               if section_map.get(k) != unit.section]
+                    if outside:
+                        # Counted, not swallowed. These never reach the aggregator, so
+                        # no MergeReport can mention them: without this a TP run that
+                        # dropped most of its proposals was indistinguishable from one
+                        # whose reflector had nothing useful to say -- opposite fixes.
+                        with tp_lock:
+                            section_violations[0] += 1
+                        if verbose:
+                            print(f"round {r:>3}  worker {unit.worker} proposed "
+                                  f"{outside[0]!r}, outside its section {unit.section}")
+                        continue
+                # The self-verify rollout doubles the cost of every proposal, so it is
+                # opt-out here exactly as it is on the async path. The governor can
+                # also turn it off mid-run when the token budget is nearly spent:
+                # the delta it produces feeds the acceptance test's tie-breaker
+                # (``observe_delta``), never the commit gates, so skipping it costs
+                # ranking precision on the advantage signal and nothing else.
+                # With an allocator installed the decision becomes per-candidate:
+                # once the budget is tight it spends the self-verify rollout only on
+                # candidates its value model expects to commit (see
+                # :mod:`agentdescent.allocator`).
+                # Cost note for k>1: self_verify runs per proposal when enabled.
+                if self_verify and governor.candidate_worth(_allocator_context(
+                        diff, adv, score, getattr(mine, "blast_radius", 0.2))):
+                    t_self = time.time()
+                    # The candidate's render is computed once and used for both the
+                    # rollout and the record, so the trajectory and the measurement
+                    # agree by construction.
+                    rendered_after = mine.apply(diff).render()
+                    after_output = run(rendered_after, task)
+                    after = _checked_reward(reward(task, after_output), task)
+                    delta = after - score
+                    # The self-verify re-run is itself evidence: it is the first
+                    # measurement of the *candidate*, against the same task, and a
+                    # learning consumer reads it exactly because it predates the
+                    # gate's own (cheaper) view. The boundary record carries the
+                    # provider's output, not just the score -- the same contract as
+                    # the rollout path.
+                    self_trace = eng._record_rollout(
+                        artifact_id=aid, rendered=rendered_after, task=task,
+                        base_version={aid: mine_v}, purpose="self_verify",
+                        output=after_output, reward=after,
+                        wallclock=time.time() - t_self,
+                        worker_id=f"w{unit.worker}")
+                else:
+                    delta = 0.0
+                    self_trace = None
+                aggregator.ingest(EvidenceCard(
+                    diff=diff, base_version={aid: mine_v}, touched=[aid],
+                    before_after_delta=delta, trajectory_refs=[task],
+                    branch=mine_branch,
+                    # The records that justify this card, when recording is on: the
+                    # rollout that produced the diff and the self-verify re-run.
+                    # Each entry is None-safe -- None means "recording off / dedupe /
+                    # write failed", and a consumer reads the empty tuple that way.
+                    trace_ids=tuple(t for t in (trace, self_trace) if t is not None),
+                    # Recorded always, acted on by nobody unless a policy from
+                    # `agentdescent.advantage` is installed. It is arithmetic over
+                    # two numbers the round already has, and a signal that is only
+                    # computed when something consumes it can never be looked at to
+                    # decide whether anything should.
+                    advantage=adv))
 
         def _run_unit_inner(unit) -> None:
             if not unit.keys:
