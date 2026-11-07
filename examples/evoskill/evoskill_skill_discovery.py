@@ -383,7 +383,7 @@ def run_evoskill(complete: Completion, docs: Dict[str, str],
                  train: List[dict], val: List[dict], iterations: int = 6,
                  max_frontier: int = 5, seed: int = 0, asynchronous: bool = False,
                  async_ratio: int = 3, max_seconds: float = 30.0, backend=None,
-                 eval_concurrency: int = 8, batch_size: int = 4, val_every: int = 3,
+                 eval_concurrency: int = 8, batch_size: int = 4,
                  eval_at_end: bool = False, max_workers: int = 3,
                  max_rollouts: Optional[int] = None, staleness: str = "guarded",
                  merge_round=None, verbose: bool = False) -> EvoResult:
@@ -392,19 +392,17 @@ def run_evoskill(complete: Completion, docs: Dict[str, str],
     ``backend`` (an :class:`~agentdescent.backends.AgentBackend`) replaces the passive
     keyword-retriever base agent with a tool-using one (OpenHands / grep-loop) so
     the agent can actually navigate the source documents; ``None`` keeps the
-    dependency-free retriever."""
+    dependency-free retriever. ``eval_at_end`` is retained for CLI compatibility;
+    the card frontier always validates on admit (``val_every`` was removed, #844).
+    """
     def to_task(i, it):
         return Task(id=f"oqa{i}", prompt=it["question"],
                     meta={"answer": it["answer"], "source_files": it["source_files"]})
 
     tasks = [to_task(i, it) for i, it in enumerate(list(train) + list(val))]
-    # eval-at-end: apply every skill update during the run (no mid-run val or
-    # roll back) and score the accumulated library on held-out once, at the end.
-    if eval_at_end:
-        val_every = 10 ** 9        # SGD merger never validates mid-run -> pure apply
+    _ = eval_at_end  # CLI flag retained; frontier admit path does not use it
     ctx = EvoSkillContext(docs=docs, frontier=Frontier(max_size=max_frontier),
-                          eval_concurrency=eval_concurrency, batch_size=batch_size,
-                          val_every=val_every)
+                          eval_concurrency=eval_concurrency, batch_size=batch_size)
 
     def run(rendered, task):
         # `rendered` is now the artifact's lossless serialisation (a file tree), not
@@ -432,8 +430,8 @@ def run_evoskill(complete: Completion, docs: Dict[str, str],
         # schedule changes *when* those evaluations happen, not whether they do.
         #
         # This used to swap in `SgdSkillAggregator` whenever `asynchronous=True`,
-        # which is not a scheduling change: it amortises validation over
-        # `val_every` applied updates, keeps or rolls back a whole batch instead
+        # which is not a scheduling change: it amortised validation over N
+        # applied updates, kept or rolled back a whole batch instead
         # of admitting per candidate, and has no frontier at all -- one
         # checkpoint in its place. The async cell then measured a different
         # optimizer that happened to run asynchronously, which is exactly what

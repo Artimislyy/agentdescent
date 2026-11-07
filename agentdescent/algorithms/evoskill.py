@@ -158,7 +158,7 @@ class EvoSkillContext:
     best_score: Optional[float] = None
     eval_concurrency: int = 8     # parallelise the aggregator's held-out (val) re-eval
     batch_size: int = 4           # failures per induction BATCH (repo is batch-level, not per-trajectory)
-    val_every: int = 3            # async SGD: validate the head every N applied skill updates (else roll back)
+    # val_every removed (#844): was documented as async SGD validate-every-N but never read.
     last_propose_at: int = 0      # index into recent_failures at the last emitted skill
     lock: threading.Lock = field(default_factory=threading.Lock)   # workers run concurrently
 

@@ -124,6 +124,8 @@ class ParetoAggregator(AggregatorProtocol):
         self.states: List[Dict[str, str]] = []
         self.scores: List[List[float]] = []
         self._seen: Set[str] = set()
+        #: Pool index of the parent last made into the dev head (#844).
+        self._parent_index: int = 0
 
     # -- per-instance evaluation over D_pareto -------------------------------
 
@@ -329,8 +331,10 @@ class ParetoAggregator(AggregatorProtocol):
                           score=sum(row) / len(row) if row else 0.0,
                           per_task=dict(zip(task_ids, row)))
                 for i, (state, row) in enumerate(zip(self.states, self.scores))]
-        ctx = SelectionContext(head=rows[0], candidates=tuple(rows), n_workers=1)
+        head_i = min(max(0, self._parent_index), len(rows) - 1) if rows else 0
+        ctx = SelectionContext(head=rows[head_i], candidates=tuple(rows), n_workers=1)
         k = self.selection.select(ctx, 1)[0].version
+        self._parent_index = k
         target_state = self.states[k]
         report_diff = None
         committed_version = None

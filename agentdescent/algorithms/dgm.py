@@ -201,6 +201,7 @@ class DGMArchiveAggregator(AggregatorProtocol):
         parent = self.ctx.archive[parent_idx]
         with self._lock:
             cards, self.cards = self.cards, []
+        admitted = 0
         for card in cards:
             child_caps = tuple(sorted(_caps_of(
                 card.diff.ops.get("capabilities", ""))))
@@ -215,7 +216,11 @@ class DGMArchiveAggregator(AggregatorProtocol):
                 continue
             self.ctx.archive.append(child)
             self.ctx.best_score = max(self.ctx.best_score, child.score)
-        parent.children += 1
+            admitted += 1
+        # Count only children that entered the archive (paper's 1/(1+children)),
+        # not skipped attempts (#844).
+        if admitted:
+            parent.children += admitted
 
         rows = [Candidate(artifact_id=self.aid, version=i,
                           score=a.score, selected=a.children)
