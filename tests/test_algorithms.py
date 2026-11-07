@@ -1060,3 +1060,16 @@ def test_mcp_list_algorithms_carries_cards_vs_ports_note():
     names = {a["name"] for a in payload["algorithms"]}
     assert "gepa" in names and "evoskill" not in names  # kind filter
     assert all(a["surface"] == "card" for a in payload["algorithms"])
+
+
+@pytest.mark.parametrize("typo,meant", [("gepaa", "gepa"), ("evo_skill", "evoskill"),
+                                        ("skilopt", "skillopt")])
+def test_unknown_algorithm_names_the_near_miss(typo, meant):
+    with pytest.raises(AlgorithmError, match=rf"did you mean '{meant}'\?$"):
+        algorithms.get(typo, where="show")
+
+
+def test_unknown_algorithm_without_near_miss_has_no_guess():
+    with pytest.raises(AlgorithmError) as e:
+        algorithms.get("nope", where="show")
+    assert "did you mean" not in str(e.value)

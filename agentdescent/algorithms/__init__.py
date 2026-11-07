@@ -321,6 +321,12 @@ def _unknown_algorithm_message(where: str, name: Any) -> str:
         return msg
     slug = _fold(name)
     if slug not in _EXAMPLES_ONLY_PORTS:
+        # A near-miss typo (`gepaa`, `evo_skill`) names the card it most
+        # likely meant, so the fix is one word rather than a list scan.
+        import difflib
+        close = difflib.get_close_matches(slug, sorted(_REGISTRY), n=1, cutoff=0.75)
+        if close:
+            return f"{msg}; did you mean {close[0]!r}?"
         return msg
     doc = f"docs/algo-{slug.replace('_', '-')}.md"
     return (f"{msg}. {slug!r} is an examples/ research port ({doc}), not a "
