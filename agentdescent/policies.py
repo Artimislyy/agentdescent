@@ -491,11 +491,16 @@ class SandboxProvider(Protocol):
 class Policies:
     """Every replaceable piece, in one argument.
 
-    `evolve()` has thirty-five parameters. Each capability after this one --
-    executors, sandbox providers, cache backends -- would otherwise add another
-    handful, to two entry points, plus the generated API reference and the
-    public-surface test. So they go here instead, and the existing keyword
-    arguments stay as shortcuts onto these fields; nothing is deprecated.
+    `evolve()` has a large flat parameter surface. Each *behaviour* capability
+    after this one -- executors, sandbox providers, cache backends -- would
+    otherwise add another handful, to two entry points, plus the generated API
+    reference and the public-surface test. So they go here instead, and the
+    existing keyword arguments stay as shortcuts onto these fields; nothing is
+    deprecated. Numerics and flags that are not replaceable pieces go in
+    :class:`~agentdescent.evolve_settings.BudgetSettings` /
+    :class:`~agentdescent.evolve_settings.RuntimeSettings` /
+    :class:`~agentdescent.evolve_settings.ObservabilitySettings` (#804), not as
+    another top-level ``evolve`` kwarg.
 
     Every field is ``None`` by default and ``None`` means "the current
     behaviour", so `Policies()` and passing nothing are the same run.

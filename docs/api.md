@@ -13,7 +13,7 @@ means the parameter has none.
 Each section links to the page that explains *why* the module is shaped the
 way it is; this page is the *what*.
 
-598 public names across 120 modules.
+603 public names across 121 modules.
 
 ---
 
@@ -269,7 +269,10 @@ evolve(
     trajectory_store: Optional['TrajectoryStore'] = None,
     contract: Optional[Contract] = None,
     extra_artifacts: Optional[Dict[str, 'EvolvingArtifact']] = None,
-    population_islands: int = 0
+    population_islands: int = 0,
+    budget: Optional['BudgetSettings'] = None,
+    runtime: Optional['RuntimeSettings'] = None,
+    observability: Optional['ObservabilitySettings'] = None
 ) -> EvolutionResult
 ```
 
@@ -325,13 +328,16 @@ evolve(
 | `stop_when` | `Optional[Callable[['RoundInfo'], bool]]` | `None` | Called after `on_round` with the same `RoundInfo`; return `True` to end the run with `stop_reason="stop_when"`. This is the seam for a budget the engine does not know how to count -- dollars from a shared `Usage`, an external deadline, a kill file. It is asked where `max_seconds` / `max_calls` are, so it stops between rounds and never mid-merge, and the run keeps what it has committed. An exception raised here is reported, not fatal. |
 | `verbose` | `bool` | `False` | Print a line per round. Independent of the `RuntimeWarning` emitted when a run ends early -- that always fires. |
 | `usage` | `Optional[Usage]` | `None` | Share one `Usage` with your model adapters (`claude(usage=u)`, `openai_compatible(usage=u)`) and the result's token counts become real. Without it the run still reports calls, seconds and failures -- `run` is `(rendered, task) -> str`, so an opaque actor has no way to surface tokens, and inventing a number would be worse than reporting zero. |
-| `policies` | `Optional['Policies']` | `None` | Bundle of replaceable pieces (`Policies`). Every field defaults to `None` meaning "current behaviour", so `Policies()` and passing nothing are the same run. The individual keyword arguments -- `task_sampler`, `staleness_policy`, `aggregator_factory` -- are shortcuts onto its fields and keep working; an explicit argument wins over a bundle default rather than being silently ignored. Fields whose implementations have not landed yet raise rather than being accepted and ignored: a caller who passes a custom acceptance rule and sees a finished run would reasonably conclude it ran. New capabilities go here rather than adding another parameter to a function that already has thirty-five. |
+| `policies` | `Optional['Policies']` | `None` | Bundle of replaceable pieces (`Policies`). Every field defaults to `None` meaning "current behaviour", so `Policies()` and passing nothing are the same run. The individual keyword arguments -- `task_sampler`, `staleness_policy`, `aggregator_factory` -- are shortcuts onto its fields and keep working; an explicit argument wins over a bundle default rather than being silently ignored. Fields whose implementations have not landed yet raise rather than being accepted and ignored: a caller who passes a custom acceptance rule and sees a finished run would reasonably conclude it ran. New capabilities go here rather than adding another parameter to a function whose flat surface is already large — prefer a Policies field or a BudgetSettings / RuntimeSettings / ObservabilitySettings bag (#804). |
 | `allocator` | `Optional[Any]` | `None` | Value-directed budget allocation (see `allocator`). `None` (the default) is the old behaviour exactly: optional spend (fusion tournaments, the self-verify rollout) degrades against the global `soft_floor` / `hard_floor` thresholds as the token budget runs out, every candidate treated alike. Pass a `ValueBudgetAllocator` (or any object with `decide(ctx) -> AllocateDecision` and `observe(ctx, committed)`) and, once the budget is tight, the self-verify rollout is spent only on candidates the allocator's value model expects to commit; the merge path reports every outcome back so the model learns. Requires `max_tokens` to be set (the allocator decides how the budget is spent; `max_tokens` is what exists to spend). Counterfactual exploration re-measures candidates the model judged unworthy, so a biased value model is corrected rather than reinforced. |
 | `record_trajectories` | `bool` | `False` | Persist every rollout and gate evaluation as a `Trajectory` under `<repo_path>/trajectories/` -- what the run provider saw, what it returned, what that earned, against which artifact version and environment. Off by default: a throwaway repo's records die with it, so the write cost is pure overhead there, and recording is a deliberate choice about keeping a run's evidence. The store is the durable base every learning-type increment reads -- process-supervised reflection, offline re-weighting, audit replay -- and it is what an `EvidenceCard.trace_ids` entry points at. Pass `trajectory_store=` with a store you built to control where records land instead. |
 | `trajectory_store` | `Optional['TrajectoryStore']` | `None` | An explicit `TrajectoryStore` to record into. Pass one to control where records land (a shared store, a custom root, a custom privacy configuration) without going through the `<repo_path>/trajectories/` default. The explicit store wins over `record_trajectories`; `None` + `record_trajectories` builds the default store. |
 | `contract` | `Optional[Contract]` | `None` | The artifact's contract -- the externally-visible interface, and where governance invariants are declared. Pass `Contract(invariants=(Invariant("mutable_keys", ("a", "b")),))` and the aggregator enforces each rule **before** a candidate is measured (see `invariants`); a diff that breaks one reports a `violates-invariant` outcome and never buys a held-out sweep. `None` (the default) is the reference skill contract, which declares nothing and enforces nothing -- the untouched path exactly. |
 | `extra_artifacts` | `Optional[Dict[str, 'EvolvingArtifact']]` | `None` | Additional artifacts to register alongside the primary (`artifact_id`), as `{aid: EvolvingArtifact}`. The primary is the one the worker loop rolls out and proposes on; each extra is registered in the ledger and the worker proposes against it too, so a proposal can name one of them as a diff target and the aggregator merges it there (the evidence buffer already buckets by `diff.target`). `depends_on` on an extra's `Contract` declares which artifacts it relies on: a contract-breaking change to one re-measures its dependents (their cached scores were taken under the superseded contract) and lands atomically via `Ledger.commit_atomic`. Empty (the default) is the old single-artifact behaviour exactly. |
 | `population_islands` | `int` | `0` | How many **persistent head-islands** the population explores in parallel, on top of `dev` (see `PopulationAggregator`). Requires a declared selection policy (`Policies(selection=...)`). `0` (the default) keeps the old behaviour exactly: per-step forks that reset a policy's lineage. Above zero, `island_count` forks survive across steps and each keeps its own lineage, so tree-shaped policies (`CladeThompson`, `FlatPuct`) score *clades* -- the metaproductivity signal HGM's population search is built on. Islands checkpoint and resume like the rest of the population archive. |
+| `budget` | `Optional['BudgetSettings']` | `None` | Typed spend/stop bag (`BudgetSettings`). Prefer this for new budget knobs; flat `max_seconds` / `max_rollouts` / `max_calls` / `max_tokens` / … remain shortcuts onto its fields. See #804 and `EVOLVE_STABLE_SUBSET`. |
+| `runtime` | `Optional['RuntimeSettings']` | `None` | Typed runtime bag (`RuntimeSettings`). Workers, gates, data split, search extras. Flat kwargs remain shortcuts. |
+| `observability` | `Optional['ObservabilitySettings']` | `None` | Typed observability bag (`ObservabilitySettings`). Hooks, meters, trajectory recording. Flat kwargs remain shortcuts. |
 
 ### `reflector(...)`
 
@@ -4533,7 +4539,10 @@ async_evolve(
     trajectory_store: Optional[Any] = None,
     contract: Optional[Contract] = None,
     population_islands: int = 0,
-    extra_artifacts: Optional[Dict[str, 'EvolvingArtifact']] = None
+    extra_artifacts: Optional[Dict[str, 'EvolvingArtifact']] = None,
+    budget: Optional['BudgetSettings'] = None,
+    runtime: Optional['RuntimeSettings'] = None,
+    observability: Optional['ObservabilitySettings'] = None
 ) -> EvolutionResult
 ```
 
@@ -4588,13 +4597,90 @@ async_evolve(
 | `stop_when` | `Optional[Callable[[RoundInfo], bool]]` | `None` | Asked after `on_round` with the same `RoundInfo`; `True` ends the run with `stop_reason="stop_when"` -- the caller's own budget (dollars, a deadline, a kill file), checked between merger sweeps like the built-in bounds. Same thread and the same rules as `on_round`. |
 | `verbose` | `bool` | `False` | Print one line per merger sweep. |
 | `usage` | `Optional[Usage]` | `None` | Share one `Usage` with your model adapters (`claude(usage=u)`, `openai_compatible(usage=u)`) and the result's token counts become real. Without it the run still reports calls, seconds and failures -- `run` is `(rendered, task) -> str`, so an opaque actor has no way to surface tokens, and inventing a number would be worse than reporting zero. |
-| `policies` | `Optional['Policies']` | `None` | Bundle of replaceable pieces (`Policies`). Every field defaults to `None` meaning "current behaviour", so `Policies()` and passing nothing are the same run. The individual keyword arguments -- `task_sampler`, `staleness_policy`, `aggregator_factory` -- are shortcuts onto its fields and keep working; an explicit argument wins over a bundle default rather than being silently ignored. Fields whose implementations have not landed yet raise rather than being accepted and ignored: a caller who passes a custom acceptance rule and sees a finished run would reasonably conclude it ran. New capabilities go here rather than adding another parameter to a function that already has thirty-five. |
+| `policies` | `Optional['Policies']` | `None` | Bundle of replaceable pieces (`Policies`). Every field defaults to `None` meaning "current behaviour", so `Policies()` and passing nothing are the same run. The individual keyword arguments -- `task_sampler`, `staleness_policy`, `aggregator_factory` -- are shortcuts onto its fields and keep working; an explicit argument wins over a bundle default rather than being silently ignored. Fields whose implementations have not landed yet raise rather than being accepted and ignored: a caller who passes a custom acceptance rule and sees a finished run would reasonably conclude it ran. New capabilities go here rather than adding another parameter to a function whose flat surface is already large — prefer a Policies field or a BudgetSettings / RuntimeSettings / ObservabilitySettings bag (#804). |
 | `allocator` | `Optional[Any]` | `None` | Exactly as in `evolve`: value-directed budget allocation (see `allocator`). `None` (the default) is the old behaviour exactly. Pass a value allocator and, once the token budget is tight, the self-verify rollout is spent only on candidates the allocator expects to commit; the merger reports every outcome back so it learns. Requires `max_tokens`. Counterfactual exploration corrects a biased value model rather than reinforcing it. |
 | `record_trajectories` | `bool` | `False` | Exactly as in `evolve`: persist every rollout and gate evaluation as a `Trajectory` under `<repo_path>/trajectories/`. Off by default; pass `trajectory_store=` to control where records land. |
 | `trajectory_store` | `Optional[Any]` | `None` | An explicit `TrajectoryStore` to record into. `None` + `record_trajectories` builds the default store at `<repo_path>/trajectories`. |
 | `contract` | `Optional[Contract]` | `None` | Exactly as in `evolve`: the artifact's contract, where governance invariants are declared. `None` (the default) is the reference skill contract, which declares nothing and enforces nothing. |
 | `population_islands` | `int` | `0` | Persistent head-islands for a population run. Exactly as in `evolve`; `0` (the default) keeps the per-step-fork behaviour. |
 | `extra_artifacts` | `Optional[Dict[str, 'EvolvingArtifact']]` | `None` | Exactly as in `evolve`: additional artifacts to register alongside the primary, as `{aid: EvolvingArtifact}`. The barrier-free worker proposes against each of them too (no parallel strategy, so it is the primary plus every extra), and the aggregator merges their diffs by target. Empty (the default) is the old single-artifact behaviour exactly. |
+| `budget` | `Optional['BudgetSettings']` | `None` | Typed spend/stop bag (`BudgetSettings`). Flat `max_seconds` / `max_iters` / `max_calls` / `max_tokens` / … remain shortcuts; the bag field `max_rollouts` is this function's `max_iters`. |
+| `runtime` | `Optional['RuntimeSettings']` | `None` | Typed runtime bag (`RuntimeSettings`). |
+| `observability` | `Optional['ObservabilitySettings']` | `None` | Typed observability bag (`ObservabilitySettings`). |
+
+---
+
+## Evolve settings bags
+
+Budget / runtime / observability bags that freeze the flat evolve() surface. &nbsp;·&nbsp; `agentdescent.evolve_settings` &nbsp;·&nbsp; [guide](evolution.md)
+
+### `BudgetSettings(...)`
+
+Spend and stop bounds shared by the sync and async drivers.
+
+```python
+BudgetSettings(
+    max_seconds: Optional[float] = None,
+    max_rollouts: Optional[int] = None,
+    max_calls: Optional[int] = None,
+    max_tokens: Optional[int] = None,
+    stop_on_diminishing_returns: bool = False,
+    efficiency_floor: float = 0.25,
+    call_budget: Optional['CallBudget'] = None,
+    target_reward: Optional[float] = None,
+    patience: Optional[int] = None,
+    oracle_budget: int = 200
+) -> None
+```
+
+| method | what it does |
+|---|---|
+| `merged_with(**kwargs: Any) -> 'BudgetSettings'` | This bag with any explicit keyword taking precedence. |
+
+### `ObservabilitySettings(...)`
+
+Hooks, meters, and durable trajectory recording.
+
+```python
+ObservabilitySettings(
+    on_round: Optional[Callable[['RoundInfo'], None]] = None,
+    on_reports: Optional[Callable[[Sequence[Any]], None]] = None,
+    stop_when: Optional[Callable[['RoundInfo'], bool]] = None,
+    verbose: bool = False,
+    usage: Optional['Usage'] = None,
+    record_trajectories: bool = False,
+    trajectory_store: Optional['TrajectoryStore'] = None
+) -> None
+```
+
+### `RuntimeSettings(...)`
+
+How the loop runs: workers, gates, data split, search extras.
+
+```python
+RuntimeSettings(
+    rounds: int = 15,
+    n_workers: int = 4,
+    max_concurrency: int = 1,
+    refresh_interval: int = 1,
+    round_timeout: Optional[float] = None,
+    eval_concurrency: int = 8,
+    max_worker_errors: int = 3,
+    async_ratio: int = 3,
+    resync_on_commit: bool = True,
+    pipelined_gate: bool = False,
+    gate_workers: int = 2,
+    self_verify: bool = True,
+    held_out_frac: float = 0.4,
+    checkpointing: bool = False,
+    cheap_eval_tasks: Optional[int] = None,
+    fusion_tournament: Optional[bool] = None,
+    solved_threshold: float = 0.999,
+    shuffle: bool = False,
+    seed: int = 0,
+    population_islands: int = 0
+) -> None
+```
 
 ---
 
@@ -5147,6 +5233,14 @@ One run's failure mode, the evidence, and what to try next.
 ### `EDIT_PROTOCOL`
 
 The multi-file proposal format a `FileTree` reflector is told to emit.
+
+### `EVOLVE_PARAM_ALLOWLIST`
+
+Frozen set of public ``evolve()`` parameter names (#804). A PR that adds a raw kwarg must update this on purpose; prefer Policies or a settings bag.
+
+### `EVOLVE_STABLE_SUBSET`
+
+Short stable ``evolve()`` contract to teach first; the long tail is advanced (Policies, bags, or a documented flat shortcut).
 
 ### `EloRating`
 

@@ -77,6 +77,15 @@ mkdocs build --strict   # must pass with no warnings (CI enforces this)
   (SWE-bench Docker, gated datasets) must be gated behind a flag and documented.
 - Match the style and comment density of the surrounding code.
 
+- **Where a new `evolve()` knob goes.** Decision / plug-in behaviour belongs on
+  a [`Policies`](docs/policies.md) field. Spend, stop, wall-clock, workers,
+  hooks and recording belong on
+  `BudgetSettings` / `RuntimeSettings` / `ObservabilitySettings`
+  (`agentdescent.evolve_settings`). Do **not** add another top-level
+  `evolve(...)` keyword without updating `EVOLVE_PARAM_ALLOWLIST` and saying
+  why a bag or Policies field was not enough — the allowlist test fails accidental
+  growth (#804). Flat kwargs that already exist stay as shortcuts.
+
 ## Pull requests
 
 1. Branch from `main` (agents: a fresh clone per task; nobody pushes to `main`

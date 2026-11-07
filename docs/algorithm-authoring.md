@@ -148,3 +148,4 @@ Acceptance for this path: a newcomer can add a named algorithm and see it in
 * Growing the research catalog itself ([#384](https://github.com/ThinkFlowLab/agentdescent/issues/384)).
 * Full MethodPolicy / `examples/` microports.
 * Engine changes (`evolve()`, aggregators, hosts).
+* New `evolve()` knobs: Policies field or `BudgetSettings` / `RuntimeSettings` / `ObservabilitySettings` (#804) — not a raw top-level kwarg.

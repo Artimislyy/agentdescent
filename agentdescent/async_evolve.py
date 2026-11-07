@@ -176,6 +176,15 @@ def async_evolve(
     #: aggregator buckets their diffs by target. Empty (the default) is the old
     #: single-artifact behaviour exactly.
     extra_artifacts: Optional[Dict[str, "EvolvingArtifact"]] = None,
+    #: Typed spend/stop bag (#804). Flat ``max_seconds`` / ``max_iters`` /
+    #: ``max_calls`` / ``max_tokens`` / … stay as shortcuts. ``max_rollouts``
+    #: on :class:`~agentdescent.evolve_settings.BudgetSettings` is this
+    #: function's ``max_iters``.
+    budget: Optional["BudgetSettings"] = None,
+    #: Typed runtime bag (#804). Flat kwargs remain shortcuts.
+    runtime: Optional["RuntimeSettings"] = None,
+    #: Typed observability bag (#804). Flat kwargs remain shortcuts.
+    observability: Optional["ObservabilitySettings"] = None,
 ) -> EvolutionResult:
     """Evolve an artifact **without a round barrier**.
 
@@ -411,7 +420,7 @@ def async_evolve(
         rather than being accepted and ignored: a caller who passes a custom
         acceptance rule and sees a finished run would reasonably conclude it ran.
         New capabilities go here rather than adding another parameter to a
-        function that already has thirty-five.
+        function whose flat surface is already large — prefer a Policies field or a BudgetSettings / RuntimeSettings / ObservabilitySettings bag (#804).
     allocator:
         Exactly as in :func:`~agentdescent.evolution.evolve`: value-directed
         budget allocation (see :mod:`agentdescent.allocator`). ``None`` (the
@@ -446,6 +455,18 @@ def async_evolve(
         strategy, so it is the primary plus every extra), and the aggregator
         merges their diffs by target. Empty (the default) is the old
         single-artifact behaviour exactly.
+    budget:
+        Typed spend/stop bag
+        (:class:`~agentdescent.evolve_settings.BudgetSettings`). Flat
+        ``max_seconds`` / ``max_iters`` / ``max_calls`` / ``max_tokens`` / …
+        remain shortcuts; the bag field ``max_rollouts`` is this function's
+        ``max_iters``.
+    runtime:
+        Typed runtime bag
+        (:class:`~agentdescent.evolve_settings.RuntimeSettings`).
+    observability:
+        Typed observability bag
+        (:class:`~agentdescent.evolve_settings.ObservabilitySettings`).
 
     Returns
     -------
@@ -470,6 +491,77 @@ def async_evolve(
         single merge can contribute two entries (the sweep that ingested its
         cards, then the one that landed its decision).
     """
+    from .evolve_settings import (
+        resolve_budget, resolve_observability, resolve_runtime,
+    )
+
+    _budget = resolve_budget(
+        budget,
+        max_seconds=max_seconds, max_rollouts=max_iters, max_calls=max_calls,
+        max_tokens=max_tokens,
+        stop_on_diminishing_returns=stop_on_diminishing_returns,
+        efficiency_floor=efficiency_floor, call_budget=call_budget,
+        target_reward=target_reward, patience=patience,
+        oracle_budget=oracle_budget,
+    )
+    _runtime = resolve_runtime(
+        runtime,
+        n_workers=n_workers, eval_concurrency=eval_concurrency,
+        max_worker_errors=max_worker_errors, async_ratio=async_ratio,
+        resync_on_commit=resync_on_commit, pipelined_gate=pipelined_gate,
+        gate_workers=gate_workers, self_verify=self_verify,
+        held_out_frac=held_out_frac, checkpointing=checkpointing,
+        cheap_eval_tasks=cheap_eval_tasks, fusion_tournament=fusion_tournament,
+        solved_threshold=solved_threshold, shuffle=shuffle, seed=seed,
+        population_islands=population_islands,
+    )
+    _obs = resolve_observability(
+        observability,
+        on_round=on_round, on_reports=on_reports, stop_when=stop_when,
+        verbose=verbose, usage=usage,
+        record_trajectories=record_trajectories,
+        trajectory_store=trajectory_store,
+    )
+    max_seconds = 20.0 if _budget.max_seconds is None else _budget.max_seconds
+    # async historically defaulted max_seconds to 20.0 when the parameter
+    # default (also 20.0) was left unset. resolve_budget with bag=None copies
+    # the flat value, so a caller who passes max_seconds=None explicitly still
+    # gets None here — keep the historical 20.0 floor for that case too.
+    if max_seconds is None:
+        max_seconds = 20.0
+    max_iters = _budget.max_rollouts
+    max_calls = _budget.max_calls
+    max_tokens = _budget.max_tokens
+    stop_on_diminishing_returns = _budget.stop_on_diminishing_returns
+    efficiency_floor = _budget.efficiency_floor
+    call_budget = _budget.call_budget
+    target_reward = _budget.target_reward
+    patience = _budget.patience
+    oracle_budget = _budget.oracle_budget
+    n_workers = _runtime.n_workers
+    eval_concurrency = _runtime.eval_concurrency
+    max_worker_errors = _runtime.max_worker_errors
+    async_ratio = _runtime.async_ratio
+    resync_on_commit = _runtime.resync_on_commit
+    pipelined_gate = _runtime.pipelined_gate
+    gate_workers = _runtime.gate_workers
+    self_verify = _runtime.self_verify
+    held_out_frac = _runtime.held_out_frac
+    checkpointing = _runtime.checkpointing
+    cheap_eval_tasks = _runtime.cheap_eval_tasks
+    fusion_tournament = _runtime.fusion_tournament
+    solved_threshold = _runtime.solved_threshold
+    shuffle = _runtime.shuffle
+    seed = _runtime.seed
+    population_islands = _runtime.population_islands
+    on_round = _obs.on_round
+    on_reports = _obs.on_reports
+    stop_when = _obs.stop_when
+    verbose = _obs.verbose
+    usage = _obs.usage
+    record_trajectories = _obs.record_trajectories
+    trajectory_store = _obs.trajectory_store
+
     _pol = _resolve_policies(policies, "async_evolve()",
                              supported=_ASYNC_WIRED_POLICIES,
                              task_sampler=task_sampler,

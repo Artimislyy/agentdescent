@@ -24,6 +24,26 @@ print(result.final_reward)    # held-out reward
 
 That's the minimum. Everything below is optional and swappable.
 
+## Stable subset vs the long tail
+
+`evolve()` still accepts a large flat keyword surface for backward compatibility
+and for JSON `spec.evolve` knobs, but the **stable contract** to learn first is
+small: `tasks` / `reward` / `agent` (or `run`+`propose`) / `strategy` /
+`policies` / `rounds` (or budgets) / `n_workers` / `repo_path`, plus the typed
+bags when you need more knobs together.
+
+| Prefer | For |
+|---|---|
+| `Policies(...)` | Replaceable decision pieces (selection, acceptance, proposal, …) |
+| `budget=BudgetSettings(...)` | Spend and stop bounds (`max_seconds`, `max_rollouts`, `max_tokens`, …) |
+| `runtime=RuntimeSettings(...)` | Workers, gates, data split, search extras |
+| `observability=ObservabilitySettings(...)` | Hooks, meters, trajectory recording |
+
+New capabilities go in one of those four places — not as another top-level
+`evolve(...)` keyword (#804). The frozen allowlist is
+`EVOLVE_PARAM_ALLOWLIST`; see also [call any algorithm](algorithms.md) / #384
+(kind filter and card vs port fidelity should not require teaching every knob).
+
 !!! tip "Three companion pages"
     [Module map](modules.md) is the index of every module and a reading
     order; [API reference](api.md) has every signature, generated from the

@@ -154,6 +154,13 @@ from .checkpoint import (
     list_checkpoints,
 )
 from .budget import BudgetGovernor, CallBudget, budgeted_completion
+from .evolve_settings import (
+    BudgetSettings,
+    EVOLVE_PARAM_ALLOWLIST,
+    EVOLVE_STABLE_SUBSET,
+    ObservabilitySettings,
+    RuntimeSettings,
+)
 from .consolidation import (
     ConsolidationRecord,
     ConsolidationStore,
@@ -1006,6 +1013,11 @@ __all__ = [
     "BudgetGovernor",
     "CallBudget",
     "budgeted_completion",
+    "BudgetSettings",
+    "RuntimeSettings",
+    "ObservabilitySettings",
+    "EVOLVE_PARAM_ALLOWLIST",
+    "EVOLVE_STABLE_SUBSET",
     # value-directed budget allocation
     "AllocatorContext",
     "AllocatorPolicy",

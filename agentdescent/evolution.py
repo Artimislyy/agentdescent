@@ -3153,6 +3153,18 @@ def evolve(
     #: (``CladeThompson``, ``FlatPuct``) score *clades* -- the metaproductivity
     #: signal HGM's population search is built on.
     population_islands: int = 0,
+    #: Typed spend/stop bag (#804). Prefer this (or ``runtime`` /
+    #: ``observability``) for new numerics and flags rather than another
+    #: top-level kwarg. Flat ``max_seconds=`` / ``max_rollouts=`` / … stay as
+    #: shortcuts onto the bag's fields — see
+    #: :class:`~agentdescent.evolve_settings.BudgetSettings`.
+    budget: Optional["BudgetSettings"] = None,
+    #: Typed runtime bag (#804): workers, gates, split, search extras. Flat
+    #: ``n_workers=`` / ``rounds=`` / … stay as shortcuts.
+    runtime: Optional["RuntimeSettings"] = None,
+    #: Typed observability bag (#804): hooks, meters, trajectory recording.
+    #: Flat ``on_round=`` / ``verbose=`` / … stay as shortcuts.
+    observability: Optional["ObservabilitySettings"] = None,
 ) -> EvolutionResult:
     """Evolve an artifact. Provide either ``agent`` (with ``solve``/``propose``)
     or the ``run`` / ``propose`` callables directly.
@@ -3479,7 +3491,7 @@ def evolve(
         rather than being accepted and ignored: a caller who passes a custom
         acceptance rule and sees a finished run would reasonably conclude it ran.
         New capabilities go here rather than adding another parameter to a
-        function that already has thirty-five.
+        function whose flat surface is already large — prefer a Policies field or a BudgetSettings / RuntimeSettings / ObservabilitySettings bag (#804).
     allocator:
         Value-directed budget allocation (see :mod:`agentdescent.allocator`).
         ``None`` (the default) is the old behaviour exactly: optional spend
@@ -3546,6 +3558,18 @@ def evolve(
         (``CladeThompson``, ``FlatPuct``) score *clades* -- the metaproductivity
         signal HGM's population search is built on. Islands checkpoint and
         resume like the rest of the population archive.
+    budget:
+        Typed spend/stop bag (:class:`~agentdescent.evolve_settings.BudgetSettings`).
+        Prefer this for new budget knobs; flat ``max_seconds`` / ``max_rollouts``
+        / ``max_calls`` / ``max_tokens`` / … remain shortcuts onto its fields.
+        See #804 and :data:`~agentdescent.evolve_settings.EVOLVE_STABLE_SUBSET`.
+    runtime:
+        Typed runtime bag (:class:`~agentdescent.evolve_settings.RuntimeSettings`).
+        Workers, gates, data split, search extras. Flat kwargs remain shortcuts.
+    observability:
+        Typed observability bag
+        (:class:`~agentdescent.evolve_settings.ObservabilitySettings`). Hooks,
+        meters, trajectory recording. Flat kwargs remain shortcuts.
 
     Returns
     -------
@@ -3559,6 +3583,77 @@ def evolve(
     """
     from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
     from .parallel import DataParallel
+    from .evolve_settings import (
+        resolve_budget, resolve_observability, resolve_runtime,
+    )
+
+    # Fold typed bags + flat shortcuts. Bags are the extension point (#804);
+    # flat kwargs keep working for pip callers and for JSON spec.evolve knobs.
+    _budget = resolve_budget(
+        budget,
+        max_seconds=max_seconds, max_rollouts=max_rollouts, max_calls=max_calls,
+        max_tokens=max_tokens,
+        stop_on_diminishing_returns=stop_on_diminishing_returns,
+        efficiency_floor=efficiency_floor, call_budget=call_budget,
+        target_reward=target_reward, patience=patience,
+        oracle_budget=oracle_budget,
+    )
+    _runtime = resolve_runtime(
+        runtime,
+        rounds=rounds, n_workers=n_workers, max_concurrency=max_concurrency,
+        refresh_interval=refresh_interval, round_timeout=round_timeout,
+        eval_concurrency=eval_concurrency, max_worker_errors=max_worker_errors,
+        async_ratio=async_ratio, resync_on_commit=resync_on_commit,
+        pipelined_gate=pipelined_gate, gate_workers=gate_workers,
+        self_verify=self_verify, held_out_frac=held_out_frac,
+        checkpointing=checkpointing, cheap_eval_tasks=cheap_eval_tasks,
+        fusion_tournament=fusion_tournament, solved_threshold=solved_threshold,
+        shuffle=shuffle, seed=seed, population_islands=population_islands,
+    )
+    _obs = resolve_observability(
+        observability,
+        on_round=on_round, on_reports=on_reports, stop_when=stop_when,
+        verbose=verbose, usage=usage,
+        record_trajectories=record_trajectories,
+        trajectory_store=trajectory_store,
+    )
+    max_seconds = _budget.max_seconds
+    max_rollouts = _budget.max_rollouts
+    max_calls = _budget.max_calls
+    max_tokens = _budget.max_tokens
+    stop_on_diminishing_returns = _budget.stop_on_diminishing_returns
+    efficiency_floor = _budget.efficiency_floor
+    call_budget = _budget.call_budget
+    target_reward = _budget.target_reward
+    patience = _budget.patience
+    oracle_budget = _budget.oracle_budget
+    rounds = _runtime.rounds
+    n_workers = _runtime.n_workers
+    max_concurrency = _runtime.max_concurrency
+    refresh_interval = _runtime.refresh_interval
+    round_timeout = _runtime.round_timeout
+    eval_concurrency = _runtime.eval_concurrency
+    max_worker_errors = _runtime.max_worker_errors
+    async_ratio = _runtime.async_ratio
+    resync_on_commit = _runtime.resync_on_commit
+    pipelined_gate = _runtime.pipelined_gate
+    gate_workers = _runtime.gate_workers
+    self_verify = _runtime.self_verify
+    held_out_frac = _runtime.held_out_frac
+    checkpointing = _runtime.checkpointing
+    cheap_eval_tasks = _runtime.cheap_eval_tasks
+    fusion_tournament = _runtime.fusion_tournament
+    solved_threshold = _runtime.solved_threshold
+    shuffle = _runtime.shuffle
+    seed = _runtime.seed
+    population_islands = _runtime.population_islands
+    on_round = _obs.on_round
+    on_reports = _obs.on_reports
+    stop_when = _obs.stop_when
+    verbose = _obs.verbose
+    usage = _obs.usage
+    record_trajectories = _obs.record_trajectories
+    trajectory_store = _obs.trajectory_store
 
     if asynchronous:
         # barrier-free mode: hand the same plug-ins to the async runtime. `rounds`
@@ -3635,7 +3730,11 @@ def evolve(
             record_trajectories=record_trajectories,
             trajectory_store=trajectory_store, contract=contract,
             extra_artifacts=extra_artifacts,
-            population_islands=population_islands)
+            population_islands=population_islands,
+            # Bags already folded into the flat locals above; forward them so
+            # the async surface does not look like it dropped the new knobs,
+            # and a bag-only caller still works if resolve is re-run (#804).
+            budget=budget, runtime=runtime, observability=observability)
 
     if pipelined_gate:
         # The mirror of the block above, and the same reasoning: a knob accepted

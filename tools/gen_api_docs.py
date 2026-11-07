@@ -213,6 +213,9 @@ SECTIONS: List[Tuple[str, str, str, str]] = [
 
     ("agentdescent.async_evolve", "Barrier-free evolution",
      "`evolve()` without the round barrier.", "async.md"),
+    ("agentdescent.evolve_settings", "Evolve settings bags",
+     "Budget / runtime / observability bags that freeze the flat evolve() surface.",
+     "evolution.md"),
     ("agentdescent.async_runtime", "The async orchestrator",
      "The reference barrier-free runtime and its statistics.", "async.md"),
     ("agentdescent.orchestrator", "The reference orchestrator",
@@ -222,6 +225,12 @@ SECTIONS: List[Tuple[str, str, str, str]] = [
 #: Symbols exported as plain values (not classes or functions) need a written
 #: line each -- ``inspect`` has nothing useful to say about an int or a frozenset.
 CONSTANTS: Dict[str, str] = {
+    "EVOLVE_PARAM_ALLOWLIST": "Frozen set of public ``evolve()`` parameter names "
+                              "(#804). A PR that adds a raw kwarg must update this "
+                              "on purpose; prefer Policies or a settings bag.",
+    "EVOLVE_STABLE_SUBSET": "Short stable ``evolve()`` contract to teach first; "
+                            "the long tail is advanced (Policies, bags, or a "
+                            "documented flat shortcut).",
     "SOLVED": "Reward at or above which a task counts as solved (`0.999`). "
               "Lower it for a graded scorer, or every rollout asks the reflector "
               "to fix an answer that was already good.",
