@@ -155,3 +155,14 @@ def test_claude_without_api_key_env_is_unchanged_and_unset_key_is_clear(monkeypa
     assert seen["init"] == {"max_retries": 0}
     with pytest.raises(RuntimeError, match="set X_KEY"):
         claude("m", api_key_env="X_KEY", retries=1)("p")
+
+
+@pytest.mark.parametrize("rounds,words", [(1, "one round"), (2, "two rounds"),
+                                          (8, "two rounds")])
+def test_dead_reflector_warning_names_the_rounds_the_spec_will_run(tmp_path, rounds, words):
+    # #872: a --rounds 1 quick trial was told it "fails after two rounds".
+    spec = _spec(tmp_path, reflect={"ref": "openai_compatible", "model": "m",
+                                    "api_key_env": "X_UNSET_KEY"})
+    spec.evolve = {"rounds": rounds}
+    [warning] = _unusable_refs(spec)
+    assert warning.endswith(f"the run fails after {words} with nothing learned"), warning

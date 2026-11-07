@@ -1671,6 +1671,21 @@ def _key_sent_to_openai(block: Any, key_env: str, url_env: str) -> Optional[str]
             f"`default_base_url` (the endpoint URL) or export {url_env}")
 
 
+def _propose_fail_rounds_text(spec: EvolveSpec) -> str:
+    """How many rounds a run with a dead reflector lasts, in words.
+
+    The evolve loop stops after ``PROPOSE_FAIL_ROUNDS`` rounds in which every
+    proposal raised, but a spec asking for fewer rounds ends sooner: the quick
+    trial ``--rounds 1`` was told its run "fails after two rounds".
+    """
+    from .evolution import PROPOSE_FAIL_ROUNDS
+    n = PROPOSE_FAIL_ROUNDS
+    rounds = (spec.evolve or {}).get("rounds") if isinstance(spec.evolve, dict) else None
+    if isinstance(rounds, int) and not isinstance(rounds, bool) and 0 < rounds < n:
+        n = rounds
+    return {1: "one round", 2: "two rounds"}.get(n, f"{n} rounds")
+
+
 def _unusable_refs(spec: EvolveSpec) -> List[str]:
     """Warnings for agents this machine cannot actually run.
 
@@ -1735,9 +1750,9 @@ def _unusable_refs(spec: EvolveSpec) -> List[str]:
                          "for its endpoint" if present else "")
                 out.append(f"{field}: `openai_compatible` needs {key_env} (and "
                            f"{url_env} for a non-OpenAI endpoint){route}; without it "
-                           + ("every proposal raises and the run fails after two rounds "
-                              "with nothing learned" if field == "reflect"
-                              else "every call raises"))
+                           + (f"every proposal raises and the run fails after "
+                              f"{_propose_fail_rounds_text(spec)} with nothing learned"
+                              if field == "reflect" else "every call raises"))
             else:
                 leak = _key_sent_to_openai(block, key_env, url_env)
                 if leak:
