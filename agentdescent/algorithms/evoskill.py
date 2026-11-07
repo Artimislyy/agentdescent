@@ -16,8 +16,10 @@ includes (a plugin's ``.ts``/``.js``) and validators (``skill_dir`` /
 
 Where an induced skill lands depends on the kind (#604, #824):
 
-* ``skill_library`` / ``agent_dir`` / ``plugin`` -- ``skills/<slug>/SKILL.md``
-  (``SkillLibraryTree`` ``LIBRARY`` layout).
+* ``skill_library`` -- top-level ``<slug>/SKILL.md`` (``LIBRARY`` layout with
+  empty library root; the target *is* a host skills directory) (#838).
+* ``agent_dir`` / ``plugin`` -- ``skills/<slug>/SKILL.md`` (``LIBRARY`` with
+  ``library_root="skills"``, matching those package layouts).
 * ``skill_dir`` -- the target *is* one Agent Skill (``SINGLE_SKILL``): induced
   rules go to ``references/<slug>.md`` with a managed index in root ``SKILL.md``.
 """
@@ -176,19 +178,63 @@ LIBRARY = "library"
 SINGLE_SKILL = "single_skill"
 
 
-def skill_path(name: str, layout: str = LIBRARY) -> str:
+def skill_path(name: str, layout: str = LIBRARY, *,
+               library_root: str = SKILL_ROOT,
+               state: Optional[Dict[str, str]] = None) -> str:
+    """Path for an induced skill.
+
+    ``LIBRARY`` on a ``skill_library`` target uses ``library_root=""`` so skills
+    land at ``<slug>/SKILL.md`` (host-loadable). Plugin/agent_dir keep the
+    nested ``skills/<slug>/SKILL.md`` root. When ``state`` already holds a path
+    for this slug, that path is reused so an edit does not fork a nested copy
+    (#838).
+    """
     if layout == SINGLE_SKILL:
         return f"{REFERENCE_ROOT}/{_slug(name)}.md"
-    return f"{SKILL_ROOT}/{_slug(name)}/SKILL.md"
+    slug = _slug(name)
+    if state:
+        for path, _body in state.items():
+            if path.endswith("/SKILL.md") and skill_name(path) == slug:
+                return path
+    if library_root:
+        return f"{library_root}/{slug}/SKILL.md"
+    return f"{slug}/SKILL.md"
 
 
 def skill_name(path: str) -> str:
     parts = path.split("/")
-    if len(parts) >= 3 and parts[0] == SKILL_ROOT:
+    if len(parts) == 2 and parts[1] == "SKILL.md":
+        return parts[0]
+    if len(parts) >= 3 and parts[0] == SKILL_ROOT and parts[-1] == "SKILL.md":
         return parts[1]
     if len(parts) == 2 and parts[0] == REFERENCE_ROOT and parts[1].endswith(".md"):
         return parts[1][:-3]
     return path
+
+
+def _with_skill_frontmatter(name: str, body: str,
+                            previous: Optional[str] = None) -> str:
+    """Ensure a LIBRARY skill body has Agent Skills ``name``/``description``.
+
+    Generators often omit YAML; without it hosts ignore the file and
+    ``SkillLibraryValidator`` would reject top-level paths (#838).
+    """
+    text = (body or "").strip()
+    if text.startswith("---"):
+        return text if text.endswith("\n") else text + "\n"
+    if previous:
+        prev = previous.lstrip()
+        if prev.startswith("---"):
+            end = prev.find("\n---", 3)
+            if end != -1:
+                fm = prev[: end + 4]
+                return fm.rstrip() + "\n\n" + text + "\n"
+    slug = _slug(name)
+    return (
+        f"---\nname: {slug}\n"
+        f"description: Evolved skill '{slug}' induced by evoskill.\n"
+        f"---\n\n{text}\n"
+    )
 
 
 def _with_index(skill_md: str, state: Dict[str, str], new_path: str) -> str:
@@ -222,7 +268,7 @@ class SkillLibraryTree(FileTree):
     """The artifact is a **directory** of `SKILL.md` files -- one per skill.
 
     The same library EvoSkill always evolved; what changed is that a state key is
-    now a real path (`skills/<name>/SKILL.md`), so the library can be materialised
+    now a real path (`<name>/SKILL.md` or `skills/<name>/SKILL.md`), so the library can be materialised
     into an agent's workspace and read file by file (`--backend claude-code`)
     instead of being inlined in every prompt.
 
@@ -241,7 +287,8 @@ class SkillLibraryTree(FileTree):
                  frozen: Tuple[str, ...] = (), *,
                  validators: Tuple[object, ...] = (),
                  max_file_bytes: Optional[int] = None,
-                 layout: str = LIBRARY) -> None:
+                 layout: str = LIBRARY,
+                 library_root: str = SKILL_ROOT) -> None:
         if layout not in (LIBRARY, SINGLE_SKILL):
             raise ValueError(f"layout must be {LIBRARY!r} or {SINGLE_SKILL!r}, "
                              f"got {layout!r}")
@@ -252,9 +299,11 @@ class SkillLibraryTree(FileTree):
                          max_files_per_diff=2 if layout == SINGLE_SKILL else 1,
                          validators=tuple(validators), **extra)
         self.layout = layout
+        self.library_root = library_root
 
     @classmethod
-    def from_base(cls, base: FileTree, *, layout: str = LIBRARY) -> "SkillLibraryTree":
+    def from_base(cls, base: FileTree, *, layout: str = LIBRARY,
+                  library_root: str = SKILL_ROOT) -> "SkillLibraryTree":
         """Adopt the ``FileTree`` ``compose`` built for the kind: its loaded tree
         (with the kind's include list), editable/frozen globs (a plugin host's
         ``PLUGIN_FROZEN`` included), size cap and validators (``skill_dir``'s
@@ -262,14 +311,18 @@ class SkillLibraryTree(FileTree):
         return cls(initial_files=dict(base.initial_files),
                    editable=tuple(base.editable), frozen=tuple(base.frozen),
                    validators=tuple(base.validators),
-                   max_file_bytes=base.max_file_bytes, layout=layout)
+                   max_file_bytes=base.max_file_bytes, layout=layout,
+                   library_root=library_root)
 
     def to_diff(self, state, proposal, author, base_version, target):
         name, _, body = proposal.partition(" :: ")
         name, body = name.strip(), body.strip()
         if not (name and body):
             return None
-        path = skill_path(name, self.layout)
+        path = skill_path(name, self.layout, library_root=self.library_root,
+                          state=state)
+        if self.layout == LIBRARY:
+            body = _with_skill_frontmatter(name, body, previous=state.get(path))
         if not self.writable(path) or len(body) > self.max_file_bytes:
             return None
         if state.get(path) == body:
@@ -448,6 +501,9 @@ def _build(ctx: BuildContext, p: Dict[str, object]) -> Overrides:
         eval_concurrency=int(p["eval_concurrency"]))
     kind = getattr(ctx.spec, "kind", None)
     layout = SINGLE_SKILL if kind == "skill_dir" else LIBRARY
+    # skill_library targets are already a host skills root (<slug>/SKILL.md).
+    # plugin/agent_dir keep a nested skills/ package folder (#838).
+    library_root = "" if kind == "skill_library" else SKILL_ROOT
     knobs: Dict[str, object] = {"aggregator_factory": factory}
     if callable(ctx.reflect):
         knobs["propose"] = make_propose(context, ctx.reflect)
@@ -460,13 +516,19 @@ def _build(ctx: BuildContext, p: Dict[str, object]) -> Overrides:
             "rules are written to references/<slug>.md and linked from a managed "
             "index block in SKILL.md, since a nested skills/<slug>/SKILL.md would "
             "not be loaded as a skill."]
+    elif kind == "skill_library":
+        layout_notes = [
+            "algorithm evoskill on kind='skill_library': layout=LIBRARY — induced "
+            "skills are written as <slug>/SKILL.md (top-level; host-loadable) with "
+            "Agent Skills frontmatter (#838)."]
     else:
         layout_notes = [
             f"algorithm evoskill on kind={kind!r}: layout=LIBRARY — induced skills "
             "are written as skills/<slug>/SKILL.md."]
     return Overrides(
         knobs=knobs,
-        strategy_from=lambda base: SkillLibraryTree.from_base(base, layout=layout),
+        strategy_from=lambda base: SkillLibraryTree.from_base(
+            base, layout=layout, library_root=library_root),
         notes=["algorithm evoskill: a bounded top-K frontier over skill libraries; "
                "each admitted change is re-scored on the full held-out set and the "
                "best member becomes the next parent."]

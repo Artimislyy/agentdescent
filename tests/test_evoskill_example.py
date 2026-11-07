@@ -187,6 +187,9 @@ def test_one_skill_per_proposal_and_the_name_protocol_survives():
 
     s = SkillLibraryTree()
     d = s.to_diff({}, "defense lookup :: find the row", "w0", 1, "skill_library")
-    assert d.ops == {"skills/defense-lookup/SKILL.md": "find the row"}
+    assert set(d.ops) == {"skills/defense-lookup/SKILL.md"}
+    assert "find the row" in d.ops["skills/defense-lookup/SKILL.md"]
+    assert d.ops["skills/defense-lookup/SKILL.md"].startswith("---")
+    assert "name: defense-lookup" in d.ops["skills/defense-lookup/SKILL.md"]
     assert s.to_diff(d.ops, "defense lookup :: find the row", "w0", 1, "a") is None
     assert s.to_diff({}, "no separator here", "w0", 1, "a") is None

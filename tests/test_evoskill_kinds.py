@@ -58,7 +58,9 @@ def test_plugin_keeps_the_host_frozen_paths_under_evoskill(tmp_path):
                  "skills/permission-check/SKILL.md", "skills/a/SKILL.md"):
         assert evo.writable(path) == plain.writable(path), path
     d = evo.to_diff({}, "csv totals :: sum the column", "w", 0, "a")
-    assert d.ops == {"skills/csv-totals/SKILL.md": "sum the column"}
+    assert set(d.ops) == {"skills/csv-totals/SKILL.md"}
+    assert "sum the column" in d.ops["skills/csv-totals/SKILL.md"]
+    assert d.ops["skills/csv-totals/SKILL.md"].startswith("---")
 
 
 def test_plugin_code_is_in_the_evolved_state_under_evoskill(tmp_path):
@@ -143,11 +145,23 @@ def _library(tmp_path):
 
 
 def test_skill_library_uses_library_layout_under_evoskill(tmp_path):
-    """#824: kind=skill_library + evoskill → SkillLibraryTree LIBRARY."""
+    """#824/#838: kind=skill_library + evoskill → top-level <slug>/SKILL.md."""
     plain, evo = _compose("skill_library", _library(tmp_path), agent="opencode")
     assert isinstance(evo, SkillLibraryTree) and evo.layout == LIBRARY
+    assert evo.library_root == ""
     d = evo.to_diff({}, "csv totals :: sum the column", "w", 0, "a")
-    assert d.ops == {"skills/csv-totals/SKILL.md": "sum the column"}
+    assert set(d.ops) == {"csv-totals/SKILL.md"}
+    body = d.ops["csv-totals/SKILL.md"]
+    assert body.startswith("---")
+    assert "name: csv-totals" in body
+    assert "sum the column" in body
+    # Edit reuses the top-level path (does not fork under skills/)
+    state = {**evo.initial(), **d.ops}
+    d2 = evo.to_diff(state, "alpha :: updated alpha body", "w", 1, "a")
+    assert "alpha/SKILL.md" in d2.ops
+    assert not any(p.startswith("skills/") for p in d2.ops)
+    assert d2.ops["alpha/SKILL.md"].startswith("---")
+    assert "name: alpha" in d2.ops["alpha/SKILL.md"]
 
 
 def test_plan_echoes_evoskill_library_layout_for_skill_library(tmp_path):
@@ -164,3 +178,24 @@ def test_plan_echoes_evoskill_library_layout_for_skill_library(tmp_path):
     assert any("SINGLE_SKILL" not in n or "skill_dir" in n for n in comp.notes)
     assert isinstance(comp.kwargs["strategy"], SkillLibraryTree)
     assert comp.kwargs["strategy"].layout == LIBRARY
+
+
+def test_skill_path_top_level_vs_nested():
+    from agentdescent.algorithms.evoskill import LIBRARY, SKILL_ROOT, skill_name, skill_path
+    assert skill_path("Csv Totals", LIBRARY, library_root="") == "csv-totals/SKILL.md"
+    assert skill_path("Csv Totals", LIBRARY, library_root=SKILL_ROOT) == (
+        "skills/csv-totals/SKILL.md")
+    state = {"alpha/SKILL.md": "---\nname: alpha\n---\n"}
+    assert skill_path("alpha", LIBRARY, library_root=SKILL_ROOT, state=state) == (
+        "alpha/SKILL.md")
+    assert skill_name("alpha/SKILL.md") == "alpha"
+    assert skill_name("skills/beta/SKILL.md") == "beta"
+
+
+def test_library_validator_rejects_missing_frontmatter_on_top_level(tmp_path):
+    """Nested skills/ paths used to skip SkillLibraryValidator (#838)."""
+    from agentdescent.skillspec import SkillLibraryValidator
+    plain, evo = _compose("skill_library", _library(tmp_path), agent="opencode")
+    assert evo.library_root == ""
+    bad = {**evo.initial(), "gamma/SKILL.md": "no yaml here"}
+    assert SkillLibraryValidator()(bad) is not None
