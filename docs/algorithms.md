@@ -25,7 +25,7 @@ the target on held-out, the run stops at once with
 `diagnose` reports `seed-already-solved`.
 
 These rows are Algorithm **cards** (`surface=card`) shipped in the
-wheel. A same-name [`examples/<algo>/`](https://github.com/ThinkFlowLab/agentdescent/tree/main/examples)
+wheel — Path A's catalog (**cards-only contract**, #384). MethodPolicy / full ports are not listed here. A same-name [`examples/<algo>/`](https://github.com/ThinkFlowLab/agentdescent/tree/main/examples)
 research port is a separate, source-only script and may use a different
 propose/strategy path — see [port fidelity](port-fidelity.md). Filter with
 `--kind` so hosts are not offered cards that cannot run on that artifact.

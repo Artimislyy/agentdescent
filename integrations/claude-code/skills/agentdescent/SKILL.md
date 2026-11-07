@@ -48,7 +48,7 @@ unless the user asked and the server was started with `--advanced` /
      one) before naming one; filter by kind so ineligible cards are not offered.
      Same-name `examples/<algo>/` research ports are source-only and may differ
      in fidelity — `plan` echoes `fidelity` / `research_port` / `fidelity_note`;
-     never claim the paper port ran when only the card did. The same data is in
+     never claim the paper port ran when only the card did. **Hard contract (#384):** Path A names **cards only**; MethodPolicy / full ports stay `python -m examples…` until a scoped card issue lands. The same data is in
      `agentdescent algorithms list` / `show`. To build the spec for one,
      call `algorithm_spec` (name, absolute `path`, absolute `cases`, optional
      `params` object, `rounds`/`workers` 1/1 for a quick trial): it writes the

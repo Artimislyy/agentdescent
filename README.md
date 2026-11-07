@@ -138,8 +138,11 @@ In a spec it is one field — `"algorithm": "gepa"` or
 `{"name": "gepa", "params": {...}}` — and every explicit field still wins.
 [The catalog →](https://thinkflowlab.github.io/agentdescent/algorithms/)
 
-The **twenty-three research ports** run from a checkout, each with a `--dry-run`
-that needs no API key:
+**Cards vs ports:** Path A names **cards** (wheel mechanism slices). The
+**twenty-three research ports** are source-only under `examples/` — same slug is
+not the same fidelity; never read a card run as paper numbers
+([decision tree](https://thinkflowlab.github.io/agentdescent/algorithm-decision-tree/), #384).
+Ports run from a checkout, each with a `--dry-run` that needs no API key:
 
 * **Benchmark-faithful (8):** ACE · GEPA · EvoSkill · SkillOpt · ADAS · DGM ·
   OpenEvolve · ERA

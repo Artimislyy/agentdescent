@@ -532,7 +532,9 @@ back to the CLI route rather than failing.
   parameters and defaults, its extra cost, and a fidelity label
   (`benchmark_faithful`, `mechanism_microport`, or `preset` for an engine
   component under an algorithm's name). The registry lives in the package, so
-  it works from the wheel; today it ships `rrsi` (`text`; screen, proposal and
+  it works from the wheel. **Cards vs ports:** Path A runs cards
+  only; `examples/<algo>/` ports stay CLI modules — same name ≠ same
+  fidelity ([decision tree](algorithm-decision-tree.md), #384); today it ships `rrsi` (`text`; screen, proposal and
   acceptance policies, see [RRSI](algo-rrsi.md)) and `archive_selection` (any
   kind; DGM-style archive parent sampling). Unknown names, unknown or
   mistyped parameters and a kind the algorithm does not apply to fail in

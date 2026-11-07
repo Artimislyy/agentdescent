@@ -3,7 +3,28 @@
 Usability pillars: **call any algorithm**, **quickly implement a new one**.
 This page is the map. Same name ≠ same fidelity — an Algorithm **card** such as
 `"algorithm": "gepa"` is not the `examples/gepa/` research port
-([port fidelity](port-fidelity.md), #384).
+([port fidelity](port-fidelity.md); cards-only contract closed via #384).
+
+## Hard contract: cards vs ports (#384)
+
+Path A (`agentdescent` CLI / MCP / host plugins) can **name Algorithm cards**
+shipped in the wheel. It does **not** run the full `examples/<algo>/` research
+ports.
+
+| Surface | What it is | How you run it |
+|---|---|---|
+| **Card** (`surface=card`) | Mechanism slice in the wheel (`agentdescent algorithms list`) | `"algorithm": "gepa"` in a spec / `/algorithms run` |
+| **Port** | Source-only paper script under `examples/` | `python -m examples.gepa…` from a checkout |
+
+**Same slug ≠ same fidelity.** A card may share a name with a port (ACE, GEPA,
+DGM, SkillOpt, EvoSkill, …) and still be only a mechanism slice —
+`plan` / `show` echo `fidelity`, `research_port`, `fidelity_note`. Never imply
+paper benchmark numbers from a card run. MethodPolicy microports stay under
+`examples/` until someone opens a scoped card issue for one of them.
+
+Future card candidates (not promised): Voyager / SkillWeaver / Reflexion /
+Self-Refine / TextGrad MethodPolicy mechanisms — each needs its own issue with
+kinds, params, fidelity class, and deviation vs `examples/<algo>/`.
 
 ## Decision tree
 
