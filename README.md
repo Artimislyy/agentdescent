@@ -196,9 +196,12 @@ count before starting**, waits for your yes, runs detached, and asks again
 before it writes anything back. No cases yet is not a blocker — it drafts 8–20
 for you to check first.
 
-`kind` is `text`, `skill_dir`, `agent_dir`, `agent_code` — or **`plugin`**: the
-host plugins themselves are evolvable, each rollout in an isolated copy of the
-host with hooks and permissions frozen and a recursion guard.
+`kind` is `text`, `skill_dir`, `agent_dir`, `agent_code`, `policy_slot` — or
+**`plugin`**: the host plugins themselves are evolvable, each rollout in an
+isolated copy of the host with hooks and permissions frozen and a recursion
+guard. A multi-skill library kind (`skill_library`) is tracked in
+[#820](https://github.com/ThinkFlowLab/agentdescent/issues/820); until then use
+`python -m examples.skill_library_evolution --dry-run`.
 [The plugin, step by step →](https://thinkflowlab.github.io/agentdescent/plugin-quickstart/)
 · [set it up and test it →](https://thinkflowlab.github.io/agentdescent/testing-guide/)
 

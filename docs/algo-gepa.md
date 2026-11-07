@@ -4,7 +4,7 @@ description: A runnable reproduction of GEPA (Reflective Prompt Evolution) with 
 
 # GEPA — Reflective Prompt Evolution
 
-> **Skill / prompt self-evolution.** Evolve an instruction prompt with a genetic,
+> **Prompt / instruction self-evolution.** Evolve an instruction prompt with a genetic,
 > reflective loop whose parent selection is a **per-instance Pareto frontier**.
 > Runs through [`evolve()`](evolution.md) with a custom `aggregator_factory`.
 > Example: [`examples/gepa/gepa_prompt_evolution.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/gepa/gepa_prompt_evolution.py).

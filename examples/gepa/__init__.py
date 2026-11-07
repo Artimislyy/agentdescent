@@ -1,1 +1,1 @@
-"""Faithful port: GEPA -- Reflective Prompt Evolution (skill / prompt)."""
+"""Faithful port: GEPA -- Reflective Prompt Evolution (prompt / instruction)."""

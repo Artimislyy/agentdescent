@@ -1,4 +1,4 @@
-"""Skill self-evolution, faithful port: **GEPA — Reflective Prompt Evolution**.
+"""Prompt self-evolution, faithful port: **GEPA — Reflective Prompt Evolution**.
 
 Paper : "GEPA: Reflective Prompt Evolution Can Outperform Reinforcement
         Learning", Lakshya A. Agrawal et al., 2025 (arXiv:2507.19457).
@@ -25,7 +25,7 @@ reflective loop. Its two distinctive mechanisms are both preserved here:
    sampled parent, so `evolve()`'s next round mutates *it*, not the greedy best.
 
 Only the parent-selection optimizer changes; the ledger, governance, staleness,
-and statistical-acceptance machinery are the framework's. Prompt = L2 skill ->
+and statistical-acceptance machinery are the framework's. Prompt = L2 instruction ->
 `blast_radius=0.2`.
 
     python -m examples.gepa.gepa_prompt_evolution --dry-run           # plan only, zero network
@@ -241,7 +241,7 @@ def main(argv=None) -> None:
     # the cost estimate and the run cannot disagree about what ran.
     args.workers = worker_count(args, args.workers)
 
-    print("Algorithm: GEPA (Reflective Prompt Evolution) -- skill/prompt self-evolution")
+    print("Algorithm: GEPA (Reflective Prompt Evolution) -- prompt / instruction self-evolution")
     print("Dataset  : HotpotQA (multi-hop QA, distractor), exact-match")
     print(f"\nPlan     : model={args.model}, rounds={args.rounds}, workers={args.workers}")
     if args.asynchronous:

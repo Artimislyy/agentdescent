@@ -1,8 +1,8 @@
 ---
-description: Turn a dataset into an evolved skill in one evolve() call. A worked example on 40 HotpotQA items that raises held-out exact match from 0.167 to 0.583.
+description: Instruction / one Agent Skill / skill library — pick the artifact. Worked HotpotQA instruction example (held-out EM 0.167 → 0.583).
 ---
 
-# Dataset → evolved skill (which kind?)
+# Instruction, one skill, or a library?
 
 Pick the artifact: **instruction** (`SingleSlot` / `AppendRules`, this page /
 [`skill_evolution`](skill-evolution.md)), **one Agent Skill**

@@ -52,8 +52,8 @@ both has nothing to read that says which one ran.
 
 Prefer a policy field when one decision is enough; reach for the factory when
 your mechanism needs state the pipeline does not keep. The contributor map is
-the [algorithm decision tree](algorithm-decision-tree.md); composing factory
-with merge Policies without a silent drop is tracked as
-[#807](https://github.com/ThinkFlowLab/agentdescent/issues/807).
-`plan` warns when it can see merge-side Policies that the factory path will
-ignore (#805).
+the [algorithm decision tree](algorithm-decision-tree.md). Composing factory
+with merge Policies without a silent drop is **done**
+([#807](https://github.com/ThinkFlowLab/agentdescent/issues/807), see above);
+`plan` still warns when merge-side Policies would be unused on an older path
+(#805).

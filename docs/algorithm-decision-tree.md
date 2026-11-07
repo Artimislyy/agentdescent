@@ -34,11 +34,13 @@ factory-built aggregator through the bundle unless the factory itself reads
 them. Carrying them in both places is a silent drop on the evolve path today;
 `plan` warns when it can see the mismatch ([#504](https://github.com/ThinkFlowLab/agentdescent/issues/504)).
 
-Making factory aggregators compose with merge Policies (no silent drop, or a
-first-class population API) is tracked as
-[#807](https://github.com/ThinkFlowLab/agentdescent/issues/807). Until that
-lands: pass merge rules into your aggregator's constructor, strip them from
-the bundle, or omit them from the spec.
+Factory ⊕ merge Policies composition **landed** via
+[#807](https://github.com/ThinkFlowLab/agentdescent/issues/807) /
+[#813](https://github.com/ThinkFlowLab/agentdescent/pull/813): `evolve`
+forwards merge-side slots into the factory (or onto the returned aggregator)
+and **raises** on unused requested slots unless
+`Policies(accept_orphaned_merge_policies=True)`. Details:
+[aggregator-factory.md](aggregator-factory.md).
 
 `selection` + `aggregator_factory` together are **refused** (both fill the
 aggregator seat) — that is already loud.
@@ -62,4 +64,4 @@ aggregator seat) — that is already loud.
 - [Port fidelity](port-fidelity.md) · [Named algorithms](algorithms.md)
 - [aggregator_factory exit](aggregator-factory.md)
 - [MethodPolicy checklist](porting-methodpolicy.md) · [Porting checklist](porting-checklist.md)
-- Engine follow-up: [#807](https://github.com/ThinkFlowLab/agentdescent/issues/807) (factory ⊕ merge Policies)
+- Factory ⊕ merge Policies: [#807](https://github.com/ThinkFlowLab/agentdescent/issues/807) (closed; see [aggregator-factory.md](aggregator-factory.md))
