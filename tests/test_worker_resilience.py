@@ -20,6 +20,8 @@ TASKS = [Task(id=str(i), prompt=str(i), meta={"gold": str(i)}) for i in range(8)
 
 
 def _evolve(run, **kw):
+    kw.setdefault("max_seconds", 20.0)
+    kw.setdefault("max_rollouts", 120)
     return evolve(TASKS, lambda t, o: 1.0 if o == t.meta["gold"] else 0.0,
                   run=run, propose=lambda *a: None,
                   strategy=SingleSlot(initial_value="v"), asynchronous=True,
@@ -126,7 +128,8 @@ def test_the_merger_survives_a_transient_too():
         warnings.simplefilter("ignore")
         res = evolve(TASKS, reward, run=lambda rendered, t: "wrong", propose=propose,
                      strategy=SingleSlot(initial_value="v"), asynchronous=True,
-                     n_workers=2, rounds=30, held_out_frac=0.5, max_seconds=15.0)
+                     n_workers=2, rounds=30, held_out_frac=0.5, max_seconds=15.0,
+                     max_rollouts=60)
     # Non-vacuity: the merger must actually have hit the outage and got past it,
     # otherwise this passes without ever exercising the recovery path.
     assert next(merger_calls) > 4, "the merger never reached the outage"
@@ -149,6 +152,7 @@ def test_a_caller_bug_in_the_merger_still_propagates():
                    propose=lambda *a: "tweak",
                    strategy=SingleSlot(initial_value="v"), asynchronous=True,
                    n_workers=2, rounds=20, held_out_frac=0.5, max_seconds=10.0,
+                   max_rollouts=40,
                    aggregator_factory=lambda *a, **kw: BadAggregator())
 
 

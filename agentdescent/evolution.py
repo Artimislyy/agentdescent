@@ -865,27 +865,33 @@ def _publish_stable(aggregator) -> None:
         pass
 
 
-#: What `evolve` can honour from a `Policies` bundle today. Everything else
+#: What each driver can honour from a `Policies` bundle today. Everything else
 #: raises rather than being accepted and ignored -- see
-#: `Policies.require_supported`. The set grows as the implementations land.
-_WIRED_POLICIES = ("task_sampler", "selection", "proposal", "conflict", "fusion",
-                   "acceptance", "promotion", "staleness", "verifier", "ledger",
-                   "aggregator_factory", "eval_cache", "sandbox_spec", "evaluator",
-                   "executor", "screen", "accept_orphaned_merge_policies")
+#: `Policies.require_supported`. One table so sync and async cannot drift
+#: apart without a test noticing (#809). ``executor`` is sync-only: the
+#: barrier-free worker calls ``eng.run`` directly and has no executor seam yet.
+#: ``accept_orphaned_merge_policies`` is on both drivers (#807).
+_POLICY_DRIVER_SUPPORT = {
+    "evolve": (
+        "task_sampler", "selection", "proposal", "conflict", "fusion",
+        "acceptance", "promotion", "staleness", "verifier", "ledger",
+        "aggregator_factory", "eval_cache", "sandbox_spec", "evaluator",
+        "executor", "screen", "accept_orphaned_merge_policies",
+    ),
+    "async_evolve": (
+        "task_sampler", "selection", "proposal", "conflict", "fusion",
+        "acceptance", "promotion", "staleness", "verifier", "ledger",
+        "aggregator_factory", "eval_cache", "sandbox_spec", "evaluator",
+        "screen", "accept_orphaned_merge_policies",
+    ),
+}
+_WIRED_POLICIES = _POLICY_DRIVER_SUPPORT["evolve"]
+_ASYNC_WIRED_POLICIES = _POLICY_DRIVER_SUPPORT["async_evolve"]
 
 #: Merge-side Policies the default Aggregator (and population_factory) wire.
 #: An aggregator_factory that cannot take them used to warn and drop them;
 #: #807 fails that combination unless accept_orphaned_merge_policies=True.
 _MERGE_POLICY_NAMES = ("conflict", "fusion", "acceptance", "promotion", "screen")
-
-#: The same bundle, minus the one field the barrier-free loop does not read.
-#: `async_evolve`'s worker calls `eng.run` directly; there is no executor seam in
-#: it yet, so a supplied one was accepted and then dropped -- the exact outcome
-#: `require_supported` exists to make impossible, arriving through a *shared*
-#: constant rather than a missing check. It matters more since a supplied
-#: executor started working on the synchronous path: flipping
-#: `asynchronous=True` would otherwise silently stop honouring it.
-_ASYNC_WIRED_POLICIES = tuple(p for p in _WIRED_POLICIES if p != "executor")
 
 
 
@@ -3253,8 +3259,9 @@ def evolve(
         Name of the evolving artifact; becomes a filename, so it must match
         ``[A-Za-z0-9_.-]+``.
     rounds:
-        Number of round barriers to run. Under ``asynchronous=True`` this becomes
-        a worker-rollout budget of ``rounds * n_workers`` instead.
+        Number of round barriers to run. Sync-only. ``evolve(asynchronous=True)``
+        no longer reinterprets this as a rollout budget (#809) — pass
+        ``max_rollouts=`` or call :func:`~agentdescent.async_evolve.async_evolve`.
     n_workers:
         Workers per round (``>= 1``).
     max_concurrency:
@@ -3319,8 +3326,12 @@ def evolve(
         documents what it does and does not fix -- a commit landing mid-rollout
         still produces a stale card.
     asynchronous, async_ratio:
-        Delegate to :func:`~agentdescent.async_evolve.async_evolve` -- no round
-        barrier, with ``async_ratio`` as the staleness lag budget.
+        **Deprecated bridge** to :func:`~agentdescent.async_evolve.async_evolve`
+        (#809). Sync and async are two contracts, not a mode flag: prefer
+        calling ``async_evolve`` directly. When ``asynchronous=True``, both
+        ``max_seconds`` and ``max_rollouts`` are required (no silent
+        reinterpretation of ``rounds``, no invented 20-second budget).
+        ``async_ratio`` is the async lag budget.
     max_seconds:
         Wall-clock budget. ``None`` (default) means unbounded; the async path
         uses ``20.0`` when unset.
@@ -3656,12 +3667,10 @@ def evolve(
     trajectory_store = _obs.trajectory_store
 
     if asynchronous:
-        # barrier-free mode: hand the same plug-ins to the async runtime. `rounds`
-        # becomes a worker-rollout budget (rounds x n_workers) alongside max_seconds.
-        # Two sync-only knobs have no meaning here and were previously dropped in
-        # silence, so `parallel=TensorParallel(...)` looked honoured while the run
-        # was plain DP. Say so instead: the async runtime shards round-robin itself
-        # and its concurrency *is* `n_workers`.
+        # Deprecated bridge (#809): sync and async are two contracts, not a mode
+        # flag. Prefer ``async_evolve`` directly. Validate budgets before the
+        # deprecation warning so a misconfigured call fails closed without the
+        # extra noise.
         for name, value, why in (
             ("parallel", parallel,
              f"the async runtime shards data-parallel across its own {n_workers} "
@@ -3681,35 +3690,34 @@ def evolve(
                     f"evolve(asynchronous=True) ignores {name}=: {why}. Use the "
                     f"synchronous path if you need it.", RuntimeWarning,
                     stacklevel=2)
-        # The two above that are *not* ignored but silently REDEFINED were the
-        # sharper edge, because nothing said so. Flipping one boolean turned an
-        # unbounded run into a 20-second one, and a partial artifact with
-        # `error=None` and a populated `history` is indistinguishable from a
-        # converged one.
         if max_seconds is None:
-            warnings.warn(
-                "evolve(asynchronous=True) has no unbounded mode: max_seconds=None "
-                "becomes 20.0 seconds here, where it means 'no limit' on the "
-                "synchronous path. Pass max_seconds= explicitly, and check "
-                "result.stop_reason -- a budget expiry otherwise looks exactly "
-                "like convergence.", RuntimeWarning, stacklevel=2)
-        if rounds != 15 and max_rollouts is None:   # i.e. the caller chose a value
-            warnings.warn(
-                f"evolve(asynchronous=True) has no round barrier, so rounds={rounds} "
-                f"is reinterpreted as a budget of {rounds * max(1, n_workers)} worker "
-                "rollouts, and RoundInfo.round becomes a merger-sweep index -- "
-                "len(result.history) is not comparable with the synchronous path. "
-                "Pass max_rollouts= to say the budget outright.",
-                RuntimeWarning, stacklevel=2)
+            raise ValueError(
+                "evolve(asynchronous=True) no longer invents max_seconds=20.0 "
+                "(that made an unbounded sync run look like a 20-second async "
+                "one). Pass max_seconds= explicitly, or call "
+                "async_evolve(max_seconds=...).")
+        if max_rollouts is None:
+            raise ValueError(
+                "evolve(asynchronous=True) no longer reinterprets "
+                f"rounds={rounds} as a budget of "
+                f"{rounds * max(1, n_workers)} worker rollouts. Pass "
+                "max_rollouts= for an equal-budget stop (or "
+                "budget=BudgetSettings(max_rollouts=...)), or call "
+                "async_evolve(max_iters=...).")
+        warnings.warn(
+            "evolve(asynchronous=True) is a deprecated bridge to async_evolve(): "
+            "sync and async are two contracts (different budgets, different "
+            "Policies wiring). Call async_evolve(...) directly; see docs/async.md "
+            "and #809.",
+            FutureWarning, stacklevel=2)
         from .async_evolve import async_evolve
         return async_evolve(
             tasks, reward, agent=agent, run=run, propose=propose, strategy=strategy,
             initial_state=initial_state, blast_radius=blast_radius, artifact_id=artifact_id,
             n_workers=n_workers, async_ratio=async_ratio,
             resync_on_commit=resync_on_commit,
-            max_seconds=20.0 if max_seconds is None else max_seconds,
-            max_iters=(max_rollouts if max_rollouts is not None
-                       else rounds * max(1, n_workers)),
+            max_seconds=max_seconds,
+            max_iters=max_rollouts,
             max_calls=max_calls, max_tokens=max_tokens, held_out_frac=held_out_frac,
             repo_path=repo_path, agg_config=agg_config, staleness_policy=staleness_policy,
             aggregator_factory=aggregator_factory, oracle_budget=oracle_budget,

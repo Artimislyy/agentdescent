@@ -446,6 +446,10 @@ def run_evoskill(complete: Completion, docs: Dict[str, str],
     # still bounded by the data, because a worker with an empty shard is not a
     # worker.
     workers = min(max_workers, len(train))
+    # #809: async no longer reinterprets rounds; name the rollout budget.
+    async_rollouts = max_rollouts
+    if asynchronous and async_rollouts is None:
+        async_rollouts = iterations * max(1, workers)
     result = evolve(tasks, reward, run=run, propose=make_propose(ctx, complete, propose_and_generate),
                     strategy=SkillLibraryTree(), blast_radius=0.2,
                     artifact_id="skill_library", rounds=iterations,
@@ -465,7 +469,7 @@ def run_evoskill(complete: Completion, docs: Dict[str, str],
                     # committed meanwhile and the rebase holds.
                     staleness_policy=get_policy(staleness),
                     aggregator_factory=factory, verbose=verbose,
-                    max_rollouts=max_rollouts)
+                    max_rollouts=async_rollouts)
     if verbose:
         report_engine(result)
 

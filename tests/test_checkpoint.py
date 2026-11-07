@@ -564,7 +564,7 @@ def test_async_path_checkpoints_too(tmp_path):
         evolve(tasks, lambda t, o: 0.5, run=lambda r, t: t.id, checkpointing=True,
                propose=lambda r, t, o, rew: f"change-{t.id}",
                rounds=2, n_workers=2, repo_path=repo,
-               max_seconds=30.0, asynchronous=True)
+               max_seconds=30.0, asynchronous=True, max_rollouts=8)
 
     payload = load_checkpoint(repo)
     assert payload is not None, "the async path did not write a checkpoint"

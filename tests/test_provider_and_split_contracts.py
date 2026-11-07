@@ -3,7 +3,7 @@
 * a provider that answered `content: null` broke the one contract in the package
   (`Completion` is prompt -> str) and the failure was then *retried as a backend
   transient*;
-* flipping `asynchronous=True` turned an unbounded run into a 20-second one, and
+* flipping `asynchronous=True` used to turn an unbounded run into a 20-second one, and
   the truncated result was indistinguishable from a converged one;
 * the train/held-out split is positional, so grouped data holds out one end of
   the file and every gate in the run is then measured against a different
@@ -125,21 +125,26 @@ def _quick(**kw):
                   n_workers=2, held_out_frac=0.5, **kw)
 
 
-def test_async_says_that_an_unset_max_seconds_becomes_twenty():
-    """`None` means "no limit" on one path and "20 seconds" on the other."""
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        _quick(rounds=1, asynchronous=True)
-    assert any("20.0 seconds" in str(w.message) for w in caught), \
-        "flipping one boolean silently bounded the run"
+def test_async_bridge_refuses_an_unset_max_seconds():
+    """#809: no invented 20-second budget behind asynchronous=True."""
+    import pytest
+    with pytest.raises(ValueError, match="max_seconds"):
+        _quick(rounds=1, asynchronous=True, max_rollouts=4)
 
 
-def test_async_says_that_rounds_changes_meaning():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+def test_async_bridge_refuses_rounds_as_a_rollout_budget():
+    """#809: rounds is sync-only; max_rollouts must be named."""
+    import pytest
+    with pytest.raises(ValueError, match="max_rollouts"):
         _quick(rounds=3, asynchronous=True, max_seconds=1.0)
-    assert any("rollouts" in str(w.message) and "rounds=3" in str(w.message)
-               for w in caught)
+
+
+def test_async_bridge_warns_that_it_is_deprecated():
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        _quick(rounds=1, asynchronous=True, max_seconds=2.0, max_rollouts=4)
+    assert any(issubclass(w.category, FutureWarning)
+               and "async_evolve" in str(w.message) for w in caught)
 
 
 def test_stop_reason_tells_convergence_from_a_spent_budget():

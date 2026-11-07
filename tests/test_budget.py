@@ -132,19 +132,16 @@ def test_async_takes_the_same_two_budgets():
     assert res.error is None
 
 
-def test_async_max_rollouts_silences_the_rounds_reinterpretation_warning():
-    """`rounds` on the async path is a rollout budget in disguise; saying the
-    budget outright is the way to stop guessing at it."""
+def test_async_bridge_requires_max_rollouts_instead_of_reinterpreting_rounds():
+    """#809: rounds is no longer an async budget behind the bridge."""
+    import pytest
     import warnings
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with pytest.raises(ValueError, match="max_rollouts"):
         _evolve(asynchronous=True, max_seconds=5.0, rounds=3, max_concurrency=1)
-    assert any("reinterpreted as a budget" in str(w.message) for w in caught)
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         _evolve(asynchronous=True, max_seconds=5.0, rounds=3, max_rollouts=12,
                 max_concurrency=1)
-    assert not any("reinterpreted as a budget" in str(w.message) for w in caught), \
-        "max_rollouts= makes the budget explicit, so there is nothing to warn about"
+    assert not any("reinterpreted as a budget" in str(w.message) for w in caught)

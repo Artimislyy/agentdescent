@@ -72,6 +72,7 @@ def _run_evolve(*, max_tokens=None, rounds=3, asynchronous=False, **kw):
     )
     if asynchronous:
         defaults["max_seconds"] = 30
+        defaults.setdefault("max_rollouts", max(8, rounds * 4))
     defaults.update(kw)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -294,6 +295,7 @@ def test_async_governor_degrades_self_verify():
             max_tokens=600,
             asynchronous=True,
             max_seconds=30,
+            max_rollouts=40,
             usage=agent.usage,
         )
     assert result.stop_reason == "max_tokens"
@@ -319,6 +321,7 @@ def test_async_governor_fusion_degrades():
             fusion_tournament=True,
             asynchronous=True,
             max_seconds=30,
+            max_rollouts=40,
             usage=agent.usage,
         )
     # The run should have stopped due to the token budget.

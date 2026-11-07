@@ -22,7 +22,9 @@ TASKS = [Task(id=str(i), prompt=str(i), meta={"gold": str(i)}) for i in range(8)
 
 ENGINES = [
     pytest.param({"n_workers": 3, "max_concurrency": 3}, id="sync"),
-    pytest.param({"n_workers": 3, "asynchronous": True, "max_seconds": 8.0},
+    # #809: bridge requires explicit max_rollouts (equal-budget: rounds×workers).
+    pytest.param({"n_workers": 3, "asynchronous": True, "max_seconds": 8.0,
+                  "max_rollouts": 36},
                  id="async"),
 ]
 

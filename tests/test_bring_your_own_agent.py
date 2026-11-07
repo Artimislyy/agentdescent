@@ -42,7 +42,7 @@ def test_the_same_agent_evolves_asynchronously():
 def test_evolve_switches_to_async_with_one_flag():
     res = evolve(TASKS, REWARD, run=RUN, propose=REFLECT(),
                  strategy=SingleSlot(), rounds=4, n_workers=3,
-                 asynchronous=True, async_ratio=3, max_seconds=4.0)
+                 asynchronous=True, async_ratio=3, max_seconds=4.0, max_rollouts=24)
     assert res.final_reward == 1.0
 
 

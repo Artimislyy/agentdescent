@@ -16,6 +16,8 @@ TASKS = [Task(id=str(i), prompt="p", meta={"gold": "x"}) for i in range(6)]
 
 def _flat_run(**kw):
     """A run that can never improve -- so only a stop rule ends it early."""
+    kw.setdefault("max_rollouts", 400)
+    kw.setdefault("max_seconds", 20.0)
     return evolve(TASKS, lambda t, o: 0.5, run=lambda a, t: "x",
                   propose=lambda *a: None, strategy=SingleSlot(initial_value="v"),
                   asynchronous=True, n_workers=2, rounds=200, **kw)

@@ -102,15 +102,21 @@ def _propose(rendered: str, task: Task, output: str, reward: float) -> Optional[
 def workload(config: Config, seed: int) -> EvolutionResult:
     """One run. Only `config` varies; data, actors and semantics do not."""
     train, _test = _dataset(seed)
+    rounds = 30
+    # #809: evolve(asynchronous=True) no longer reinterprets rounds as a
+    # rollout budget. Name the equal-budget stop explicitly (rounds × workers).
+    async_kw = {}
+    if config.asynchronous:
+        async_kw["max_rollouts"] = rounds * max(1, config.n_workers)
     return evolve(
         train, _reward, run=_run, propose=_propose, strategy=AppendRules(),
-        rounds=30, n_workers=config.n_workers,
+        rounds=rounds, n_workers=config.n_workers,
         max_concurrency=config.n_workers,
         eval_concurrency=config.eval_concurrency,
         asynchronous=config.asynchronous, async_ratio=config.async_ratio,
         resync_on_commit=config.resync_on_commit,
         staleness_policy=get_policy(config.staleness),
-        held_out_frac=0.4, seed=seed, max_seconds=60.0)
+        held_out_frac=0.4, seed=seed, max_seconds=60.0, **async_kw)
 
 
 def test_quality(seed: int) -> Callable[[EvolutionResult], float]:

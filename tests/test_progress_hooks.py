@@ -67,7 +67,7 @@ def test_async_on_round_fires_per_sweep():
 def test_evolve_forwards_on_round_to_the_async_path():
     seen = []
     evolve(_tasks(), REWARD, agent=_Agent(), strategy=AppendRules(),
-           asynchronous=True, n_workers=2, max_seconds=3.0, rounds=3,
+           asynchronous=True, n_workers=2, max_seconds=3.0, rounds=3, max_rollouts=6,
            on_round=seen.append)
     assert seen, "on_round must survive the delegation to async_evolve"
 

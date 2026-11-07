@@ -68,7 +68,8 @@ def test_the_async_path_takes_the_same_pieces():
     import warnings
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        res = _evolve(asynchronous=True, max_seconds=5.0, max_concurrency=1)
+        res = _evolve(asynchronous=True, max_seconds=5.0, max_concurrency=1,
+                  max_rollouts=20)
     assert isinstance(res, EvolutionResult)
     assert not [x for x in w if "ignores max_concurrency" in str(x.message)]
 

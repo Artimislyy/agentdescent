@@ -50,7 +50,7 @@ def test_outcomes_survive_save_and_load():
 
 
 def test_the_async_path_reports_them_too():
-    res = _run(n_workers=2, asynchronous=True, max_seconds=4.0)
+    res = _run(n_workers=2, asynchronous=True, max_seconds=4.0, max_rollouts=8)
     assert res.outcomes()
 
 

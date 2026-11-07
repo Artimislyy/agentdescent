@@ -68,7 +68,7 @@ result = evolve(
     propose=reflector(claude(model="claude-haiku-4-5")),          # who reflects
     strategy=SingleSlot(initial_value="Answer concisely."),       # what evolves
     n_workers=4, max_concurrency=4,        # ...in parallel
-    # asynchronous=True,                   # ...or barrier-free
+    # async_evolve(...),                   # ...or barrier-free
 )
 print(result.rendered)      # the evolved system prompt
 ```
@@ -649,7 +649,8 @@ limit, credit exhaustion) — progress isn't lost.
                          # | "max_rollouts" | "max_calls" | "error"
     ```
 
-    This matters most under `asynchronous=True`, where **`max_seconds=None` means
+    This matters most under the deprecated `asynchronous=True` bridge, where
+    **`max_seconds` is now required** (#809); historically `max_seconds=None` meant
     20 seconds**, not "unbounded" as it does on the synchronous path — flipping one
     boolean could truncate a run and the result looked converged. Both that and
     `rounds` changing meaning (it becomes a `rounds × n_workers` rollout budget,
@@ -836,13 +837,13 @@ evolve(tasks, reward, agent=agent, n_workers=4, max_concurrency=4)   # 4 workers
     need a rollout contract exposing its turns (see
     [duration-aware scheduling](duration-scheduling.md)).
 
-* **Across rounds — `asynchronous=True` (barrier-free).** Removing the round
-  barrier entirely is [`async_evolve()`](#the-barrier-free-runtime-async_evolve),
-  reachable as `evolve(asynchronous=True, async_ratio=…)`. It takes the **same**
-  plug-ins, so every example runs async with a `--async` flag.
+* **Across rounds — barrier-free `async_evolve`.** Removing the round barrier
+  entirely is [`async_evolve()`](#the-barrier-free-runtime-async_evolve). It takes
+  the **same** plug-ins, so every example runs async with a `--async` flag.
+  `evolve(asynchronous=True)` remains only as a deprecated bridge (#809).
 
 ```python
-evolve(tasks, reward, agent=agent, asynchronous=True, async_ratio=3, max_seconds=30)
+async_evolve(tasks, reward, agent=agent, async_ratio=3, max_seconds=30, max_iters=120)
 ```
 
 ## The barrier-free runtime: `async_evolve()`
@@ -861,17 +862,15 @@ result = async_evolve(tasks, reward, agent=agent,
                       staleness_policy=get_policy("reflective"))
 ```
 
-Reach it via `evolve(asynchronous=True)` or directly. Small `async_ratio` →
-near-synchronous, few stale diffs; large → highly asynchronous, many stale diffs
-for the policy to rebase or discard.
+Call `async_evolve` directly. Small `async_ratio` → near-synchronous, few stale
+diffs; large → highly asynchronous, many stale diffs for the policy to rebase or
+discard.
 
-!!! warning "Five arguments change meaning under `asynchronous=True`"
-    Three are ignored (`parallel`, `max_concurrency`, `round_timeout`) and two are
-    **redefined**: `rounds` becomes a budget of `rounds × n_workers` rollouts, and
-    `max_seconds=None` becomes 20 seconds where it meant "no limit". Each warns,
-    but check `result.stop_reason` — a budget expiry otherwise looks exactly like
-    convergence. The full table, the pipeline's cold-start and backpressure
-    behaviour, and what only the async path can report are on
+!!! warning "`evolve(asynchronous=True)` is a deprecated bridge (#809)"
+    Sync and async are two contracts. The bool still forwards to `async_evolve`
+    for one migration window, but it **requires** explicit `max_seconds` and
+    `max_rollouts` (no invented 20-second budget, no `rounds` reinterpretation)
+    and emits `FutureWarning`. Prefer `async_evolve(...)`. Full table on
     [the async page](async.md).
 
 ### More async / parallel recipes
@@ -883,7 +882,7 @@ The two levers compose; pick per workload:
 evolve(tasks, reward, agent=agent, n_workers=8, max_concurrency=8, rounds=10)
 
 # 2. Barrier-free async, time-bounded: run for 20 min, keep the best head so far.
-evolve(tasks, reward, agent=agent, asynchronous=True, async_ratio=3, max_seconds=1200)
+async_evolve(tasks, reward, agent=agent, async_ratio=3, max_seconds=1200)
 
 # 3. Async to a target: stop as soon as held-out reward crosses a bar.
 async_evolve(tasks, reward, agent=agent, n_workers=6, target_reward=0.85)
@@ -893,8 +892,9 @@ async_evolve(tasks, reward, agent=agent, n_workers=4, max_iters=200)
 
 # 5. Faithful port on the async path: skip the per-trajectory re-run, score the
 #    candidate on held-out only (see EvoSkill), with concurrent held-out eval.
-evolve(tasks, reward, run=run, propose=propose, strategy=strat,
-       aggregator_factory=factory, asynchronous=True, self_verify=False)
+async_evolve(tasks, reward, run=run, propose=propose, strategy=strat,
+             aggregator_factory=factory, self_verify=False, max_seconds=600,
+             max_iters=200)
 
 # 6. Highly-async, staleness-heavy: large lag budget + reflective rebase-and-verify.
 async_evolve(tasks, reward, agent=agent, n_workers=8, async_ratio=8,

@@ -62,6 +62,7 @@ def test_async_evolve_stops_at_max_iters():
 def test_evolve_asynchronous_flag_delegates_to_async():
     r = evolve(_tasks(), REWARD, agent=_Composer(), strategy=AppendRules(),
                asynchronous=True, n_workers=4, rounds=12, async_ratio=3, max_seconds=8.0,
+               max_rollouts=48,
                held_out_frac=0.5)
     assert r.final_reward >= r.history[0].held_out_reward
 

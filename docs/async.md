@@ -10,8 +10,8 @@ a run reproducible and easy to reason about — and it is also what makes the wh
 round wait for its slowest rollout.
 
 ```python
-result = evolve(tasks, reward, agent=agent,
-                asynchronous=True, async_ratio=3, max_seconds=120)
+result = async_evolve(tasks, reward, agent=agent,
+                      async_ratio=3, max_seconds=120, max_iters=200)
 ```
 
 Two stages — *rollout + propose* (the workers) and *aggregate + commit* (the
@@ -44,40 +44,45 @@ budget discards everything (`outcomes()` fills with `all-stale` and nothing
 commits); a tight lag budget re-introduces the waiting you removed the barrier to
 avoid. `result.forced_refreshes` is the mismatch showing itself.
 
-## `evolve(asynchronous=True)` vs `async_evolve()`
+## `evolve` vs `async_evolve` — two contracts (#809)
 
-They are the same engine; the first delegates. The wrapper exists so that
-switching costs one argument, but three of `evolve()`'s parameters have no
-meaning without a barrier and it **says so** rather than dropping them silently:
+They share a loop shape, but they are **not** one function with a mode flag.
+`async_evolve` is the barrier-free entry. `evolve(asynchronous=True)` remains
+only as a **deprecated bridge** (emits `FutureWarning`): it forwards to
+`async_evolve` and refuses the old silent redefinitions.
 
-| argument | what happens under `asynchronous=True` |
+| argument | under `evolve(asynchronous=True)` |
 |---|---|
-| `parallel=` | ignored — the async runtime shards data-parallel across its own workers |
-| `max_concurrency=` | ignored — concurrency *is* `n_workers` |
-| `round_timeout=` | ignored — there is no barrier to bound; use the backend's own timeout |
-| `rounds=` | **reinterpreted** as a budget of `rounds × n_workers` worker rollouts (silent, and exact, once `max_rollouts=` says the budget outright) |
-| `max_seconds=None` | **becomes 20.0 seconds**, where it means "no limit" on the sync path |
+| `parallel=` / `max_concurrency=` / `round_timeout=` / `refresh_interval=` | ignored with `RuntimeWarning` — sync-only |
+| `rounds=` | **not** an async budget; omitting `max_rollouts=` raises `ValueError` |
+| `max_seconds=None` | **raises** — no invented 20-second budget |
+| `max_rollouts=` / `budget=BudgetSettings(...)` | required equal-budget stop (maps to async `max_iters`) |
+| Policies `executor=` | refused on async (`_POLICY_DRIVER_SUPPORT`) — sync-only seam |
 
-Each of those emits a `RuntimeWarning`. The last two are the sharp ones: flipping
-one boolean turns an unbounded run into a 20-second one, and a partial artifact
-with `error=None` and a populated `history` is indistinguishable from a converged
-one. **Check `result.stop_reason`** — `"target_reward"` is convergence,
-`"max_seconds"` / `"max_iters"` / `"max_rollouts"` / `"max_calls"` is a budget
-expiry.
-
-Say the rollout budget outright rather than deriving it from `rounds`. Either
-spelling works and both silence the reinterpretation warning:
+Prefer the honest call:
 
 ```python
-from agentdescent import async_evolve, evolve
-
-evolve(tasks, reward, agent=agent, asynchronous=True,
-       n_workers=6, max_seconds=120, max_rollouts=200, max_calls=400)
+from agentdescent import async_evolve, BudgetSettings
 
 async_evolve(tasks, reward, agent=agent,
              n_workers=6, async_ratio=3,
              max_seconds=120, max_iters=200, max_calls=400)
+# or
+async_evolve(tasks, reward, agent=agent,
+             budget=BudgetSettings(max_seconds=120, max_rollouts=200, max_calls=400),
+             n_workers=6, async_ratio=3)
 ```
+
+The deprecated bridge still works when both budgets are explicit:
+
+```python
+evolve(tasks, reward, agent=agent, asynchronous=True,
+       n_workers=6, max_seconds=120, max_rollouts=200, max_calls=400)
+```
+
+**Check `result.stop_reason`** — `"target_reward"` is convergence;
+`"max_seconds"` / `"max_iters"` / `"max_rollouts"` / `"max_calls"` is a budget
+expiry. Cross-link: settings bags in #804; population on both drivers in #806.
 
 `max_calls` is the second half of an equal-budget comparison: two configurations
 matched on rollouts still differ in model spend whenever one asks for more
@@ -187,7 +192,7 @@ print(stats.rollouts, stats.commits, stats.discarded_stale,
 | you want | use |
 |---|---|
 | reproducibility, a clean per-round trace, a paper table | synchronous (`max_concurrency=n_workers` for the speedup) |
-| maximum throughput, long or uneven rollouts | `asynchronous=True` |
+| maximum throughput, long or uneven rollouts | `async_evolve(...)` |
 | both, to compare | run each and read `result.history` — but see the reinterpretation table above before comparing lengths |
 
 `len(result.history)` is **not** comparable across the two: on the async path a

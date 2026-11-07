@@ -1315,9 +1315,20 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
     knobs.setdefault("n_workers", max(1, min(default_workers, train)))
     if not knobs.get("asynchronous"):
         knobs.setdefault("max_concurrency", knobs["n_workers"])
-    elif "max_seconds" not in knobs:
-        knobs["max_seconds"] = 600.0
-        notes.append("asynchronous=True needs max_seconds; defaulted to 600.")
+    else:
+        # Async is a second contract (#809). Plan must name budgets in async
+        # units — never leave rounds to be reinterpreted at evolve() time.
+        if "max_seconds" not in knobs:
+            knobs["max_seconds"] = 600.0
+            notes.append("asynchronous=True needs max_seconds; defaulted to 600.")
+        if "max_rollouts" not in knobs:
+            rounds = int(knobs.get("rounds", 15))
+            workers = int(knobs["n_workers"])
+            knobs["max_rollouts"] = rounds * max(1, workers)
+            notes.append(
+                f"asynchronous=True needs max_rollouts; derived "
+                f"{knobs['max_rollouts']} from rounds*n_workers at plan time "
+                f"(rounds is sync-only — pass max_rollouts= to be explicit).")
     if "agg_config" in knobs and isinstance(knobs["agg_config"], Mapping):
         knobs["agg_config"] = build_agg_config(spec, **knobs["agg_config"])
     elif spec.kind == "text" and (spec.agg_config or (ov and ov.agg_config)):
