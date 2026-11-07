@@ -132,3 +132,33 @@ def test_population_factory_path_honours_merge_policies_without_orphan():
         held_out_frac=0.5, seed=0, self_verify=False,
     )
     assert result.error is None, result.error
+
+
+def test_gepa_unused_conflict_is_orphaned_unless_accepted():
+    """GEPA must not claim unused conflict/promotion/screen as applied (#839)."""
+    from agentdescent.fusion import KeepContradictions
+
+    factory = pareto_aggregator_factory(artifact_id="prompt", seed=0)
+    with pytest.raises(ValueError, match="left Policies"):
+        evolve(
+            _tasks(), _reward, run=_run, propose=_propose,
+            strategy=SingleSlot(initial_value="cap:0"),
+            artifact_id="prompt",
+            policies=Policies(aggregator_factory=factory,
+                              conflict=KeepContradictions()),
+            rounds=2, n_workers=1, max_concurrency=1,
+            held_out_frac=0.5, seed=0, self_verify=False,
+        )
+    with pytest.warns(RuntimeWarning, match="left Policies"):
+        result = evolve(
+            _tasks(), _reward, run=_run, propose=_propose,
+            strategy=SingleSlot(initial_value="cap:0"),
+            artifact_id="prompt",
+            policies=Policies(
+                aggregator_factory=factory,
+                conflict=KeepContradictions(),
+                accept_orphaned_merge_policies=True),
+            rounds=2, n_workers=1, max_concurrency=1,
+            held_out_frac=0.5, seed=0, self_verify=False,
+        )
+    assert result.error is None

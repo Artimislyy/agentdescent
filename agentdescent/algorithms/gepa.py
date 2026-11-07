@@ -85,11 +85,13 @@ class ParetoAggregator(AggregatorProtocol):
         # ``fusion=`` is the Policies name for the same seat as ``merge_round``.
         if merge_round is None and fusion is not None:
             merge_round = fusion
-        # conflict/promotion/screen are accepted so evolve can compose them
-        # without orphaning; GEPA's loop does not consult them yet.
-        self.conflict = conflict
-        self.promotion = promotion
-        self.screen = screen
+        # conflict/promotion/screen are accepted on the signature so the factory
+        # can take them from evolve (#807 forward), but they are **not** stored:
+        # GEPA's loop does not consult them. Storing them used to make
+        # ``_apply_merge_policies`` report the seats as applied and bypass the
+        # orphan check (#839). Callers who pass them need
+        # ``accept_orphaned_merge_policies=True`` until GEPA honours them.
+        _ = (conflict, promotion, screen)
         #: Optional :class:`~agentdescent.policies.FusionPolicy`. When set, the
         #: round's surviving diffs are combined into **one** candidate before
         #: admission, so the pool grows by one per round instead of one per
@@ -355,8 +357,10 @@ def pareto_aggregator_factory(artifact_id: str = "gepa_prompt", seed: int = 0,
 
     ``evolve`` forwards merge-side ``Policies`` into this factory (#807):
     ``fusion`` fills ``merge_round`` when the capture left it empty, and
-    ``acceptance`` / ``conflict`` / ``promotion`` / ``screen`` land on the
-    aggregator so a caller does not have to strip the bundle.
+    ``acceptance`` is stored and consulted on admit. ``conflict`` /
+    ``promotion`` / ``screen`` are accepted so the call does not TypeError,
+    but are not stored on the aggregator — #807's orphan check then fails
+    closed unless ``accept_orphaned_merge_policies=True`` (#839).
     """
     holder = {}
     default_merge = merge_round
