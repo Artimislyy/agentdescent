@@ -1,4 +1,5 @@
-"""Structural checks for an Agent Skills directory (``kind="skill_dir"``).
+"""Structural checks for an Agent Skills directory (``kind="skill_dir"``)
+or a multi-skill library (``kind="skill_library"``).
 
 What makes a directory a *skill* in every host AgentDescent ships to (Claude
 Code, Codex, OpenCode, DeepSeek Harness) is a root ``SKILL.md`` whose YAML
@@ -30,9 +31,12 @@ __all__ = [
     "SKILL_FILE",
     "SKILL_RULES",
     "SkillTreeValidator",
+    "SkillLibraryValidator",
     "parse_skill_frontmatter",
     "skill_tree_validator",
     "validate_skill_tree",
+    "validate_skill_library",
+    "skill_names_in_library",
 ]
 
 SKILL_FILE = "SKILL.md"
@@ -295,3 +299,53 @@ class SkillTreeValidator:
 def skill_tree_validator(*, root_name: Optional[str] = None) -> SkillTreeValidator:
     """Shorthand for :class:`SkillTreeValidator`."""
     return SkillTreeValidator(root_name)
+
+
+def skill_names_in_library(tree: Mapping[str, Optional[str]]) -> List[str]:
+    """Top-level skill directory names that contain a ``SKILL.md`` in ``tree``."""
+    names = sorted({p.split("/", 1)[0] for p in tree
+                    if p and "/" in p and p.endswith("/" + SKILL_FILE)
+                    and tree.get(p) is not None})
+    # Also a bare SKILL.md at root is NOT a library skill.
+    return [n for n in names if f"{n}/{SKILL_FILE}" in tree]
+
+
+def validate_skill_library(tree: Mapping[str, Optional[str]]) -> List[str]:
+    """Validate every ``<name>/SKILL.md`` subtree; return human-readable errors.
+
+    Empty when the tree has no skill folders yet (init may seed them) or when
+    every skill passes :func:`validate_skill_tree`.
+    """
+    errors: List[str] = []
+    for name in skill_names_in_library(tree):
+        skill_state: Dict[str, Optional[str]] = {}
+        prefix = name + "/"
+        for p, body in tree.items():
+            if p == f"{name}/{SKILL_FILE}":
+                skill_state[SKILL_FILE] = body
+            elif p.startswith(prefix):
+                skill_state[p[len(prefix):]] = body
+        for err in validate_skill_tree(skill_state, root_name=name):
+            errors.append(f"{name}: {err}")
+    return errors
+
+
+class SkillLibraryValidator:
+    """``FileTree`` validator: each ``*/SKILL.md`` must stay a valid Agent Skill."""
+
+    def __call__(self, state: Mapping[str, Optional[str]]) -> Optional[str]:
+        for name in skill_names_in_library(state):
+            skill_state: Dict[str, Optional[str]] = {}
+            prefix = name + "/"
+            for p, body in state.items():
+                if p == f"{name}/{SKILL_FILE}":
+                    skill_state[SKILL_FILE] = body
+                elif p.startswith(prefix):
+                    skill_state[p[len(prefix):]] = body
+            errors = validate_skill_tree(skill_state, root_name=name)
+            if errors:
+                return f"skill-library-{name}-{errors[0]}"
+        return None
+
+    def __repr__(self) -> str:
+        return "SkillLibraryValidator()"

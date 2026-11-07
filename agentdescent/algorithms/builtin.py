@@ -9,7 +9,7 @@ from . import Algorithm, AlgorithmError, BuildContext, Overrides, Param, registe
 from .rrsi.rrsi_policies import RRsiConfig, build_rrsi_bundle
 
 #: Kinds whose strategy is a directory tree or a code/plugin tree.
-_TREE_KINDS = ("skill_dir", "agent_dir", "agent_code", "plugin")
+_TREE_KINDS = ("skill_dir", "skill_library", "agent_dir", "agent_code", "plugin")
 
 _RRSI_HELP = {
     "beta0": "large-gain cost rule: tolerance",

@@ -70,7 +70,7 @@ enough for an LLM to author correctly and complete enough to reproduce a run.
 ```jsonc
 {
   "version": 1,
-  "kind": "skill_dir",                 // text | skill_dir | agent_dir | agent_code | plugin
+  "kind": "skill_dir",                 // text | skill_dir | skill_library | agent_dir | agent_code | plugin | policy_slot
   // "host": "dsh",                    // plugin kind only: dsh | claude_code | codex
   "target": "~/.claude/skills/pdf-audit",
   "name": "pdf-audit",                 // artifact_id; defaults to basename

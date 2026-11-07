@@ -7,7 +7,7 @@ description: Instruction / one Agent Skill / skill library — pick the artifact
 Pick the artifact: **instruction** (`SingleSlot` / `AppendRules`, this page /
 [`skill_evolution`](skill-evolution.md)), **one Agent Skill**
 ([`skill_dir_evolution`](quickstart-directory.md)), or a **skill library**
-(`python -m examples.skill_library_evolution --dry-run`, [`evoskill`](algo-evoskill.md)).
+(`python -m examples.skill_library_evolution --dry-run`, Path A `--kind skill_library`, [`evoskill`](algo-evoskill.md)).
 A `SingleSlot` result is not an Agent Skill folder.
 
 ---

@@ -296,9 +296,11 @@ line for line:
 |---|---|---|---|---|---|---|
 | `text` | `SingleSlot(target)` | `model(template)` | `reflector` | `scorer` | L2 | rounds 8, patience 3, target 0.98 |
 | `skill_dir` | `FileTree(load_tree(target))` | `tree_runner` | `tree_reflector` | `scorer` | L2 | rounds 6, `self_verify=False`, `cheap_eval_tasks=4` |
+| `skill_library` | same (≥2 `*/SKILL.md`) | `tree_runner(layout="skill_library")` | same | same | L2 | same; see `examples.skill_library_evolution` |
 | `agent_dir` | same | `tree_runner(layout="claude_agent")` | same | same | L1 | same |
 | `agent_code` | same, tests frozen | `code_runner(entrypoint, test_cmd)` | same | `gated_reward(scorer)` | L1 | same |
 | `plugin` | same, hooks frozen | `plugin_runner(host)` | same | `gated_reward(scorer)` | L1 | same, container advised |
+| `policy_slot` | `SlotSpec` | one inner search | `slot_reflector` | `meta_reward` | L1 | wall-clock budget |
 
 The other fields:
 

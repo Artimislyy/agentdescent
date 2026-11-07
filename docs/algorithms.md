@@ -58,7 +58,7 @@ ACE's sectioned playbook: append content-addressed lessons, refuse near-duplicat
 
 Parent sampling from an archive of every accepted candidate, tempered by novelty (DGM's rule by default) instead of always extending the head.
 
-- **Kinds:** `text`, `skill_dir`, `agent_dir`, `agent_code`, `plugin`
+- **Kinds:** `text`, `skill_dir`, `skill_library`, `agent_dir`, `agent_code`, `plugin`
 - **Fidelity:** `preset`
 - **Surface:** `card` (Algorithm card)
 - **Cost:** none

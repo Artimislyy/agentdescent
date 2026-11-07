@@ -24,13 +24,14 @@ shown to the user and logged, so anything in it is public.
 The composition table -- what each ``kind`` assembles -- is
 :data:`KIND_ROWS` and is meant to be read::
 
-    kind        strategy       run                 propose          reward         layer
-    text        SingleSlot     model(template)     reflector        scorer         L2
-    skill_dir   FileTree       tree_runner         tree_reflector   scorer         L2
-    agent_dir   FileTree       tree_runner         tree_reflector   scorer         L1
-    agent_code  FileTree       code_runner         tree_reflector   gated_reward   L1
-    plugin      FileTree       plugin_runner       tree_reflector   gated_reward   L1
-    policy_slot SlotSpec       one inner search    slot_reflector   meta_reward    L1
+    kind           strategy       run                 propose          reward         layer
+    text           SingleSlot     model(template)     reflector        scorer         L2
+    skill_dir      FileTree       tree_runner         tree_reflector   scorer         L2
+    skill_library  FileTree       tree_runner         tree_reflector   scorer         L2
+    agent_dir      FileTree       tree_runner         tree_reflector   scorer         L1
+    agent_code     FileTree       code_runner         tree_reflector   gated_reward   L1
+    plugin         FileTree       plugin_runner       tree_reflector   gated_reward   L1
+    policy_slot    SlotSpec       one inner search    slot_reflector   meta_reward    L1
 
 ``policy_slot`` is the odd one and the reason the table is worth reading: its
 artifact is not a file but a *decision rule of the optimiser itself*, and one
@@ -61,7 +62,9 @@ from .governance import HARNESS_BLAST_RADIUS, SKILL_BLAST_RADIUS
 from .policies import Policies
 from .rewards import SCORERS, command_scorer, scorer
 from .runners import code_runner, gated_reward, tree_runner
-from .skillspec import SKILL_FILE, SkillTreeValidator, parse_skill_frontmatter, validate_skill_tree
+from .skillspec import (SKILL_FILE, SkillLibraryValidator, SkillTreeValidator,
+                        parse_skill_frontmatter, skill_names_in_library,
+                        validate_skill_library, validate_skill_tree)
 from .staleness import get_policy
 from .treestrategy import FileTree, tree_reflector
 from .workspec import DEFAULT_ALLOWED_PREFIXES, Ref, RefError
@@ -83,8 +86,8 @@ __all__ = [
 
 #: The artifact shapes a spec can name. ``plugin`` is a host plugin (a DSH Cordis
 #: package, a Claude Code plugin directory); see :func:`~agentdescent.runners.plugin_runner`.
-KINDS: Tuple[str, ...] = ("text", "skill_dir", "agent_dir", "agent_code", "plugin",
-                          "policy_slot")
+KINDS: Tuple[str, ...] = ("text", "skill_dir", "skill_library", "agent_dir",
+                          "agent_code", "plugin", "policy_slot")
 
 #: The composition table, for readers and for the test that checks it against
 #: the quickstarts. Values are the *names* of what is assembled; :func:`compose`
@@ -94,6 +97,8 @@ KIND_ROWS: Dict[str, Dict[str, str]] = {
                    "reward": "scorer", "blast_radius": "SKILL_BLAST_RADIUS"},
     "skill_dir":  {"strategy": "FileTree", "run": "tree_runner", "propose": "tree_reflector",
                    "reward": "scorer", "blast_radius": "SKILL_BLAST_RADIUS"},
+    "skill_library": {"strategy": "FileTree", "run": "tree_runner", "propose": "tree_reflector",
+                      "reward": "scorer", "blast_radius": "SKILL_BLAST_RADIUS"},
     "agent_dir":  {"strategy": "FileTree", "run": "tree_runner", "propose": "tree_reflector",
                    "reward": "scorer", "blast_radius": "HARNESS_BLAST_RADIUS"},
     "agent_code": {"strategy": "FileTree", "run": "code_runner", "propose": "tree_reflector",
@@ -206,11 +211,12 @@ class EvolveSpec:
     editable: Sequence[str] = ("**",)
     frozen: Sequence[str] = ()
     max_files_per_diff: int = 2
-    #: ``skill_dir`` only: reject, before any rollout, a candidate that deletes
-    #: ``SKILL.md`` or breaks its Agent Skills frontmatter (``name`` /
-    #: ``description`` rules, ``name`` kept stable). Skipped with a note when the
-    #: initial tree does not pass itself. ``false`` for a host that accepts a
-    #: looser format. See :mod:`agentdescent.skillspec`.
+    #: ``skill_dir`` / ``skill_library``: reject, before any rollout, a candidate
+    #: that deletes ``SKILL.md`` or breaks Agent Skills frontmatter (``name`` /
+    #: ``description`` rules, ``name`` kept stable). For a library, each
+    #: ``*/SKILL.md`` is checked. Skipped with a note when the initial tree does
+    #: not pass itself. ``false`` for a host that accepts a looser format. See
+    #: :mod:`agentdescent.skillspec`.
     validate_skill: bool = True
     #: ``agent_code`` only.
     entrypoint: Sequence[str] = ()
@@ -694,6 +700,9 @@ class Composition:
     #: parameters resolved to what will run, and which of its defaults the spec
     #: itself overrides. ``None`` when the spec names none.
     algorithm: Optional[Dict[str, Any]] = None
+    #: Resolved runner layout for directory kinds (``claude_skill``,
+    #: ``skill_library``, …). ``None`` for ``text`` / ``policy_slot``.
+    layout: Optional[str] = None
 
     def run(self) -> EvolutionResult:
         return evolve(self.tasks, self.reward, **self.kwargs)
@@ -746,7 +755,7 @@ def text_target_dir_message(target: str) -> Optional[str]:
     skill = os.path.join(str(target).rstrip("/\\"), "SKILL.md")
     return (f"target {target!r} is a directory; kind=text evolves the text of one "
             f"file, not a directory. Point the target at a file inside it (for "
-            f"example {skill!r}) or use --kind skill_dir / agent_dir for the "
+            f"example {skill!r}) or use --kind skill_dir / skill_library / agent_dir for the "
             "directory")
 
 
@@ -1130,6 +1139,7 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
     tasks = build_tasks(spec)
     reward = build_reward(spec)
     notes: List[str] = []
+    resolved_layout: Optional[str] = None
     agent = _resolve(spec.agent, spec, where="agent", usage=usage)
     reflect = (_resolve(spec.reflect, spec, where="reflect", usage=usage)
                if spec.reflect else agent)
@@ -1242,6 +1252,27 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
                         f"the target directory {dirname!r}; the Agent Skills spec "
                         f"requires them to match, so install the result as "
                         f"{root_name}/ (the gate keeps the name stable).")
+        elif spec.kind == "skill_library" and spec.validate_skill:
+            initial_errors = validate_skill_library(tree)
+            names = skill_names_in_library(tree)
+            if not names:
+                notes.append(
+                    "kind='skill_library': no */SKILL.md found under the target; "
+                    "seed at least two Agent Skill folders (init --kind skill_library "
+                    "writes a starter pair) or set validate_skill: false.")
+            elif initial_errors:
+                notes.append(
+                    "kind='skill_library': the initial library is not fully valid "
+                    f"({'; '.join(initial_errors)}), so the per-skill SKILL.md gate "
+                    "is off for this run; fix the frontmatter to enable it, or set "
+                    "validate_skill: false to silence this.")
+            else:
+                validators.append(SkillLibraryValidator())
+                if len(names) < 2:
+                    notes.append(
+                        f"kind='skill_library': only {len(names)} skill folder "
+                        f"({names[0]!r}); a library is ≥2 */SKILL.md — add another "
+                        "or use kind='skill_dir' for a single skill.")
         strategy = FileTree(tree, editable=list(spec.editable), frozen=frozen,
                             max_files_per_diff=spec.max_files_per_diff,
                             max_file_bytes=tspec.max_file_bytes,
@@ -1255,22 +1286,30 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
                              sandbox_pool=sandbox_pool)
         context_files: Sequence[str] = ("**/SKILL.md", "**/AGENT.md", "*.md")
 
-        if spec.kind in ("skill_dir", "agent_dir"):
+        if spec.kind in ("skill_dir", "skill_library", "agent_dir"):
             if not isinstance(agent, WorkspaceAgent):
                 raise SpecError(
                     f"kind={spec.kind!r} needs a WorkspaceAgent ({WORKSPACE_AGENT_REFS}) "
                     f"so the directory is put in front of it; got "
                     f"{type(agent).__name__}")
-            layout = spec.layout or ("claude_skill" if spec.kind == "skill_dir" else "claude_agent")
+            if spec.kind == "skill_dir":
+                layout = spec.layout or "claude_skill"
+            elif spec.kind == "skill_library":
+                layout = spec.layout or "skill_library"
+            else:
+                layout = spec.layout or "claude_agent"
+            resolved_layout = layout
             extra = {"prompt_template": spec.prompt_template} if spec.prompt_template else {}
             kwargs["run"] = tree_runner(agent, layout=layout, **extra, **runner_common)
-            kwargs["blast_radius"] = (SKILL_BLAST_RADIUS if spec.kind == "skill_dir"
-                                      else HARNESS_BLAST_RADIUS)
+            kwargs["blast_radius"] = (SKILL_BLAST_RADIUS if spec.kind in (
+                "skill_dir", "skill_library") else HARNESS_BLAST_RADIUS)
+            notes.append(f"kind={spec.kind!r}: resolved layout={layout!r}")
         elif spec.kind == "agent_code":
             if not spec.entrypoint:
                 raise SpecError("kind='agent_code' needs entrypoint (argv the task prompt is appended to)")
+            resolved_layout = spec.layout or "root"
             kwargs["run"] = code_runner(
-                list(spec.entrypoint), layout=spec.layout or "root",
+                list(spec.entrypoint), layout=resolved_layout,
                 setup_cmd=list(spec.setup_cmd) or None,
                 test_cmd=list(spec.test_cmd) or None, timeout=spec.timeout,
                 env={k: os.environ[k] for k in spec.env_passthrough if k in os.environ},
@@ -1278,9 +1317,11 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
             reward = gated_reward(reward)
             kwargs["blast_radius"] = HARNESS_BLAST_RADIUS
             context_files = ("**/*.py",)
-        else:  # plugin
+            notes.append(f"kind='agent_code': resolved layout={resolved_layout!r}")
+        elif spec.kind == "plugin":
             from .runners import PLUGIN_CONTEXT, plugin_runner
 
+            resolved_layout = spec.layout  # plugin_runner picks host layout
             kwargs["run"] = plugin_runner(
                 spec.host, agent_args=list(spec.entrypoint),
                 env_passthrough=list(spec.env_passthrough), timeout=spec.timeout,
@@ -1290,6 +1331,8 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
             context_files = PLUGIN_CONTEXT[spec.host]
             notes.append("kind='plugin': candidate plugin code runs inside the host "
                          "process; prefer a container sandbox (see docs/plugins.md).")
+        else:
+            raise SpecError(f"kind {spec.kind!r} has no compose path")
 
         kwargs.update(strategy=strategy, agg_config=cfg,
                       propose=tree_reflector(reflect, strategy=strategy,
@@ -1381,7 +1424,8 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
         notes.append(small_held_out_message(n_held, len(tasks), held_out))
     return Composition(tasks=tasks, reward=reward, kwargs=kwargs, tree=tree,
                        notes=notes, audit=audit,
-                       algorithm=_algorithm_echo(chosen, spec, ov) if chosen else None)
+                       algorithm=_algorithm_echo(chosen, spec, ov) if chosen else None,
+                       layout=resolved_layout)
 
 
 def run_spec(spec: EvolveSpec, **hooks: Any) -> EvolutionResult:

@@ -367,6 +367,12 @@ def starter_spec(path: str, *, kind: Optional[str] = None, data: Optional[str] =
         if agent == "claude_code":
             spec["agent"] = {"ref": "claude_code",
                              "extra_args": ["--permission-mode", "acceptEdits"]}
+    if kind == "skill_library":
+        spec["reflect"] = dict(llm)
+        spec["layout"] = "skill_library"
+        if agent == "claude_code":
+            spec["agent"] = {"ref": "claude_code",
+                             "extra_args": ["--permission-mode", "acceptEdits"]}
     if kind == "agent_dir":
         spec["reflect"] = dict(llm)
     if kind == "agent_code":
@@ -803,7 +809,7 @@ def init_agent_mismatch(kind: str, ref: str) -> Optional[str]:
     short = ref.split(":", 1)[1] if ref.startswith("agentdescent.agents:") else ref
     if short == "agentdescent.host_sampling:host_model":
         short = "host_model"
-    if kind in ("skill_dir", "agent_dir") and short in _PLAIN_REFS:
+    if kind in ("skill_dir", "skill_library", "agent_dir") and short in _PLAIN_REFS:
         return (f"kind={kind!r} needs a WorkspaceAgent "
                 f"({' / '.join(_WORKSPACE_REFS)}) so the directory is put in front "
                 f"of it; `{ref}` is a plain model call")
@@ -884,6 +890,62 @@ def _backup_existing_spec(out: str, spec: Any) -> Optional[str]:
     return backup
 
 
+
+#: Starter pair for ``init --kind skill_library`` when the target has <2 skills.
+_STARTER_LIBRARY_SKILLS = (
+    ("example-alpha",
+     "---\n"
+     "name: example-alpha\n"
+     "description: Example library skill A. Replace with a real skill.\n"
+     "---\n"
+     "# example-alpha\n"
+     "Replace this body. The agent should read this skill off disk.\n"),
+    ("example-beta",
+     "---\n"
+     "name: example-beta\n"
+     "description: Example library skill B. Replace with a real skill.\n"
+     "---\n"
+     "# example-beta\n"
+     "Replace this body. A library needs at least two skills.\n"),
+)
+
+
+def count_library_skills(path: str) -> int:
+    """How many ``*/SKILL.md`` folders sit directly under ``path``."""
+    root = os.path.expanduser(path)
+    if not os.path.isdir(root):
+        return 0
+    n = 0
+    for name in os.listdir(root):
+        if os.path.isfile(os.path.join(root, name, "SKILL.md")):
+            n += 1
+    return n
+
+
+def ensure_skill_library_tree(path: str) -> List[str]:
+    """Seed ≥2 ``*/SKILL.md`` under ``path`` when fewer exist. Returns written paths."""
+    root = os.path.expanduser(path)
+    os.makedirs(root, exist_ok=True)
+    written: List[str] = []
+    if count_library_skills(root) >= 2:
+        return written
+    existing = {name for name in os.listdir(root)
+                if os.path.isfile(os.path.join(root, name, "SKILL.md"))}
+    for name, body in _STARTER_LIBRARY_SKILLS:
+        if name in existing:
+            continue
+        skill_dir = os.path.join(root, name)
+        os.makedirs(skill_dir, exist_ok=True)
+        dest = os.path.join(skill_dir, "SKILL.md")
+        if not os.path.exists(dest):
+            with open(dest, "w", encoding="utf-8") as fh:
+                fh.write(body)
+            written.append(dest)
+        if count_library_skills(root) >= 2:
+            break
+    return written
+
+
 def write_starter_spec(
     path: str,
     *,
@@ -955,6 +1017,9 @@ def write_starter_spec(
             raise ValueError(
                 f"--agent {agent}: {why}; pick a matching ref "
                 "(see `agentdescent doctor`) or omit --agent for the default")
+    library_seeded: List[str] = []
+    if spec["kind"] == "skill_library":
+        library_seeded = ensure_skill_library_tree(path)
     column_notes: List[str] = []
     if spec["kind"] != "policy_slot" and isinstance(spec.get("data"), dict):
         columns, column_notes = detect_data_columns(data)
@@ -989,6 +1054,11 @@ def write_starter_spec(
     with open(out, "w", encoding="utf-8") as fh:
         json.dump(spec, fh, indent=2)
     report: List[Tuple[str, str]] = [("wrote", f"wrote {out}")]
+    for seeded in library_seeded:
+        report.append(("wrote", f"seeded {seeded}"))
+    if library_seeded:
+        report.append(("note", "kind=skill_library needs ≥2 */SKILL.md; "
+                       "seeded example-alpha / example-beta — replace before evolve"))
     if backup:
         # Re-running init / `algorithms run` on the same --out used to drop a
         # hand-edited spec without a word; keep the old copy and say so (#725).
@@ -1665,6 +1735,8 @@ def plan_payload(spec: EvolveSpec, *, usd_per_call: Optional[float] = None,
     if budget_warn and budget_warn not in warnings:
         warnings.append(budget_warn)
     payload = {"ok": not hard_errors, "spec": spec.to_dict(), "tasks": n_tasks,
+            "kind": spec.kind,
+            **({"layout": comp.layout} if comp.layout is not None else {}),
             "warnings": warnings,
             "artifact_id": spec.artifact_id(),
             **({"audit": audit} if audit else {}),
@@ -4326,8 +4398,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("init", help="write a starter spec for a path")
     s.add_argument("path")
-    s.add_argument("--kind", choices=("text", "skill_dir", "agent_dir", "agent_code",
-                                  "plugin", "policy_slot"))
+    s.add_argument("--kind", choices=("text", "skill_dir", "skill_library", "agent_dir",
+                                  "agent_code", "plugin", "policy_slot"))
     s.add_argument("--data", help="cases file, or a module:attribute problems ref for policy_slot")
     s.add_argument("--agent", default=None,
                    help="worker agent short name (default: the first of claude_code, "
@@ -4609,8 +4681,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="endpoint URL for that model (written as default_base_url)")
     s2.add_argument("--key-env", dest="key_env", default=None,
                     help="environment variable holding its key")
-    s2.add_argument("--kind", choices=("text", "skill_dir", "agent_dir", "agent_code",
-                                       "plugin", "policy_slot"),
+    s2.add_argument("--kind", choices=("text", "skill_dir", "skill_library", "agent_dir",
+                                       "agent_code", "plugin", "policy_slot"),
                     default=argparse.SUPPRESS,
                     help="spec kind (default: guessed from PATH, as init --kind)")
     s2.add_argument("--out", help="where to write the spec "
