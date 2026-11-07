@@ -2,9 +2,19 @@
 description: Turn a dataset into an evolved skill in one evolve() call. A worked example on 40 HotpotQA items that raises held-out exact match from 0.167 to 0.583.
 ---
 
-# Dataset → evolved skill
+# Dataset → evolved skill (which kind?)
 
-There is one entry point, [`evolve`](evolution.md). Evolving a skill from a
+Pick the artifact: **instruction** (`SingleSlot` / `AppendRules`, this page /
+[`skill_evolution`](skill-evolution.md)), **one Agent Skill**
+([`skill_dir_evolution`](quickstart-directory.md)), or a **skill library**
+(`python -m examples.skill_library_evolution --dry-run`, [`evoskill`](algo-evoskill.md)).
+A `SingleSlot` result is not an Agent Skill folder.
+
+---
+
+## Instruction path
+
+There is one entry point, [`evolve`](evolution.md). Evolving an **instruction** from a
 dataset needs three things that are genuinely yours:
 
 1. **your data**,
@@ -24,14 +34,14 @@ rows = hf_rows("hotpotqa/hotpot_qa", "validation", config="distractor", limit=40
 model = openai_compatible(model="deepseek-v4-flash")
 
 tasks = tasks_from(rows, prompt="question", gold="answer")     # rows -> Task objects
-run = lambda skill, task: model(f"{skill}\n\n{task.prompt}")   # the skill meets the question
+run = lambda instruction, task: model(f"{instruction}\n\n{task.prompt}")
 
 result = evolve(tasks, scorer("exact"), run=run, propose=reflector(model),
                 strategy=SingleSlot(initial_value="You are a helpful assistant."),
                 rounds=8, n_workers=8, max_concurrency=8, held_out_frac=0.3,
                 patience=3, target_reward=0.98)
 
-print(result.rendered)        # the skill it learned
+print(result.rendered)        # the instruction it learned
 print(result.final_reward)    # held-out reward
 print(result.outcomes())      # why it went that way
 ```
@@ -46,8 +56,8 @@ The block above, run as written on 40 real HotpotQA items with
 | starting instruction (`"You are a helpful assistant."`) | 2/12 = **0.167** |
 | after evolution | 7/12 = **0.583** |
 
-Four rounds, stopped by `patience`; 338 model calls, ~25 min wall-clock. The skill
-it wrote:
+Four rounds, stopped by `patience`; 338 model calls, ~25 min wall-clock. The
+instruction it wrote:
 
 > *"Respond with only the requested answer, omitting any extra explanation or
 > restatement."*
@@ -69,9 +79,9 @@ job, not a stuck run.
 |---|---|
 | `tasks_from(rows, prompt=, gold=)` | rows (dicts) from anywhere → `Task`s; the gold lands in `meta`, where [the reflector reads it](evolution.md#bring-an-agent-you-already-have). Ready-made `Task`s need no wrapping. |
 | `scorer(name_or_callable)` | a name from `SCORERS` below, or your own `(task, output) -> float` |
-| `run=` | how the skill meets the question. The lambda above is the whole default; put the skill after the question, or inside a scaffold, by writing a different one |
+| `run=` | how the instruction meets the question. The lambda above is the whole default; put it after the question, or inside a scaffold, by writing a different one |
 | `propose=reflector(model)` | any [completion](agents.md) as the proposer. A cheap model here behind an expensive one in `run=` is a fine trade |
-| `strategy=SingleSlot(initial_value=…)` | the artifact is one instruction, and each accepted proposal replaces it. `AppendRules` / `KeyedRules` are the other [text strategies](strategies.md) |
+| `strategy=SingleSlot(initial_value=…)` | one instruction; `AppendRules` / `KeyedRules` are the other [text strategies](strategies.md) |
 
 ## The scorers
 
@@ -112,10 +122,7 @@ custom optimizer (`aggregator_factory=`), a multi-step agent as `run=` — is
 
 ## Next
 
-* **Have a folder rather than a dataset?**
-  [Quickstart — evolve a directory](quickstart-directory.md) does the same thing
-  for a skill folder, an agent folder, or its code, with a real agent reading the
-  files off disk.
+* **Want a real Agent Skill / library?** `python -m examples.skill_library_evolution --dry-run` or [evolve a directory](quickstart-directory.md).
 * **Want the knobs?** [The `evolve` method](evolution.md).
 * **Want to know why it works?** [Concepts](concepts.md), then
   [the aggregator](aggregator.md).

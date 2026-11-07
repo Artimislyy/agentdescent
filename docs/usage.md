@@ -55,6 +55,7 @@ python -m examples.rq2_staleness
 
 ```bash
 python -m examples.skill_dir_evolution
+python -m examples.skill_library_evolution --dry-run
 ```
 
 Materialises a candidate skill directory into a throwaway workspace at

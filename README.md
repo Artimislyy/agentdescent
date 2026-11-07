@@ -90,21 +90,23 @@ rows = hf_rows("hotpotqa/hotpot_qa", "validation", config="distractor", limit=40
 model = openai_compatible(model="deepseek-v4-flash")
 
 tasks = tasks_from(rows, prompt="question", gold="answer")     # rows -> Task objects
-run = lambda skill, task: model(f"{skill}\n\n{task.prompt}")   # the skill meets the question
+run = lambda instruction, task: model(f"{instruction}\n\n{task.prompt}")
 
 result = evolve(tasks, scorer("exact"), run=run, propose=reflector(model),
                 strategy=SingleSlot(initial_value="You are a helpful assistant."),
                 rounds=8, n_workers=8, max_concurrency=8, held_out_frac=0.3,
                 patience=3, target_reward=0.98)
 
-print(result.rendered)        # the skill it learned
+print(result.rendered)        # the instruction it learned
 print(result.final_reward)    # held-out reward
 print(result.outcomes())      # why it went that way
 ```
 
 On 40 HotpotQA items (12 held out) this took held-out exact match from **0.167
 to 0.583**, learning *"Respond with only the requested answer, omitting any extra
-explanation or restatement."* Pass `agent=LLMAgent(claude_code())` (or any
+explanation or restatement."* That evolves an **instruction** (`SingleSlot`), not
+an Agent Skill folder — for a library run `python -m examples.skill_library_evolution --dry-run`.
+Pass `agent=LLMAgent(claude_code())` (or any
 [agent or LLM](https://thinkflowlab.github.io/agentdescent/agents/)) instead of
 `run`/`propose` to evolve against a tool-using CLI agent.
 [Quickstart — dataset to skill →](https://thinkflowlab.github.io/agentdescent/quickstart-skill/)

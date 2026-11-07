@@ -1,0 +1,2 @@
+Changed
+Flagship skill demo is now `examples/skill_library_evolution.py`: a multi-file Agent Skill library (`layout="skill_library"`, offline agent must read skills off disk, `--dry-run` / `--install-to`). `examples/skill_evolution.py` and README / `docs/quickstart-skill.md` are retitled as instruction / playbook evolution so SingleSlot / AppendRules are not called "a skill" without qualification (#818).

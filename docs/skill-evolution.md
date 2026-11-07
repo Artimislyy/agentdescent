@@ -1,8 +1,8 @@
-# Example: skill evolution (real API, all modules)
+# Example: instruction / playbook evolution (BBH, AppendRules)
 
 The one complete, end-to-end example — a real dataset, a real LLM, and every
-module wired together. It evolves a **skill playbook** (accumulated lessons) on a
-**BIG-Bench-Hard** task, and it uses:
+module wired together. It evolves an `AppendRules` **playbook** (not an Agent
+Skill folder — see `examples.skill_library_evolution` for a library). Uses:
 
 | Module | Used for |
 |---|---|
