@@ -228,7 +228,8 @@ agentdescent init ./my-skill --data cases.jsonl --out spec.json \
 ```json
 "reflect": {"ref": "openai_compatible", "model": "deepseek-v4-flash",
             "api_key_env": "ARK_API_KEY",
-            "default_base_url": "https://ark.cn-beijing.volces.com/api/coding/v3"}
+            "default_base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+            "stream": true}
 ```
 
 `--key-env NAME` picks the key variable when several are set; with

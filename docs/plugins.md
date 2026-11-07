@@ -355,15 +355,18 @@ The other fields:
   ```json
   "reflect": {"ref": "openai_compatible", "model": "deepseek-v4-flash",
               "api_key_env": "ARK_API_KEY",
-              "default_base_url": "https://ark.cn-beijing.volces.com/api/coding/v3"}
+              "default_base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+              "stream": true}
   ```
 
   Every other keyword (`temperature`, `thinking`, ...) goes into the request body.
-  A **reasoning model** (Ark `doubao-seed-code` thinks by default) sends nothing
-  while it thinks, so a non-streaming call can hit the 120 s `"timeout"`: set
-  `"stream": true` on the block, raise `"timeout"`, or pass the provider's own
-  switch (`"thinking": {"type": "disabled"}` on Ark). A timeout is reported with
-  the endpoint, model and seconds, not as a bare `TimeoutError`.
+  A **reasoning model** (Ark `doubao-seed-code` / `deepseek-v4-flash` thinks by
+  default) sends nothing while it thinks, so a non-streaming call can hit the
+  120 s `"timeout"`: set `"stream": true` on the block, raise `"timeout"`, or
+  pass the provider's own switch (`"thinking": {"type": "disabled"}` on Ark).
+  `init` / `algorithms run` with an Ark `--base-url` write `"stream": true`
+  automatically; `plan` warns when a hand-edited Ark block omits it. A timeout
+  is reported with the endpoint, model and seconds, not as a bare `TimeoutError`.
   A spec that writes `base_url`, `api_key` or a similar guess is **refused** by
   `plan`, `evolve` and MCP `start` with the spelling to use; `plan` also warns when
   a non-OpenAI `api_key_env` has no endpoint configured. A key is never written in

@@ -26,10 +26,18 @@ def test_quickstart_ark_coding_example_uses_the_recipe_model():
     text = (DOCS / "plugin-quickstart.md").read_text(encoding="utf-8")
     cli = re.findall(r"--model (\S+) --base-url " + re.escape(CODING), text)
     spec = re.findall(r'"model": "([^"]+)",\s*"api_key_env": "ARK_API_KEY",\s*'
-                      r'"default_base_url": "' + re.escape(CODING) + '"', text)
-    assert cli and spec, "the quickstart lost its only-ARK_API_KEY example"
+                      r'"default_base_url": "' + re.escape(CODING) + r'",\s*'
+                      r'"stream": true', text)
+    assert cli and spec, "the quickstart lost its only-ARK_API_KEY example (with stream:true)"
     assert set(cli) == {model}, cli
     assert set(spec) == {model}, spec
+
+
+def test_plugins_ark_example_includes_stream():
+    text = (DOCS / "plugins.md").read_text(encoding="utf-8")
+    assert re.search(
+        r'"default_base_url": "' + re.escape(CODING) + r'",\s*"stream": true',
+        text), "plugins.md Ark reflect example must show stream: true (#832)"
 
 
 def test_quickstart_never_names_a_model_the_coding_plan_refuses():

@@ -172,6 +172,22 @@ PLACEHOLDER_MODEL = "<your-model>"
 PLACEHOLDER_URL = "<your-endpoint-url>"
 
 
+def _is_ark_endpoint(url: Optional[str]) -> bool:
+    """True when ``url`` is a Volcengine Ark host (``*.volces.com``).
+
+    Used by the starter writer and ``plan`` so Ark reasoning models get a
+    reliable transport (`stream: true`) without changing the global
+    ``openai_compatible`` default for library callers (#832).
+    """
+    if not (isinstance(url, str) and url) or url == PLACEHOLDER_URL:
+        return False
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return False
+    return host.endswith("volces.com")
+
+
 def starter_model_block(*, model: Optional[str] = None, base_url: Optional[str] = None,
                         key_env: Optional[str] = None,
                         keys: Optional[Dict[str, bool]] = None) -> Dict[str, Any]:
@@ -183,6 +199,10 @@ def starter_model_block(*, model: Optional[str] = None, base_url: Optional[str] 
     ``api_key_env`` and needs ``default_base_url`` -- otherwise that key would be
     sent to api.openai.com. The model, and that endpoint, are the user's
     (``--model`` / ``--base-url``) or a placeholder ``plan`` refuses; never a guess.
+
+    When ``base_url`` is an Ark host, the block also sets ``"stream": true`` so a
+    reasoning model (e.g. ``deepseek-v4-flash``) does not sit silent past the
+    default 120 s non-streaming timeout (#832).
     """
     if keys is None:
         keys = doctor_report()["provider_keys_present"]
@@ -200,6 +220,8 @@ def starter_model_block(*, model: Optional[str] = None, base_url: Optional[str] 
             base_url = PLACEHOLDER_URL
     if base_url:
         block["default_base_url"] = base_url
+    if _is_ark_endpoint(base_url):
+        block["stream"] = True
     return block
 
 
@@ -1597,6 +1619,20 @@ def _unusable_refs(spec: EvolveSpec) -> List[str]:
                 leak = _key_sent_to_openai(block, key_env, url_env)
                 if leak:
                     out.append(f"{field}: {leak}")
+                # Hand-edited Ark specs without stream hit the 120s propose
+                # timeout on reasoning models; starter writer sets it (#832).
+                if isinstance(block, dict):
+                    ark_url = block.get("default_base_url")
+                    if not (isinstance(ark_url, str) and ark_url):
+                        ark_url = os.environ.get(url_env)
+                    if (_is_ark_endpoint(ark_url)
+                            and block.get("stream") is not True):
+                        out.append(
+                            f"{field}: Ark Coding endpoint without "
+                            '`"stream": true` -- a reasoning model can sit silent '
+                            "past the default 120s non-streaming timeout; set "
+                            '`"stream": true` (or raise `"timeout"` / disable '
+                            "thinking), see docs/plugins.md")
         elif ref in _CLI_BINARIES:
             binary = _CLI_BINARIES[ref]
             # Missing binary is a hard error via _missing_cli_messages / plan ok
