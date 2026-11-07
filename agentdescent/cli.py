@@ -2333,6 +2333,15 @@ def _text_plan(dest: str, rendered: str) -> Dict[str, Any]:
             "chars": len(rendered), "noop": False}
 
 
+
+def resolve_apply_dest(to: Optional[str], install_to: Optional[str]) -> Optional[str]:
+    """Combine ``--to`` and ``--install-to`` (alias). Error if both differ."""
+    if to and install_to and os.path.expanduser(to) != os.path.expanduser(install_to):
+        raise runstore.RunStoreError(
+            f"--to {to!r} and --install-to {install_to!r} disagree; pass one")
+    return to or install_to
+
+
 def apply_payload(run_id: str, *, to: Optional[str] = None, store: Optional[str] = None,
                   dry_run: bool = False, backup: bool = True) -> Dict[str, Any]:
     rd = runstore.get(run_id, store=store)
@@ -2380,6 +2389,18 @@ def apply_payload(run_id: str, *, to: Optional[str] = None, store: Optional[str]
                 "dest": dest}
     plan = result.write_to(dest, backup=backup, dry_run=dry_run)
     plan["dest"] = dest
+    if spec.kind == "skill_library":
+        # write_to default prune=False: host skills outside the evolved keys
+        # stay as `extra` and are not deleted (#823).
+        plan.setdefault("notes", [])
+        if isinstance(plan["notes"], list):
+            plan["notes"].append(
+                "kind=skill_library: only evolved tree keys are written; "
+                "unrelated host skills under the destination are left alone "
+                "(listed as extra when present; no prune)")
+        n_skills = len({p.split("/", 1)[0] for p in result.state
+                        if p and "/" in p and p.endswith("/SKILL.md")})
+        plan["library_skills"] = n_skills
     return plan
 
 
@@ -2530,23 +2551,29 @@ def apply_from_payload(source: str, *, to: str, dry_run: bool = False,
 
 def cmd_apply(a: argparse.Namespace) -> int:
     source = getattr(a, "source", None)
+    try:
+        dest = resolve_apply_dest(getattr(a, "to", None),
+                                  getattr(a, "install_to", None))
+    except runstore.RunStoreError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     if source:
         if a.run_id:
             print("error: pass a run_id or --from PATH, not both", file=sys.stderr)
             return 2
-        if not a.to:
-            print("error: --from needs --to PATH (where to install the artifact)",
-                  file=sys.stderr)
+        if not dest:
+            print("error: --from needs --to/--install-to PATH "
+                  "(where to install the artifact)", file=sys.stderr)
             return 2
-        payload = apply_from_payload(source, to=a.to, dry_run=a.dry_run,
+        payload = apply_from_payload(source, to=dest, dry_run=a.dry_run,
                                      backup=not a.no_backup)
         what = source
     else:
         if not a.run_id:
-            print("error: apply needs a run_id, or --from PATH --to PATH",
+            print("error: apply needs a run_id, or --from PATH --to/--install-to PATH",
                   file=sys.stderr)
             return 2
-        payload = apply_payload(a.run_id, to=a.to, store=a.store, dry_run=a.dry_run,
+        payload = apply_payload(a.run_id, to=dest, store=a.store, dry_run=a.dry_run,
                                 backup=not a.no_backup)
         what = f"run {a.run_id}"
     _out(payload, as_json=True)
@@ -4497,6 +4524,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("run_id", nargs="?")
     s.add_argument("--to", help="a different destination than the spec's target "
                    "(required with --from)")
+    s.add_argument("--install-to", dest="install_to", metavar="PATH",
+                   help="install a skill_library (or any FileTree result) into a "
+                        "host skills root such as ~/.claude/skills; same write/"
+                        "backup semantics as --to (do not silently prune unrelated "
+                        "host skills). Alias of --to when --to is omitted")
     s.add_argument("--from", dest="source", metavar="PATH",
                    help="install an artifact from disk (e.g. a campaign's "
                    "final_target) instead of a run's result")

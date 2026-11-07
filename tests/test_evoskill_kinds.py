@@ -130,3 +130,37 @@ def test_strategy_from_is_refused_on_kind_text():
                                agent="echo", algorithm="_tree_only"))
     finally:
         algorithms._REGISTRY.pop("_tree_only", None)
+
+
+def _library(tmp_path):
+    root = tmp_path / "lib"
+    for name in ("alpha", "beta"):
+        d = root / name
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: skill {name}\n---\n# {name}\n")
+    return str(root)
+
+
+def test_skill_library_uses_library_layout_under_evoskill(tmp_path):
+    """#824: kind=skill_library + evoskill → SkillLibraryTree LIBRARY."""
+    plain, evo = _compose("skill_library", _library(tmp_path), agent="opencode")
+    assert isinstance(evo, SkillLibraryTree) and evo.layout == LIBRARY
+    d = evo.to_diff({}, "csv totals :: sum the column", "w", 0, "a")
+    assert d.ops == {"skills/csv-totals/SKILL.md": "sum the column"}
+
+
+def test_plan_echoes_evoskill_library_layout_for_skill_library(tmp_path):
+    from agentdescent.cli import plan_payload
+    root = _library(tmp_path)
+    spec = EvolveSpec(
+        kind="skill_library", target=root, data={"inline": ROWS},
+        agent="opencode", algorithm="evoskill",
+        evolve={"rounds": 2, "n_workers": 2, "seed": 0})
+    # compose notes include layout=LIBRARY
+    from agentdescent.evolvespec import compose
+    comp = compose(spec)
+    assert any("layout=LIBRARY" in n for n in comp.notes)
+    assert any("SINGLE_SKILL" not in n or "skill_dir" in n for n in comp.notes)
+    assert isinstance(comp.kwargs["strategy"], SkillLibraryTree)
+    assert comp.kwargs["strategy"].layout == LIBRARY

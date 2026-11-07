@@ -302,6 +302,8 @@ line for line:
 | `plugin` | same, hooks frozen | `plugin_runner(host)` | same | `gated_reward(scorer)` | L1 | same, container advised |
 | `policy_slot` | `SlotSpec` | one inner search | `slot_reflector` | `meta_reward` | L1 | wall-clock budget |
 
+For `kind: skill_library`, install the evolved tree into a host skills root with `agentdescent apply <run_id> --install-to ~/.claude/skills` (same as `--to`; does not prune unrelated host skills).
+
 The other fields:
 
 * **`algorithm`** (optional): a named method from `agentdescent algorithms list`

@@ -122,7 +122,7 @@ custom optimizer (`aggregator_factory=`), a multi-step agent as `run=` — is
 
 ## Next
 
-* **Want a real Agent Skill / library?** `python -m examples.skill_library_evolution --dry-run` or [evolve a directory](quickstart-directory.md).
+* **Want a real Agent Skill / library?** `python -m examples.skill_library_evolution --dry-run`, Path A `--kind skill_library`, then `agentdescent apply <run_id> --install-to ~/.claude/skills`, or [evolve a directory](quickstart-directory.md).
 * **Want the knobs?** [The `evolve` method](evolution.md).
 * **Want to know why it works?** [Concepts](concepts.md), then
   [the aggregator](aggregator.md).

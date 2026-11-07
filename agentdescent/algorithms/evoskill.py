@@ -7,21 +7,19 @@ dev so the next round extends it). The example keeps its OfficeQA domain, prompt
 and CLI and imports this implementation.
 
 Use it from a spec as ``"algorithm": "evoskill"`` (``kind: skill_dir``,
-``agent_dir`` or ``plugin``). The spec's target directory is the initial skill
-library and its ``reflect`` model drives the Proposer/Generator. The strategy is
-derived from the ``FileTree`` that ``compose`` builds for the kind, so the kind's
-frozen paths (a plugin host's ``PLUGIN_FROZEN``), loader includes (a plugin's
-``.ts``/``.js``) and validators (``skill_dir``'s SKILL.md gate) all still apply.
+``skill_library``, ``agent_dir`` or ``plugin``). The spec's target directory is
+the initial skill tree and its ``reflect`` model drives the Proposer/Generator.
+The strategy is derived from the ``FileTree`` that ``compose`` builds for the
+kind, so the kind's frozen paths (a plugin host's ``PLUGIN_FROZEN``), loader
+includes (a plugin's ``.ts``/``.js``) and validators (``skill_dir`` /
+``skill_library`` gates) all still apply.
 
-Where an induced skill lands depends on the kind (#604):
+Where an induced skill lands depends on the kind (#604, #824):
 
-* ``agent_dir`` / ``plugin`` -- ``skills/<slug>/SKILL.md``, a library of skills
-  (the layout a plugin host discovers skills in).
-* ``skill_dir`` -- the target *is* one Agent Skill, so a nested ``SKILL.md``
-  would not be loaded by a host. The induced rule is written as a reference file
-  ``references/<slug>.md`` and linked from a managed index block in the root
-  ``SKILL.md`` body (frontmatter untouched), so the agent reading the skill is
-  pointed at it -- the Agent Skills progressive-disclosure layout.
+* ``skill_library`` / ``agent_dir`` / ``plugin`` -- ``skills/<slug>/SKILL.md``
+  (``SkillLibraryTree`` ``LIBRARY`` layout).
+* ``skill_dir`` -- the target *is* one Agent Skill (``SINGLE_SKILL``): induced
+  rules go to ``references/<slug>.md`` with a managed index in root ``SKILL.md``.
 """
 
 from __future__ import annotations
@@ -448,23 +446,31 @@ def _build(ctx: BuildContext, p: Dict[str, object]) -> Overrides:
         context, artifact_id=ctx.spec.artifact_id(),
         max_frontier=int(p["max_frontier"]),
         eval_concurrency=int(p["eval_concurrency"]))
-    layout = SINGLE_SKILL if getattr(ctx.spec, "kind", None) == "skill_dir" else LIBRARY
+    kind = getattr(ctx.spec, "kind", None)
+    layout = SINGLE_SKILL if kind == "skill_dir" else LIBRARY
     knobs: Dict[str, object] = {"aggregator_factory": factory}
     if callable(ctx.reflect):
         knobs["propose"] = make_propose(context, ctx.reflect)
     # No `strategy` knob: that would replace the kind's FileTree and with it the
     # kind's frozen paths, include list and validators (#615 review). compose
     # hands its FileTree to `strategy_from` instead.
+    if layout == SINGLE_SKILL:
+        layout_notes = [
+            "algorithm evoskill on kind='skill_dir': layout=SINGLE_SKILL — induced "
+            "rules are written to references/<slug>.md and linked from a managed "
+            "index block in SKILL.md, since a nested skills/<slug>/SKILL.md would "
+            "not be loaded as a skill."]
+    else:
+        layout_notes = [
+            f"algorithm evoskill on kind={kind!r}: layout=LIBRARY — induced skills "
+            "are written as skills/<slug>/SKILL.md."]
     return Overrides(
         knobs=knobs,
         strategy_from=lambda base: SkillLibraryTree.from_base(base, layout=layout),
         notes=["algorithm evoskill: a bounded top-K frontier over skill libraries; "
                "each admitted change is re-scored on the full held-out set and the "
                "best member becomes the next parent."]
-              + (["algorithm evoskill on kind='skill_dir': induced rules are written "
-                  "to references/<slug>.md and linked from a managed index block in "
-                  "SKILL.md, since a nested skills/<slug>/SKILL.md would not be loaded "
-                  "as a skill."] if layout == SINGLE_SKILL else []))
+              + layout_notes)
 
 
 register(Algorithm(
@@ -472,7 +478,7 @@ register(Algorithm(
     summary="EvoSkill's two-role skill induction: Proposer analyses a failure "
             "batch, Generator writes one SKILL.md, and a bounded top-K frontier "
             "keeps the best skill libraries.",
-    kinds=("skill_dir", "agent_dir", "plugin"),
+    kinds=("skill_dir", "skill_library", "agent_dir", "plugin"),
     fidelity="mechanism_microport",
     params=(
         Param("max_frontier", "int", 5, "frontier size", minimum=1),

@@ -161,6 +161,15 @@ and `kind: "skill_library"` in a spec composes `FileTree` + `tree_runner(layout=
 See also [`examples.skill_library_evolution`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skill_library_evolution.py)
 and [EvoSkill](algo-evoskill.md).
 
+After a library run, install into the host skills root without pruning unrelated skills:
+
+```bash
+agentdescent apply <run_id> --install-to ~/.claude/skills --dry-run
+agentdescent apply <run_id> --install-to ~/.claude/skills
+```
+
+`--install-to` is an alias of `--to` with the same `write_to(..., backup=True, prune=False)` semantics (extras listed, not deleted).
+
 Any literal prefix works too. Per rollout the runner makes a fresh workspace,
 materialises the candidate, overlays the pristine frozen files, stages the task's
 fixtures (`task.meta["fixtures"]`, or a `fixtures=` callable), runs the agent

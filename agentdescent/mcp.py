@@ -164,7 +164,7 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
         "from the outcome histogram."),
     "apply": (
         "DESTRUCTIVE: write an evolved artifact back over a target. Pass `run_id` to "
-        "install a finished run's result (optional `to` overrides the run's target), OR "
+        "install a finished run's result (optional `to` / `install_to` overrides the run's target; `install_to` is the host-skills-root form for skill_library), OR "
         "pass `from` + `to` to install an on-disk artifact such as a campaign "
         "`final_target` -- same rules as CLI `apply --from` (from requires to; mutually "
         "exclusive with run_id; symlinks refused). Backs the original up first unless "
@@ -643,25 +643,30 @@ class Tools:
 
     def apply(self, run_id: Optional[str] = None, to: Optional[str] = None,
               dry_run: bool = False, backup: bool = True, *,
-              source: Optional[str] = None) -> Dict[str, Any]:
-        """Install a run result (`run_id`) or an on-disk artifact (`source` + `to`).
+              source: Optional[str] = None,
+              install_to: Optional[str] = None) -> Dict[str, Any]:
+        """Install a run result (`run_id`) or an on-disk artifact (`source` + dest).
 
         ``source`` is the MCP/`CLI` ``from`` path (campaign ``final_target``, etc.).
-        ``run_id`` and ``source`` are mutually exclusive; ``source`` requires ``to``.
+        ``run_id`` and ``source`` are mutually exclusive; ``source`` requires
+        ``to`` or ``install_to`` (alias for a host skills root such as
+        ``~/.claude/skills`` — same write/backup semantics as ``to``, no prune).
         """
+        from .cli import resolve_apply_dest
         try:
+            dest = resolve_apply_dest(to, install_to)
             if source:
                 if run_id:
                     raise runstore.RunStoreError(
                         "pass a run_id or from PATH, not both")
-                if not to:
+                if not dest:
                     raise runstore.RunStoreError(
-                        "from needs to PATH (where to install the artifact)")
-                return apply_from_payload(source, to=to, dry_run=dry_run, backup=backup)
+                        "from needs to/install_to PATH (where to install the artifact)")
+                return apply_from_payload(source, to=dest, dry_run=dry_run, backup=backup)
             if not run_id:
                 raise runstore.RunStoreError(
-                    "apply needs a run_id, or from PATH and to PATH")
-            return apply_payload(run_id, to=to, store=self.store, dry_run=dry_run,
+                    "apply needs a run_id, or from PATH and to/install_to PATH")
+            return apply_payload(run_id, to=dest, store=self.store, dry_run=dry_run,
                                 backup=backup)
         except (runstore.RunStoreError, OSError, ValueError) as e:
             return {"error": str(e)}
@@ -1289,8 +1294,10 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
 
     def apply(run_id: Optional[str] = None, to: Optional[str] = None,
               dry_run: bool = False, backup: bool = True,
-              from_: Optional[str] = None) -> Dict[str, Any]:
-        return t.apply(run_id, to, dry_run, backup, source=from_)
+              from_: Optional[str] = None,
+              install_to: Optional[str] = None) -> Dict[str, Any]:
+        return t.apply(run_id, to, dry_run, backup, source=from_,
+                       install_to=install_to)
 
     apply.__annotations__["from_"] = Annotated[
         Optional[str],
