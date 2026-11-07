@@ -674,49 +674,104 @@ def cmd_demo(a: argparse.Namespace) -> int:
     spec_dict = demo_mod.build(root, algorithm=algo)
     kind = spec_dict["kind"]
 
-    if kind == "text":
-        prompt_path = os.path.join(root, "prompt.txt")
-        print(f"A text prompt that totals a CSV column, in {root}")
-        print(f"  prompt.txt   ->  {open(prompt_path).read().strip()!r}   "
-              f"(wrong: `id` is a row number)")
-        print("  cases.jsonl  ->  12 prompts with embedded CSVs and known totals")
-    else:
-        skill = os.path.join(root, demo_mod.DEMO_SKILL)
-        rules = os.path.join(skill, "references", "rules.md")
-        print(f"A skill that totals a column of a CSV, in {root}")
-        print(f"  {demo_mod.DEMO_SKILL}/references/rules.md  ->  "
-              f"{open(rules).read().strip()!r}   (wrong: `id` is a row number)")
-        print("  cases.jsonl                        ->  12 CSVs with known totals")
-    print("  the agent is a local program, so this costs nothing and needs no key")
-    print("  note: this is a smoke trajectory; for multi-round library edits see")
-    print("        python -m examples.skill_library_evolution  (#847)")
-    if algo:
-        print(f"  algorithm: {algo}   (`agentdescent algorithms show {algo}`)")
-    print()
+    as_json = getattr(a, "json", False)
+    if not as_json:
+        if kind == "text":
+            prompt_path = os.path.join(root, "prompt.txt")
+            print(f"A text prompt that totals a CSV column, in {root}")
+            print(f"  prompt.txt   ->  {open(prompt_path).read().strip()!r}   "
+                  f"(wrong: `id` is a row number)")
+            print("  cases.jsonl  ->  12 prompts with embedded CSVs and known totals")
+        else:
+            skill = os.path.join(root, demo_mod.DEMO_SKILL)
+            rules = os.path.join(skill, "references", "rules.md")
+            print(f"A skill that totals a column of a CSV, in {root}")
+            print(f"  {demo_mod.DEMO_SKILL}/references/rules.md  ->  "
+                  f"{open(rules).read().strip()!r}   (wrong: `id` is a row number)")
+            print("  cases.jsonl                        ->  12 CSVs with known totals")
+        print("  the agent is a local program, so this costs nothing and needs no key")
+        print("  note: this is a smoke trajectory; for multi-round library edits see")
+        print("        python -m examples.skill_library_evolution  (#847)")
+        if algo:
+            print(f"  algorithm: {algo}   (`agentdescent algorithms show {algo}`)")
+        print()
 
     spec = EvolveSpec.from_dict(spec_dict)
     comp = compose(spec)
     est = estimate(comp)
-    print(f"plan: {len(comp.tasks)} tasks, "
-          f"{comp.kwargs['rounds']} rounds x {comp.kwargs['n_workers']} workers, "
-          f"up to {est['agent_calls_upper_bound']} agent calls\n")
+    if not as_json:
+        print(f"plan: {len(comp.tasks)} tasks, "
+              f"{comp.kwargs['rounds']} rounds x {comp.kwargs['n_workers']} workers, "
+              f"up to {est['agent_calls_upper_bound']} agent calls\n")
 
     rd = runstore.create(spec.to_dict(), store=a.store)
-    print(f"running ({rd.run_id})...")
+    if not as_json:
+        print(f"running ({rd.run_id})...")
     result = runstore.execute(rd)
-    for info in result.history:
-        print(f"  round {info.round:>2}  reward={info.held_out_reward:.3f}  "
-              f"+{info.committed}/-{info.rejected}")
+    if not as_json:
+        for info in result.history:
+            print(f"  round {info.round:>2}  reward={info.held_out_reward:.3f}  "
+                  f"+{info.committed}/-{info.rejected}")
 
     init = getattr(result, "initial_reward", None)
+    learned = demo_mod.learned_summary(result.state, kind=kind)
+    ok = result.final_reward >= 1.0
+    if kind == "text":
+        next_steps = [
+            f"agentdescent show  {rd.run_id}",
+            f"agentdescent apply {rd.run_id} --dry-run",
+            "agentdescent init <your-prompt.txt> --kind text --data <your-cases.jsonl> --out spec.json",
+            "agentdescent doctor",
+            "agentdescent plan spec.json",
+        ]
+    else:
+        next_steps = [
+            f"agentdescent show  {rd.run_id}",
+            f"agentdescent apply {rd.run_id} --dry-run",
+            "agentdescent init <your-skill-dir> --data <your-cases.jsonl> --out spec.json",
+            "agentdescent doctor",
+            "agentdescent plan spec.json",
+        ]
+
+    if as_json:
+        # #862: honour the advertised --json flag so hosts can assert an
+        # offline algo smoke without scraping the human narrative.
+        _out({
+            "ok": ok,
+            "dir": root,
+            "kind": kind,
+            "algorithm": algo,
+            "run_id": rd.run_id,
+            "plan": {
+                "tasks": len(comp.tasks),
+                "rounds": comp.kwargs["rounds"],
+                "n_workers": comp.kwargs["n_workers"],
+                "agent_calls_upper_bound": est["agent_calls_upper_bound"],
+            },
+            "initial_reward": init,
+            "final_reward": result.final_reward,
+            "outcomes": result.outcomes(),
+            "learned": learned,
+            "history": [
+                {"round": info.round,
+                 "held_out_reward": info.held_out_reward,
+                 "committed": info.committed,
+                 "rejected": info.rejected}
+                for info in result.history
+            ],
+            "next": next_steps,
+            **({} if ok else {"note": "lower than expected for the demo; see the run store"}),
+        }, as_json=True)
+        return 0 if ok else 1
+
     if init is not None:
         print(f"\nheld-out reward: {init:.3f} -> {result.final_reward:.3f}   "
               f"outcomes: {result.outcomes()}")
     else:
         print(f"\nheld-out reward: {result.final_reward:.3f}   "
               f"outcomes: {result.outcomes()}")
-    print(f"what it learned:  {demo_mod.learned_summary(result.state, kind=kind)}")
-    if result.final_reward < 1.0:
+    print(f"what it learned:  {learned}")
+    if not ok:
         print("\n(that is lower than expected for the demo; the run store has the detail:")
         print(f" {rd.path})")
         return 1

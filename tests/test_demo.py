@@ -164,6 +164,33 @@ def test_demo_algorithm_accepts_an_alias(tmp_path, monkeypatch):
     assert "algorithm: archive_selection" in buf.getvalue()
 
 
+
+def test_demo_json_emits_a_parseable_result(tmp_path, monkeypatch):
+    # #862: --json was advertised but cmd_demo always printed human text.
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "home"))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                         "--dir", str(tmp_path / "work"),
+                         "--algorithm", "ace", "--json"])
+    out = buf.getvalue()
+    assert code == 0, out
+    payload = json.loads(out)
+    assert payload["ok"] is True
+    assert payload["kind"] == "text"
+    assert payload["algorithm"] == "ace"
+    assert payload["initial_reward"] == 0.0
+    assert payload["final_reward"] == 1.0
+    assert payload["outcomes"].get("committed", 0) >= 1
+    assert "COLUMN: amount" in payload["learned"]
+    assert payload["run_id"]
+    assert payload["plan"]["tasks"] == 12
+    assert payload["plan"]["agent_calls_upper_bound"] >= 1
+    assert any("show" in step for step in payload["next"])
+    # human narrative must not leak into the JSON document
+    assert "A text prompt that totals" not in out
+
+
 def test_demo_algorithm_refuses_one_that_needs_a_real_model(tmp_path, capsys):
     # #845: evoskill has an explicit skip_reason (proposer protocol); other
     # unknown-to-offline names still use the generic refusal.
