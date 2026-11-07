@@ -73,7 +73,7 @@ workers, the merge and the held-out gate are the same code a real run uses, so
 what you watch is the actual loop:
 
 ```text
-plan: 12 tasks, 4 rounds x 2 workers, up to 64 agent calls
+plan: 12 tasks, 4 rounds x 2 workers, up to 68 agent calls
 
 running (20260905-134121-1c695b)...
   round  0  reward=1.000  +1/-0

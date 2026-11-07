@@ -72,7 +72,7 @@ names the **wrong** column, twelve CSVs with known totals, and an agent that is
 a local program reading that skill off disk — then runs the real loop:
 
 ```
-plan: 12 tasks, 4 rounds x 2 workers, up to 64 agent calls
+plan: 12 tasks, 4 rounds x 2 workers, up to 68 agent calls
 running (20260905-134121-1c695b)...
   round  0  reward=1.000  +1/-0
 
