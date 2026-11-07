@@ -510,9 +510,29 @@ def doctor_report(*, home: Optional[str] = None) -> Dict[str, Any]:
                 f"then in a Grok Bot chat ask it to rewrite its `agentdescent` skill "
                 f"from {info['path']}")
         elif info["state"] in ("stale", "partial"):
-            problems.append(
+            msg = (
                 f"{name}: the installed integration is {info['state']} "
-                f"(skill {info['skill']}, mcp {info['mcp']}); run `agentdescent install {name}`")
+                f"(skill {info['skill']}, mcp {info['mcp']}); "
+                f"run `agentdescent install {name}`")
+            # Scaffold refresh alone is not enough when the Bot never saved the
+            # skill (#825): keep the save/rewrite tip next to the install tip.
+            if name == "grok-bot" and info.get("user_skill") == "missing":
+                msg += (
+                    f"; then in a Grok Bot chat ask it to save "
+                    f"`skills/agentdescent/SKILL.md` as a user skill from "
+                    f"{info['path']}")
+            problems.append(msg)
+        elif (name == "grok-bot"
+              and info.get("user_skill") == "missing"
+              and info.get("skill") != "missing"):
+            # Scaffold is present (ok/partial already handled above) but the Bot
+            # has no saved user skill — install notes say this once; doctor must
+            # keep surfacing it (#825). Hint, not problem: host state may be ok.
+            hints.append(
+                f"grok-bot: scaffold is installed but no saved user skill named "
+                f"`agentdescent` was found; ask Grok Bot to save "
+                f"`skills/agentdescent/SKILL.md` as a user skill from "
+                f"{info['path']} (doctor/install never write the Bot's skill store)")
     return {
         # Which install answered: the version and the interpreter running it. A host
         # starts its own `agentdescent mcp` (often through the interpreter `install`

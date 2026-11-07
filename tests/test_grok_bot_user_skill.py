@@ -109,3 +109,32 @@ def test_doctor_does_not_write_the_skill_store(home, capsys):
     install("grok-bot", home=str(home))
     after = {p: p.read_bytes() for p in store.rglob("*") if p.is_file()}
     assert before == after
+
+def test_missing_user_skill_after_scaffold_is_a_hint(home, capsys):
+    """doctor keeps the save-as-user-skill tip visible after install (#825)."""
+    install("grok-bot", home=str(home))
+    info = host_status("grok-bot", home=str(home))
+    assert (info["state"], info["skill"], info["user_skill"]) == ("ok", "ok", "missing")
+    _, out = _doctor(home, capsys)
+    hint = next(l for l in out.splitlines() if l.startswith("- grok-bot"))
+    assert "user skill" in hint and info["path"] in hint
+    assert "save" in hint.lower()
+    _, out = _doctor(home, capsys, "--json")
+    hints = json.loads(out)["hints"]
+    assert any("user skill" in h and info["path"] in h for h in hints)
+
+
+def test_stale_scaffold_with_missing_user_skill_tips_save(home, capsys):
+    """stale install problem also names the user-skill save step (#825)."""
+    install("grok-bot", home=str(home))
+    path = host_status("grok-bot", home=str(home))["path"]
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(skill_text().replace("doctor", "doctr", 1))
+    info = host_status("grok-bot", home=str(home))
+    assert (info["state"], info["skill"], info["user_skill"]) == (
+        "stale", "stale", "missing")
+    rc, out = _doctor(home, capsys)
+    assert rc == 1
+    problem = next(l for l in out.splitlines() if l.startswith("! grok-bot"))
+    assert "install grok-bot" in problem and "user skill" in problem
+    assert info["path"] in problem
