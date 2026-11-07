@@ -165,13 +165,14 @@ def test_demo_algorithm_accepts_an_alias(tmp_path, monkeypatch):
 
 
 def test_demo_algorithm_refuses_one_that_needs_a_real_model(tmp_path, capsys):
+    # #845: evoskill has an explicit skip_reason (proposer protocol); other
+    # unknown-to-offline names still use the generic refusal.
     code = cli.main(["--store", str(tmp_path / "runs"), "demo",
                      "--dir", str(tmp_path / "work"), "--algorithm", "evoskill"])
     err = capsys.readouterr().err
     assert code == 2
-    assert "does not run against the offline demo" in err
+    assert "evoskill" in err and ("real model" in err or "offline demo" in err)
     assert "agentdescent algorithms run evoskill" in err
-    # refused before anything is built or run
     assert not (tmp_path / "work").exists()
     assert not (tmp_path / "runs").exists() or not os.listdir(tmp_path / "runs")
 
@@ -182,3 +183,49 @@ def test_demo_algorithm_unknown_name_lists_the_real_ones(tmp_path, capsys):
     err = capsys.readouterr().err
     assert code == 2
     assert "unknown algorithm 'nope'" in err and "archive_selection" in err
+
+
+def test_offline_text_agent_uses_last_column_match():
+    # ACE/DGM keep the seed and append lessons; the last COLUMN wins (#845).
+    prompt = (
+        "COLUMN: id\n\n# Playbook\n## general\n- COLUMN: amount\n\n"
+        "What is the total?\n```csv\nid,amount\n1,10\n2,20\n```"
+    )
+    assert demo.offline_text_agent(prompt) == "30"
+    assert demo.offline_text_agent(
+        "COLUMN: id\n\nWhat is the total?\n```csv\nid,amount\n1,10\n2,20\n```"
+    ) == "3"
+
+
+def test_offline_text_reflector_returns_rule_or_skillopt_json():
+    assert demo.offline_text_reflector("propose a rule") == "COLUMN: amount"
+    out = demo.offline_text_reflector('Return ONLY a JSON object with "edits"')
+    payload = json.loads(out)
+    assert payload["edits"] == [{
+        "op": "replace", "target": "COLUMN: id", "content": "COLUMN: amount",
+    }]
+
+
+def test_build_text_fixture_for_text_only_cards(tmp_path):
+    spec = demo.build(str(tmp_path), algorithm="gepa")
+    assert spec["kind"] == "text" and spec["algorithm"] == "gepa"
+    assert (tmp_path / "prompt.txt").read_text().strip() == "COLUMN: id"
+    assert not (tmp_path / demo.DEMO_SKILL).exists()
+    rows = [json.loads(l) for l in (tmp_path / "cases.jsonl").read_text().splitlines()]
+    assert "```csv" in rows[0]["prompt"] and "fixtures" not in rows[0]
+
+
+def test_demo_algorithm_refuses_evoskill_with_skip_reason(tmp_path, capsys):
+    code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                     "--dir", str(tmp_path / "work"), "--algorithm", "evoskill"])
+    err = capsys.readouterr().err
+    assert code == 2
+    assert "evoskill" in err and "real model" in err
+    assert "proposer/generator" in err or "algorithms run evoskill" in err
+    assert not (tmp_path / "work").exists()
+
+
+def test_skip_reason_only_for_listed_skips():
+    assert demo.skip_reason("evoskill")
+    assert demo.skip_reason("gepa") is None
+    assert set(demo.OFFLINE_TEXT_ALGORITHMS).issubset(set(demo.OFFLINE_ALGORITHMS))

@@ -648,6 +648,9 @@ def cmd_demo(a: argparse.Namespace) -> int:
             algo = algorithms.get(a.algorithm, where="demo --algorithm").name
         except algorithms.AlgorithmError as e:
             raise SpecError(str(e)) from None
+        why = demo_mod.skip_reason(algo)
+        if why:
+            raise SpecError(f"demo --algorithm: {why}")
         if algo not in demo_mod.OFFLINE_ALGORITHMS:
             raise SpecError(
                 f"demo --algorithm: {algo!r} does not run against the offline demo "
@@ -659,13 +662,21 @@ def cmd_demo(a: argparse.Namespace) -> int:
         prefix="agentdescent-demo-")
     os.makedirs(root, exist_ok=True)
     spec_dict = demo_mod.build(root, algorithm=algo)
-    skill = os.path.join(root, demo_mod.DEMO_SKILL)
-    rules = os.path.join(skill, "references", "rules.md")
+    kind = spec_dict["kind"]
 
-    print(f"A skill that totals a column of a CSV, in {root}")
-    print(f"  {demo_mod.DEMO_SKILL}/references/rules.md  ->  "
-          f"{open(rules).read().strip()!r}   (wrong: `id` is a row number)")
-    print("  cases.jsonl                        ->  12 CSVs with known totals")
+    if kind == "text":
+        prompt_path = os.path.join(root, "prompt.txt")
+        print(f"A text prompt that totals a CSV column, in {root}")
+        print(f"  prompt.txt   ->  {open(prompt_path).read().strip()!r}   "
+              f"(wrong: `id` is a row number)")
+        print("  cases.jsonl  ->  12 prompts with embedded CSVs and known totals")
+    else:
+        skill = os.path.join(root, demo_mod.DEMO_SKILL)
+        rules = os.path.join(skill, "references", "rules.md")
+        print(f"A skill that totals a column of a CSV, in {root}")
+        print(f"  {demo_mod.DEMO_SKILL}/references/rules.md  ->  "
+              f"{open(rules).read().strip()!r}   (wrong: `id` is a row number)")
+        print("  cases.jsonl                        ->  12 CSVs with known totals")
     print("  the agent is a local program, so this costs nothing and needs no key")
     if algo:
         print(f"  algorithm: {algo}   (`agentdescent algorithms show {algo}`)")
@@ -692,13 +703,25 @@ def cmd_demo(a: argparse.Namespace) -> int:
     else:
         print(f"\nheld-out reward: {result.final_reward:.3f}   "
               f"outcomes: {result.outcomes()}")
-    print(f"what it learned:  rules.md -> "
-          f"{result.state.get('references/rules.md', '').strip()!r}")
+    print(f"what it learned:  {demo_mod.learned_summary(result.state, kind=kind)}")
     if result.final_reward < 1.0:
         print("\n(that is lower than expected for the demo; the run store has the detail:")
         print(f" {rd.path})")
         return 1
-    print(f"""
+    if kind == "text":
+        print(f"""
+The prompt on disk is untouched -- an evolved artifact only lands when you say so:
+
+  agentdescent show  {rd.run_id}          the diff
+  agentdescent apply {rd.run_id} --dry-run  what it would write
+
+Your own run is the same shape with a real model instead of the offline pair:
+
+  agentdescent init <your-prompt.txt> --kind text --data <your-cases.jsonl> --out spec.json
+  agentdescent doctor
+  agentdescent plan spec.json""")
+    else:
+        print(f"""
 The skill on disk is untouched -- an evolved artifact only lands when you say so:
 
   agentdescent show  {rd.run_id}          the diff
@@ -4474,8 +4497,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("demo", help="build a complete example and run it, offline")
     s.add_argument("--dir", help="where to build it (default: a temp directory)")
     s.add_argument("--algorithm", metavar="NAME",
-                   help="run the demo with this named algorithm (one that works "
-                        "offline: " + ", ".join(_demo_offline_algorithms()) + ")")
+                   help="run the demo with this named algorithm offline "
+                        "(skill_dir: archive_selection; text: gepa, dgm, ace, "
+                        "skillopt, rrsi; evoskill is refused — needs a real model). "
+                        "Currently: " + ", ".join(_demo_offline_algorithms()))
     s.set_defaults(fn=cmd_demo)
 
     s = sub.add_parser("init", help="write a starter spec for a path")
