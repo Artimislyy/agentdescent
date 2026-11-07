@@ -563,7 +563,8 @@ back to the CLI route rather than failing.
   run and shown to the user, so it never carries code or secrets.
 
 `agentdescent init <path>` writes a starter spec with `kind` guessed from what
-the path is.
+the path is (a directory with two or more `*/SKILL.md` and no root `SKILL.md`
+is guessed as `skill_library`; pass `--kind` to override).
 
 Relative paths (`target`, `data.path`, a `cmd` grader) are resolved **when the
 spec is read**, not when it runs: the detached run has the run directory as its

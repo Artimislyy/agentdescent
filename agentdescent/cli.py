@@ -332,7 +332,8 @@ def guess_kind(path: str) -> str:
     """The spec kind ``init`` / ``algorithms run`` assume for ``path`` without ``--kind``.
 
     A path that does not exist is never guessed as ``skill_dir``: callers must
-    report :func:`missing_target_message` first (#706).
+    report :func:`missing_target_message` first (#706). A directory holding ≥2
+    ``*/SKILL.md`` and no root ``SKILL.md`` is a ``skill_library`` (#866).
     """
     p = os.path.expanduser(path)
     if not os.path.exists(p):
@@ -347,6 +348,12 @@ def guess_kind(path: str) -> str:
         return "plugin"
     if os.path.basename(os.path.dirname(p.rstrip(os.sep))) == "agents":
         return "agent_dir"
+    # A multi-file skill library: no root SKILL.md, ≥2 ``*/SKILL.md`` children —
+    # the layout ``kind=skill_library`` evolves (#866). A root SKILL.md stays
+    # ``skill_dir`` (one Agent Skill with helpers beside it).
+    if (not os.path.exists(os.path.join(p, "SKILL.md"))
+            and count_library_skills(p) >= 2):
+        return "skill_library"
     return "skill_dir"
 
 
