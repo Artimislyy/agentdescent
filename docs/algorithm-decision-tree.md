@@ -26,6 +26,16 @@ Future card candidates (not promised): Voyager / SkillWeaver / Reflexion /
 Self-Refine / TextGrad MethodPolicy mechanisms — each needs its own issue with
 kinds, params, fidelity class, and deviation vs `examples/<algo>/`.
 
+## Skill libraries vs text-only cards (#846)
+
+Product positioning emphasises multi-file skill libraries (`kind=skill_library`),
+but most named cards today declare **`kinds=("text",)` only**:
+`gepa`, `dgm`, `ace`, `skillopt`, `rrsi`. For an on-disk Agent Skill library,
+use **`evoskill`** or **`archive_selection`** (both list `skill_library`), or
+stay on `kind=text` / `skill_dir` with a text-capable card. Expanding more
+cards to `skill_library` is tracked in #846 — until then, `algorithms show`
+/`--kind` filtering is the source of truth, not the marketing copy.
+
 ## Decision tree
 
 | If you need… | Prefer… | Fidelity / surface | Example |
