@@ -10,7 +10,7 @@ Port onto the AgentDescent engine, as a declarative
 | Paper | "Voyager: An Open-Ended Embodied Agent with Large Language Models", Wang et al., 2023 ([arXiv:2305.16291](https://arxiv.org/abs/2305.16291)) |
 | Upstream code | [MineDojo/Voyager@55e45a88](https://github.com/MineDojo/Voyager/tree/55e45a880755d0c8c66ca7fb5fe7962ac8974f89) |
 | Domain (compact) | deterministic crafting world (12 recipe goals, disjoint splits) |
-| Definition plug-ins | `SkillLibrary` strategy; `Policies(task_sampler=DifficultyWeighted)`; `self_verify` critic; environment error feedback |
+| Definition plug-ins | `KeyedSkillBank` strategy; `Policies(task_sampler=DifficultyWeighted)`; `self_verify` critic; environment error feedback |
 
 ## Run
 

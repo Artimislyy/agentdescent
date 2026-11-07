@@ -77,8 +77,8 @@ TextGrad were added after that measurement.
 | **Reflexion** | `mechanism_microport` | GSM-Hard | `WindowedMemory` (bounded append-only) | [→](algo-reflexion.md) |
 | **SICA** | `self_edit_analogue` | GSM-Hard | AST gate; `Archive('best')` selection | [→](algo-sica.md) |
 | **Gödel Agent** | `self_edit_analogue` | GSM-Hard | AST gate; optional `--gateless` acceptance | [→](algo-godel-agent.md) |
-| **Voyager** | `environment_analogue` | crafting world | `SkillLibrary`, `DifficultyWeighted`, self-verify critic | [→](algo-voyager.md) |
-| **SkillWeaver** | `environment_analogue` | settings site | `SkillLibrary`, `DifficultyWeighted`, self-verify reward model | [→](algo-skillweaver.md) |
+| **Voyager** | `environment_analogue` | crafting world | `KeyedSkillBank`, `DifficultyWeighted`, self-verify critic | [→](algo-voyager.md) |
+| **SkillWeaver** | `environment_analogue` | settings site | `KeyedSkillBank`, `DifficultyWeighted`, self-verify reward model | [→](algo-skillweaver.md) |
 | **Absolute Zero** | `inference_analogue` | self-play carts | frozen self-play evaluation; learnability signal | [→](algo-absolute-zero.md) |
 | **R-Zero** | `inference_analogue` | self-play carts | `AdvantageAcceptance` (GRPO shape), `DifficultyWeighted` | [→](algo-r-zero.md) |
 | **Agent0** | `inference_analogue` | self-play carts | `DifficultyWeighted`; calculator stop-and-go | [→](algo-agent0.md) |

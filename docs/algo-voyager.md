@@ -4,11 +4,13 @@ description: A runnable reproduction of Voyager's embodied skill library with a 
 
 # Voyager — Embodied skill-library agent
 
-> **Skill-library self-evolution.** Grow a library of executable skills from a
-> curriculum, repairing failed programs from environment feedback. Runs through
-> the shared [`MethodPolicy`](policies.md) runner with `self_verify` on (the
-> critic). Example:
+> **Keyed skill-bank self-evolution** (MethodPolicy microport). Grow a bank of
+> executable skill *strings* keyed by goal — not a disk `skills/*/SKILL.md`
+> library. Runs through the shared [`MethodPolicy`](policies.md) runner with
+> `self_verify` on (the critic). Example:
 > [`examples/voyager/voyager_skill_library.py`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/voyager/voyager_skill_library.py).
+> For an Agent Skill library on disk, use
+> [`examples.skill_library_evolution`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skill_library_evolution.py).
 
 | | |
 |---|---|
@@ -36,7 +38,7 @@ from a gold program.
 
 | Upstream mechanism | Where it lives here |
 |---|---|
-| Add-only skill library | `SkillLibrary`: per-goal keys that accumulate and union-merge; the reusable placeholder skill evolves under the generic key |
+| Add-only keyed bank | `KeyedSkillBank`: per-goal **prompt strings** that accumulate and union-merge (not an on-disk Agent Skill library); the reusable placeholder evolves under the generic key. For a real `*/SKILL.md` library see [`skill_library_evolution`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skill_library_evolution.py) / [EvoSkill](algo-evoskill.md) |
 | Repair from environment errors | a deterministic crafting simulator reports the first failed step; that message is all the repair prompt sees |
 | The critic | the engine's `self_verify` rollout: every proposal re-runs and is judged by the environment reward |
 | Curriculum at the frontier | `DifficultyWeighted` sampling over the task pool |

@@ -38,7 +38,7 @@ from agentdescent.policies import Policies
 from agentdescent.sampling import DifficultyWeighted
 
 from examples._measure import canonical_json, parse_json_object
-from examples._method_policy import MethodPolicy, SkillLibrary
+from examples._method_policy import MethodPolicy, KeyedSkillBank
 from examples._method_runner import standard_main
 
 
@@ -268,7 +268,7 @@ def build(seed: int) -> MethodPolicy:
             "The critic is the engine's self-verify rollout: proposals are re-run and judged by the environment reward.",
             "A deterministic crafting world replaces Minecraft; the task pool plus difficulty sampling stands in for the generative curriculum.",
         ),
-        strategy=SkillLibrary(
+        strategy=KeyedSkillBank(
             categories=categories,
             value_validator=_skill_value,
             initial_entries={

@@ -325,7 +325,7 @@ each is a real `Strategy` you can read and reuse:
 | `OpenEvolveStrategy` | [OpenEvolve](algo-openevolve.md) | one evolved program each proposal replaces, behind a validity gate |
 
 The first eleven MethodPolicy ports ride four shared strategies — `ValidatedSlot`,
-`FieldSlots`, `WindowedMemory`, `SkillLibrary` — see
+`FieldSlots`, `WindowedMemory`, `KeyedSkillBank` — see
 [examples-level strategies](strategies.md#examples-level-strategies).
 
 ---

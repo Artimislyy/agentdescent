@@ -10,7 +10,7 @@ base is updated **only when the success check passes** -- ``explore.py``:
 engine's self-verify plus acceptance gate here.
 
 An API key holds the **latest** accepted call sequence, not an accumulation: the
-per-page entry is rewritten when a better one is accepted, as `SkillLibrary`
+per-page entry is rewritten when a better one is accepted, as `KeyedSkillBank`
 does. Upstream's knowledge base likewise carries one current definition per
 function name and bumps ``metadata["global_version"]``.
 
@@ -42,7 +42,7 @@ from agentdescent.policies import Policies
 from agentdescent.sampling import DifficultyWeighted
 
 from examples._measure import canonical_json, parse_json_object
-from examples._method_policy import MethodPolicy, SkillLibrary
+from examples._method_policy import MethodPolicy, KeyedSkillBank
 from examples._method_runner import standard_main
 
 
@@ -293,7 +293,7 @@ def build(seed: int) -> MethodPolicy:
             "Upstream alternates explore and test iterations on a schedule and synthesises only from tested functions; verification here is a per-proposal re-roll.",
             "A deterministic settings service replaces Dockerized WebArena.",
         ),
-        strategy=SkillLibrary(
+        strategy=KeyedSkillBank(
             categories=categories,
             value_validator=_api_value,
             initial_entries={

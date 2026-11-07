@@ -196,4 +196,4 @@ produces no diff):
 | `ValidatedSlot` | `SingleSlot` + a `ValueError`-raising validator and an invalid-proposal counter | [Self-Refine](algo-self-refine.md), [Absolute Zero](algo-absolute-zero.md), [Agent0](algo-agent0.md), [SICA](algo-sica.md), [Gödel Agent](algo-godel-agent.md) |
 | `FieldSlots` | a genome of named plain-text fields, one ledger key each — disjoint edits union-merge, contested fields model-merge | [PromptBreeder](algo-promptbreeder.md), [AFlow](algo-aflow.md), [R-Zero](algo-r-zero.md) |
 | `WindowedMemory` | append-only entries rendered as the last Ω — appends never contradict | [Reflexion](algo-reflexion.md) |
-| `SkillLibrary` | one validated entry per goal key; different goals accumulate and union-merge | [Voyager](algo-voyager.md), [SkillWeaver](algo-skillweaver.md) |
+| `KeyedSkillBank` | one validated **prompt string** per goal key (not an Agent Skill folder); different goals accumulate and union-merge | [Voyager](algo-voyager.md), [SkillWeaver](algo-skillweaver.md) |

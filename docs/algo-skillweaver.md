@@ -38,7 +38,14 @@ execution throws**). The product is a growing library of plug-and-play APIs.
 | Proposal stage | task pool + `DifficultyWeighted` sampling |
 | Practice + reward model | the engine rollout + the `self_verify` re-roll graded by the deterministic site |
 | Honing from execution failures | the site simulator reports the first failed call; the HONE prompt sees that, never a required trace |
-| Growing API library | `SkillLibrary` per-page keys; the reusable placeholder API evolves under the generic key |
+| Growing API bank | `KeyedSkillBank` per-page **prompt/API strings** (not `*/SKILL.md` folders); the reusable placeholder evolves under the generic key. Disk libraries: [`skill_library_evolution`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skill_library_evolution.py) |
+
+## Not an on-disk Agent Skill library
+
+The MethodPolicy helper is a **keyed string bank**. It does not write
+`*/SKILL.md` folders. For a real library use
+[`examples.skill_library_evolution`](https://github.com/ThinkFlowLab/agentdescent/blob/main/examples/skill_library_evolution.py)
+or EvoSkill / Path A `kind=skill_library` when available.
 
 ## Boundaries
 

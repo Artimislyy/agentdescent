@@ -219,19 +219,22 @@ class WindowedMemory:
 
 
 @dataclass
-class SkillLibrary:
-    """Voyager/SkillWeaver's growing library: one validated entry per goal key.
+class KeyedSkillBank:
+    """Voyager/SkillWeaver keyed prompt bank (not an on-disk Agent Skill library).
 
     Proposals are ``"<key>: <value>"``; the value must pass ``value_validator``.
-    Skills for different goals accumulate and union-merge; a second proposal for
+    Entries for different goals accumulate and union-merge; a second proposal for
     an existing goal contradicts and is resolved by the aggregator. Keys outside
     ``categories`` are rejected (counted), not appended.
+
+    For a real ``skills/*/SKILL.md`` library see ``SkillLibraryTree`` /
+    ``examples.skill_library_evolution`` / EvolveSpec ``kind=skill_library``.
     """
 
     categories: Sequence[str]
     value_validator: Validator
     initial_entries: Mapping[str, str] = field(default_factory=dict)
-    title: str = "# Skill library"
+    title: str = "# Keyed skill bank"
     invalid_proposals: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -253,7 +256,7 @@ class SkillLibrary:
                 raise ValueError("proposal is not '<key>: <value>'")
             key = match.group(1).strip().lower()
             if key not in set(self.keys()):
-                raise ValueError(f"unknown skill key {key!r}")
+                raise ValueError(f"unknown bank key {key!r}")
             value = self.value_validator(match.group(2).strip())
         except (KeyError, TypeError, ValueError):
             with self._lock:
@@ -265,6 +268,10 @@ class SkillLibrary:
             return None
         return Diff(diff_id=f"{author}:{key}:{base_version}", target=target,
                     ops={key: value}, author=author)
+
+
+#: Deprecated alias — prefer :class:`KeyedSkillBank` (#821).
+SkillLibrary = KeyedSkillBank
 
 
 @dataclass(frozen=True)
