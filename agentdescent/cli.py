@@ -2205,6 +2205,14 @@ def show_payload(run_id: str, *, store: Optional[str] = None, diff: bool = True,
         payload["propose_errors"] = perr
         payload["propose_error"] = next(
             (h.propose_error for h in result.history if h.propose_error), None)
+    # Reflective-merge health (#834 / #766): contested vs unranked vs losses.
+    # Always attach when a result exists so Path A / MCP show can see merge
+    # ranking without reading the ledger Python API.
+    from dataclasses import asdict
+    stats = result.fusion_stats()
+    payload["fusion_stats"] = asdict(stats)
+    if stats.trials:
+        payload["fusion_summary"] = stats.summary()
     spec = EvolveSpec.from_dict(rd.spec_dict())
     # Why the reward is what it is (#452): the worst rollouts of the final
     # artifact, output vs gold. Only when some were recorded, so a run with
@@ -2262,6 +2270,8 @@ def cmd_show(a: argparse.Namespace) -> int:
               "best_reward", "propose_errors", "propose_error", "note"):
         if payload.get(k) is not None:
             print(f"{k}: {payload[k]}")
+    if payload.get("fusion_summary"):
+        print(payload["fusion_summary"])
     if payload.get("history"):
         print("rounds so far:")
         for h in payload["history"]:
