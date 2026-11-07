@@ -1136,11 +1136,19 @@ def write_starter_spec(
     return out, spec, report, providers_out
 
 
-def _print_init_report(report: List[Tuple[str, str]]) -> None:
+def _print_init_report(report: List[Tuple[str, str]], *,
+                       skip: Optional[set] = None) -> set:
+    """Print report lines once each; return the set of bodies printed (#848)."""
+    printed: set = set(skip or ())
     first_next = True
     for kind, text in report:
+        if text in printed:
+            continue
+        printed.add(text)
         if kind == "warning":
             print(f"warning: {text}")
+        elif kind == "note":
+            print(f"note: {text}")
         elif kind == "next":
             print(("next: " if first_next else "      ") + text)
             first_next = False
@@ -1148,6 +1156,7 @@ def _print_init_report(report: List[Tuple[str, str]]) -> None:
             print(f"then: {text}")
         else:
             print(text)
+    return printed
 
 
 def cmd_init(a: argparse.Namespace) -> int:
@@ -3390,26 +3399,24 @@ def _cmd_algorithms_run(a: argparse.Namespace) -> int:
     if stage == "plan":
         # The spec is already on disk: say so before the error (#688), and
         # keep init's notes/warnings, e.g. where an overwritten spec went (#749).
-        for kind_tag, text in report:
-            if kind_tag == "warning":
-                print(f"warning: {text}")
-            elif kind_tag == "note":
-                print(f"note: {text}")
-            else:
-                print(text)
-        print(f"error: {obj['error']}", file=sys.stderr)
+        printed = _print_init_report(report)
+        err = obj["error"]
+        # If the error body was already shown as a warning/note, still print
+        # error: once — but do not re-print matching plan warnings below.
+        print(f"error: {err}", file=sys.stderr)
+        printed.add(err)
         print(f"next: fix {out}, then {obj['next']}")
         return 2
     payload = obj["_plan"]
-    for kind_tag, text in report:
-        if kind_tag == "warning":
-            print(f"warning: {text}")
-        elif kind_tag == "note":
-            print(f"note: {text}")
-        else:
-            print(text)
+    printed = _print_init_report(report)
     if not ok:
-        print(f"error: {payload.get('error', 'plan failed')}", file=sys.stderr)
+        for w in payload.get("warnings") or []:
+            if w in printed:
+                continue
+            print(f"warning: {w}")
+            printed.add(w)
+        err = payload.get("error", "plan failed")
+        print(f"error: {err}", file=sys.stderr)
         print(f"next: fix {out}, then {obj['next']}")
         return 2
     _out(payload, as_json=False)
@@ -4453,7 +4460,9 @@ def _wants_json(argv: Sequence[str]) -> bool:
 def build_parser() -> argparse.ArgumentParser:
     p = _CliParser(prog="agentdescent",
                                 description="Evolve skills, agents, prompts, code and plugins "
-                                            "with a parallel, merge-based optimiser.")
+                                            "with a parallel, merge-based optimiser. "
+                                            "Path A: demo | doctor | init | plan | "
+                                            "evolve | apply; named cards: algorithms.")
     p.add_argument("-V", "--version", action="version",
                    version=f"%(prog)s {_version()}",
                    help="print the AgentDescent version and exit")
