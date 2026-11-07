@@ -39,6 +39,7 @@ name: csv-total
 description: Total one column of data.csv. Use when asked for a CSV column sum.
 ---
 # csv-total
+STATUS: draft
 Read `references/rules.md` for the column; reply with only the sum.
 """
 
@@ -48,6 +49,7 @@ name: date-parse
 description: Extract a calendar field from date.txt. Use when asked for year/month/day.
 ---
 # date-parse
+STATUS: draft
 Read `references/rules.md` for the field; parse `date.txt` (YYYY-MM-DD); reply with only that value.
 """
 
@@ -151,6 +153,19 @@ def offline_agent():
 def offline_reflector():
     def complete(prompt: str) -> str:
         edits = []
+        # Per-skill STATUS flip from the inlined --- <slug>/SKILL.md --- sections (#847).
+        for name in SKILL_NAMES:
+            marker = f"--- {name}/SKILL.md ---"
+            if marker not in prompt:
+                continue
+            section = prompt.split(marker, 1)[1].split("\n--- ", 1)[0]
+            if "STATUS: draft" not in section:
+                continue
+            body = _CSV_SKILL if name == "csv-total" else _DATE_SKILL
+            edits.append({
+                "path": f"{name}/SKILL.md",
+                "content": body.replace("STATUS: draft", "STATUS: ready"),
+            })
         if "COLUMN: amount" not in prompt:
             edits.append({"path": "csv-total/references/rules.md",
                           "content": "COLUMN: amount\n"})
@@ -161,7 +176,7 @@ def offline_reflector():
             edits.append({"path": "csv-total/references/rules.md",
                           "content": "COLUMN: amount\n"})
         return "<EDITS>" + json.dumps({
-            "rationale": "sum amount; date tasks ask for year",
+            "rationale": "mark skills ready; sum amount; date tasks ask for year",
             "edits": edits[:2],
         }) + "</EDITS>"
     return complete

@@ -229,3 +229,16 @@ def test_skip_reason_only_for_listed_skips():
     assert demo.skip_reason("evoskill")
     assert demo.skip_reason("gepa") is None
     assert set(demo.OFFLINE_TEXT_ALGORITHMS).issubset(set(demo.OFFLINE_ALGORITHMS))
+
+
+def test_demo_labels_itself_smoke_and_points_at_library_example(tmp_path, monkeypatch):
+    """#847: demo stays a one-commit smoke; multi-round lives in skill_library."""
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "home"))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                         "--dir", str(tmp_path / "work")])
+    out = buf.getvalue()
+    assert code == 0, out
+    assert "smoke trajectory" in out
+    assert "skill_library_evolution" in out

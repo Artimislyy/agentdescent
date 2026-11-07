@@ -244,7 +244,7 @@ def test_algorithms_run_agent_passthrough(tmp_path, capsys, monkeypatch):
     capsys.readouterr()
     spec = json.loads(out.read_text())
     assert spec["agent"] == {"ref": "dsh"}
-    assert spec["algorithm"] == "evoskill"
+    assert spec["algorithm"] == {"name": "evoskill", "params": {"batch_size": 1}}
 
 
 def test_algorithms_run_agent_mismatch_refused(tmp_path, capsys, monkeypatch):

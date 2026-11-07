@@ -416,7 +416,17 @@ def starter_spec(path: str, *, kind: Optional[str] = None, data: Optional[str] =
         # in wall clock: the recorded run asked for 8 rounds and got 2 in 90 min.
         spec["evolve"] = {"rounds": 4, "n_workers": 2, "max_seconds": 5400}
         spec["allow"] = ["mypkg"]
-    chosen = algorithm_override(algorithm, algorithm_params, spec["kind"],
+    params = dict(algorithm_params or {})
+    # #847: short skill_library / skill_dir starter runs must still induce —
+    # evoskill's paper default batch_size=4 can exit with zero proposes.
+    if algorithm:
+        from . import algorithms as _algs
+        try:
+            if _algs.get(algorithm, where="init").name == "evoskill":
+                params.setdefault("batch_size", 1)
+        except _algs.AlgorithmError:
+            pass
+    chosen = algorithm_override(algorithm, params or None, spec["kind"],
                                 target=path)
     if chosen is not None:
         spec["algorithm"] = chosen
@@ -678,6 +688,8 @@ def cmd_demo(a: argparse.Namespace) -> int:
               f"{open(rules).read().strip()!r}   (wrong: `id` is a row number)")
         print("  cases.jsonl                        ->  12 CSVs with known totals")
     print("  the agent is a local program, so this costs nothing and needs no key")
+    print("  note: this is a smoke trajectory; for multi-round library edits see")
+    print("        python -m examples.skill_library_evolution  (#847)")
     if algo:
         print(f"  algorithm: {algo}   (`agentdescent algorithms show {algo}`)")
     print()

@@ -32,6 +32,8 @@ def test_seed_two_valid_skills_and_library_fixes_them():
     assert result.error is None and result.final_reward == 1.0
     assert "COLUMN: amount" in result.state["csv-total/references/rules.md"]
     assert "FIELD: year" in result.state["date-parse/references/rules.md"]
+    # #847: offline path must edit a */SKILL.md body, not only references/
+    assert "STATUS: ready" in result.state["csv-total/SKILL.md"]
     assert result.outcomes().get("committed", 0) >= 1
     assert load_tree(path)["csv-total/references/rules.md"].strip() == "COLUMN: id"
 
@@ -71,3 +73,18 @@ def test_estimate_and_dry_run(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "Library tree:" in out and "csv-total/SKILL.md" in out
     assert "date-parse/SKILL.md" in out and "[dry-run]" in out
+
+
+def test_starter_evoskill_defaults_batch_size_one(tmp_path):
+    """#847: skill_library + evoskill starter must not wait for batch_size=4."""
+    from agentdescent.cli import starter_spec
+    root = tmp_path / "lib"
+    root.mkdir()
+    (root / "a").mkdir(); (root / "a" / "SKILL.md").write_text(
+        "---\nname: a\ndescription: A\n---\n# a\n")
+    (root / "b").mkdir(); (root / "b" / "SKILL.md").write_text(
+        "---\nname: b\ndescription: B\n---\n# b\n")
+    spec = starter_spec(str(root), kind="skill_library", algorithm="evoskill")
+    algo = spec["algorithm"]
+    assert isinstance(algo, dict) and algo["name"] == "evoskill"
+    assert algo["params"]["batch_size"] == 1
