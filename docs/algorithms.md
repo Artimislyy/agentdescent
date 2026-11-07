@@ -141,15 +141,15 @@ Regularized recursive self-improvement: an annealed edit budget, a leakage scree
 
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
-| `beta0` | `float` | `0.0` | large-gain cost rule: tolerance |
-| `beta1` | `float` | `0.0` | large-gain cost rule: slope |
+| `beta0` | `float` | `0.05` | large-gain cost rule: tolerance |
+| `beta1` | `float` | `0.05` | large-gain cost rule: slope |
 | `w_s` | `float` | `1.0` | within-band score weight |
 | `w_c` | `float` | `1.0` | within-band cost weight |
 | `w_n` | `float` | `0.0` | within-band novelty weight |
-| `noise_band` | `float` | `0.0` | historical-best floor tolerance (score >= S* - noise_band); the paper estimates it by re-evaluating the unchanged base |
+| `noise_band` | `float` | `0.02` | historical-best floor tolerance (score >= S* - noise_band); the paper estimates it by re-evaluating the unchanged base |
 | `b_min` | `int` | `1` | smallest edit budget (independent edits per candidate) |
 | `b_max` | `int` | `5` | largest edit budget, at the start of the anneal |
-| `T` | `int` | `20` | rounds the edit budget anneals over |
+| `T` | `int` | `8` | rounds the edit budget anneals over (default 8 matches typical evolve rounds so the anneal is visible on a short run) |
 | `stall_window` | `int` | `5` | rounds without movement of S* that count as a stall |
 | `prune_window` | `int` | `5` | rounds of component yield a component must show gain over to stay |
 | `max_history_chars` | `int` | `1500` | how much per-edit history fits in the reflection prompt |

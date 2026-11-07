@@ -12,8 +12,8 @@ import pytest
 from agentdescent import algorithms, cli
 from agentdescent.algorithms import (Algorithm, AlgorithmError, Overrides, Param,
                                      resolve_params)
-from agentdescent.algorithms.rrsi.rrsi_policies import (RRsiAcceptance, RRsiCritic,
-                                                         RRsiProposalPolicy)
+from agentdescent.algorithms.rrsi.rrsi_policies import (RRsiAcceptance, RRsiConfig,
+                                                         RRsiCritic, RRsiProposalPolicy)
 from agentdescent.evolvespec import EvolveSpec, SpecError, compose
 from agentdescent.selection import Archive
 
@@ -103,7 +103,7 @@ def test_resolve_params_rejects_what_it_cannot_honour(params, message):
 def test_resolve_params_fills_defaults_and_widens_int_to_float():
     out = resolve_params(algorithms.get("rrsi"), {"w_s": 2, "b_max": 3})
     assert out["w_s"] == 2.0 and isinstance(out["w_s"], float)
-    assert out["b_max"] == 3 and out["T"] == 20 and out["protected"] == []
+    assert out["b_max"] == 3 and out["T"] == RRsiConfig().T and out["protected"] == []
 
 
 def test_a_zero_temperature_is_refused_by_the_schema_not_deep_in_build():
@@ -282,7 +282,7 @@ def test_plan_echoes_the_resolved_algorithm(tmp_path, capsys):
     assert out["ok"] is True
     alg = out["algorithm"]
     assert alg["name"] == "rrsi" and alg["fidelity"] == "mechanism_microport"
-    assert alg["params"]["b_max"] == 3 and alg["params"]["T"] == 20
+    assert alg["params"]["b_max"] == 3 and alg["params"]["T"] == RRsiConfig().T
     assert "extra_calls" in alg and alg["overridden_by_spec"] == []
 
 

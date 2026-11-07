@@ -21,7 +21,7 @@ _RRSI_HELP = {
                   "paper estimates it by re-evaluating the unchanged base",
     "b_min": "smallest edit budget (independent edits per candidate)",
     "b_max": "largest edit budget, at the start of the anneal",
-    "T": "rounds the edit budget anneals over",
+    "T": "rounds the edit budget anneals over (default 8 matches typical evolve rounds so the anneal is visible on a short run)",
     "stall_window": "rounds without movement of S* that count as a stall",
     "prune_window": "rounds of component yield a component must show gain over to stay",
     "max_history_chars": "how much per-edit history fits in the reflection prompt",
@@ -64,7 +64,12 @@ def _build_rrsi(ctx: BuildContext, p: Dict[str, Any]) -> Overrides:
     bundle, _state = build_rrsi_bundle(
         ctx.reflect, protected=tuple(p["protected"]), config=config,
         base_score=p["base_score"])
-    notes = []
+    notes = [
+        f"algorithm rrsi: anneal T={config.T}, noise_band={config.noise_band}, "
+        f"beta0={config.beta0}, beta1={config.beta1}, w_n={config.w_n} "
+        "(defaults chosen so a short run still feels regularisation; set "
+        "noise_band/betas to 0 to disable those gates) (#841).",
+    ]
     if not p["protected"]:
         notes.append(
             "algorithm rrsi: `protected` is empty, so the leakage screen has nothing to "

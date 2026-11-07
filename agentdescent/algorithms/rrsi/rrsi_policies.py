@@ -106,19 +106,19 @@ class RRsiConfig:
     """
 
     # -- selection (Algorithm 2) ---------------------------------------------
-    beta0: float = 0.0
-    beta1: float = 0.0
+    beta0: float = 0.05
+    beta1: float = 0.05
     w_s: float = 1.0
     w_c: float = 1.0
     w_n: float = 0.0
     #: The historical-best noise floor: ``score >= S* - noise_band``.
-    noise_band: float = 0.0
+    noise_band: float = 0.02
 
     # -- proposal (annealed edit budget) -------------------------------------
     b_min: int = 1
     b_max: int = 5
     #: Number of RRSI rounds the budget anneals over.
-    T: int = 20
+    T: int = 8
     #: Rounds without S* movement (beyond ``noise_band``) that count as a stall.
     stall_window: int = 5
     #: Rounds of component yield a component must show positive gain over to
