@@ -105,6 +105,31 @@ def test_ensure_skill_library_seeds_two_skills(tmp_path):
     assert ensure_skill_library_tree(str(root)) == []  # idempotent
 
 
+def test_init_skill_library_seed_note_names_only_what_was_written(tmp_path, monkeypatch, capsys):
+    """#868: note must not claim example-beta when only example-alpha was seeded."""
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "partial-lib"
+    only = root / "only"
+    only.mkdir(parents=True)
+    only.joinpath("SKILL.md").write_text(
+        "---\nname: only\ndescription: One real skill already here.\n---\n# only\n",
+        encoding="utf-8")
+    out = tmp_path / "spec.json"
+    rc = main(["init", str(root), "--kind", "skill_library",
+               "--out", str(out), "--agent", "cli_agent", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    notes = payload.get("notes") or []
+    seed_notes = [n for n in notes if "seeded" in n and "≥2" in n]
+    assert seed_notes, notes
+    assert "example-alpha" in seed_notes[0]
+    assert "example-beta" not in seed_notes[0]
+    assert count_library_skills(str(root)) == 2
+    assert (root / "example-alpha" / "SKILL.md").is_file()
+    assert not (root / "example-beta" / "SKILL.md").exists()
+
+
 def test_init_kind_skill_library_writes_spec_and_seeds(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "my-lib"

@@ -1176,8 +1176,11 @@ def write_starter_spec(
     for seeded in library_seeded:
         report.append(("wrote", f"seeded {seeded}"))
     if library_seeded:
+        # Name only what was actually written: when the target already had one
+        # skill, ensure_skill_library_tree seeds a single starter (#868).
+        seeded_names = [os.path.basename(os.path.dirname(p)) for p in library_seeded]
         report.append(("note", "kind=skill_library needs ≥2 */SKILL.md; "
-                       "seeded example-alpha / example-beta — replace before evolve"))
+                       f"seeded {' / '.join(seeded_names)} — replace before evolve"))
     if backup:
         # Re-running init / `algorithms run` on the same --out used to drop a
         # hand-edited spec without a word; keep the old copy and say so (#725).
