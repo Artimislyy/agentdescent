@@ -251,7 +251,24 @@ def load_split(split: str) -> List[dict]:
         os.replace(tmp, path)
         _CACHE[split] = rows
         return rows
-    raise RuntimeError(f"could not load GSM8K {split}: " + "; ".join(errors))
+    raise RuntimeError(f"could not load GSM8K {split}: " + "; ".join(errors)
+                       + "\n" + _load_hint(errors))
+
+
+def _load_hint(errors: Sequence[str]) -> str:
+    """What to do next when every transport failed (#870).
+
+    A bare list of transport errors left a fresh checkout with no way forward:
+    ``pyarrow`` is in no extra, so the parquet path is always skipped on a
+    default install, and the bundled sample was never mentioned.
+    """
+    steps = []
+    if any("pyarrow" in e for e in errors):
+        steps.append("pip install pyarrow (enables the parquet mirror path)")
+    steps.append("retry, or set HF_ENDPOINT to a reachable Hugging Face mirror")
+    steps.append(f"or set {SAMPLE_ENV}=1 for the bundled {SAMPLE_ROWS}-row "
+                 "sample (offline smoke only, not paper numbers)")
+    return "next: " + "; ".join(steps)
 
 
 def _tasks(rows: Sequence[dict], split: str, offset: int) -> List[Task]:
