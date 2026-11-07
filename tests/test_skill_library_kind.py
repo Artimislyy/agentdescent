@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -158,3 +159,27 @@ def test_starter_spec_sets_layout():
                      agent_explicit=True)
     assert s["kind"] == "skill_library"
     assert s["layout"] == "skill_library"
+
+
+def test_init_skill_library_tips_archive_selection_path(tmp_path, monkeypatch, capsys):
+    """#864: skill_library init names the non-evoskill Path A card."""
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "lib"
+    root.mkdir()
+    out = tmp_path / "spec.json"
+    rc = main(["init", str(root), "--kind", "skill_library",
+               "--out", str(out), "--agent", "cli_agent"])
+    assert rc == 0
+    captured = capsys.readouterr().out
+    assert "archive_selection" in captured
+    assert "algorithms list --kind skill_library" in captured
+    # demo tip must not pretend the offline demo is a library tree
+    assert "skill_dir smoke" in captured or "--algorithm archive_selection" in captured
+
+
+def test_algorithm_authoring_archive_kinds_include_skill_library():
+    """#864: worked example kinds stay in sync with builtin.archive_selection."""
+    text = Path(__file__).resolve().parents[1].joinpath(
+        "docs", "algorithm-authoring.md").read_text(encoding="utf-8")
+    # The worked register() block must list skill_library with the other kinds.
+    assert 'kinds=("text", "skill_dir", "skill_library", "agent_dir", "agent_code", "plugin")' in text

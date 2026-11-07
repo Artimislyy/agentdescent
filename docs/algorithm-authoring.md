@@ -109,7 +109,7 @@ register(Algorithm(
     summary="Parent sampling from an archive of every accepted candidate, "
             "tempered by novelty (DGM's rule by default) instead of always "
             "extending the head.",
-    kinds=("text", "skill_dir", "agent_dir", "agent_code", "plugin"),
+    kinds=("text", "skill_dir", "skill_library", "agent_dir", "agent_code", "plugin"),
     fidelity="preset",
     params=(
         Param("sampling", "str", "sigmoid_novelty", "...",

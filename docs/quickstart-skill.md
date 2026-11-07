@@ -7,8 +7,26 @@ description: Instruction / one Agent Skill / skill library — pick the artifact
 Pick the artifact: **instruction** (`SingleSlot` / `AppendRules`, this page /
 [`skill_evolution`](skill-evolution.md)), **one Agent Skill**
 ([`skill_dir_evolution`](quickstart-directory.md)), or a **skill library**
-(`python -m examples.skill_library_evolution --dry-run`, Path A `--kind skill_library`, [`evoskill`](algo-evoskill.md)).
+(`python -m examples.skill_library_evolution --dry-run`, Path A `--kind skill_library`,
+[`evoskill`](algo-evoskill.md) or [`archive_selection`](algorithms.md)).
 A `SingleSlot` result is not an Agent Skill folder.
+
+### Path A: skill library + `archive_selection` (#864)
+
+Most named cards are text-only. For a multi-file `*/SKILL.md` library without
+evoskill's proposer protocol, use the archive parent-selection card:
+
+```bash
+mkdir -p my-skills && agentdescent init my-skills --kind skill_library \
+  --data cases.jsonl --algorithm archive_selection --out spec.json
+# fill cases.jsonl, pin reflect/agent, then:
+agentdescent plan spec.json
+# agentdescent evolve spec.json
+```
+
+Offline smoke of the same *card* (skill_dir fixture, not a library tree):
+`agentdescent demo --algorithm archive_selection`. Multi-round library teaching
+still lives in `python -m examples.skill_library_evolution --dry-run`.
 
 ---
 
@@ -122,7 +140,7 @@ custom optimizer (`aggregator_factory=`), a multi-step agent as `run=` — is
 
 ## Next
 
-* **Want a real Agent Skill / library?** `python -m examples.skill_library_evolution --dry-run`, Path A `--kind skill_library`, then `agentdescent apply <run_id> --install-to ~/.claude/skills`, or [evolve a directory](quickstart-directory.md).
+* **Want a real Agent Skill / library?** Path A: `init --kind skill_library --algorithm archive_selection` (above), or `python -m examples.skill_library_evolution --dry-run` / [`evoskill`](algo-evoskill.md); then `agentdescent apply <run_id> --install-to ~/.claude/skills`, or [evolve a directory](quickstart-directory.md).
 * **Want the knobs?** [The `evolve` method](evolution.md).
 * **Want to know why it works?** [Concepts](concepts.md), then
   [the aggregator](aggregator.md).

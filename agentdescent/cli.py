@@ -1220,8 +1220,22 @@ def write_starter_spec(
             if not os.path.exists(os.path.expanduser(data_path)):
                 report.append(("next", f"create {data_path} -- one JSON object per line, "
                                '{"prompt": "...", "gold": "..."}'))
-                report.append(("next", "(`agentdescent demo` runs a complete example, "
-                               "offline, to copy from)"))
+                if spec["kind"] == "skill_library":
+                    # #864 / #846: demo is skill_dir smoke; name the library card path.
+                    report.append(("next",
+                                   "(`agentdescent demo --algorithm archive_selection` "
+                                   "is an offline skill_dir smoke; for this library "
+                                   "Path A card use --algorithm archive_selection — "
+                                   "see docs/quickstart-skill.md)"))
+                else:
+                    report.append(("next", "(`agentdescent demo` runs a complete example, "
+                                   "offline, to copy from)"))
+        if spec["kind"] == "skill_library":
+            # Always tip which wheel cards apply (evoskill needs a real model).
+            report.append(("note",
+                           "skill_library cards: archive_selection "
+                           "(selection rule) or evoskill (needs a real model); "
+                           "`agentdescent algorithms list --kind skill_library`"))
         report.append(("then", f"agentdescent plan {out}"))
     return out, spec, report, providers_out
 
