@@ -25,7 +25,7 @@ The composition table -- what each ``kind`` assembles -- is
 :data:`KIND_ROWS` and is meant to be read::
 
     kind           strategy       run                 propose          reward         layer
-    text           SingleSlot     model(template)     reflector        scorer         L2
+    text           SeededAppendRules model(template)   reflector        scorer         L2
     skill_dir      FileTree       tree_runner         tree_reflector   scorer         L2
     skill_library  FileTree       tree_runner         tree_reflector   scorer         L2
     agent_dir      FileTree       tree_runner         tree_reflector   scorer         L1
@@ -54,7 +54,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 from . import algorithms as _algorithms
 from .agents import Completion, Usage, WorkspaceAgent
 from .aggregator import AggregatorConfig
-from .evolution import (MIN_HELD_OUT, EvolutionResult, SingleSlot, Task, evolve,
+from .evolution import (MIN_HELD_OUT, EvolutionResult, SeededAppendRules, SingleSlot, Task, evolve,
                         held_out_size, reflector, small_held_out_message, tasks_from)
 from .filetree import TreeSpec, load_tree
 from .fusion import reflective_merge
@@ -93,7 +93,7 @@ KINDS: Tuple[str, ...] = ("text", "skill_dir", "skill_library", "agent_dir",
 #: the quickstarts. Values are the *names* of what is assembled; :func:`compose`
 #: is the code.
 KIND_ROWS: Dict[str, Dict[str, str]] = {
-    "text":       {"strategy": "SingleSlot", "run": "model(template)", "propose": "reflector",
+    "text":       {"strategy": "SeededAppendRules", "run": "model(template)", "propose": "reflector",
                    "reward": "scorer", "blast_radius": "SKILL_BLAST_RADIUS"},
     "skill_dir":  {"strategy": "FileTree", "run": "tree_runner", "propose": "tree_reflector",
                    "reward": "scorer", "blast_radius": "SKILL_BLAST_RADIUS"},
@@ -1177,8 +1177,12 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
 
         kwargs.update(
             run=run, propose=reflector(reflect),
-            strategy=SingleSlot(initial_value=_read_text_target(spec.target)),
+            strategy=SeededAppendRules(seed=_read_text_target(spec.target)),
             blast_radius=SKILL_BLAST_RADIUS)
+        notes.append(
+            "kind=text: SeededAppendRules keeps the seed prompt and appends each "
+            "accepted one-sentence rule under '# Learned rules' (#837); pass "
+            "strategy=SingleSlot(...) in evolve knobs for full-rewrite semantics")
         # Inline text is supported, but a path-looking missing file is almost
         # certainly a typo -- warn so plan surfaces it (#706).
         if looks_like_path_target(spec.target) and not os.path.isfile(

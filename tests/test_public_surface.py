@@ -33,7 +33,7 @@ def test_all_is_sorted_free_of_duplicates():
 
 @pytest.mark.parametrize("name", [
     "evolve", "async_evolve", "scorer", "Task", "tasks_from",
-    "AppendRules", "KeyedRules", "SingleSlot", "EvolutionResult",
+    "AppendRules", "KeyedRules", "SeededAppendRules", "SingleSlot", "EvolutionResult",
 ])
 def test_the_things_a_first_run_needs_are_top_level(name):
     """`tasks_from` was documented as `from agentdescent.evolution import ...`.

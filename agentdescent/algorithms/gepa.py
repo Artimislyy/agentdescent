@@ -386,13 +386,37 @@ def pareto_aggregator_factory(artifact_id: str = "gepa_prompt", seed: int = 0,
     return factory
 
 
+_GEPA_PROPOSE_TMPL = (
+    "The artifact just failed a task (score {reward:.2f} out of 1.0).\n\n"
+    "Current artifact:\n{artifact}\n\nTask input:\n{prompt}\n\n"
+    "It produced:\n{output}\n{expected}\n"
+    "Rewrite the COMPLETE artifact so it would handle this and similar cases. "
+    "Output the full improved artifact text only (not a single rule or a "
+    "diff), or NONE if no change would help."
+)
+
+
 def _build(ctx: BuildContext, p: Dict[str, object]) -> Overrides:
-    return Overrides(
-        knobs={"aggregator_factory": pareto_aggregator_factory(
+    from ..evolvespec import _read_text_target
+    from ..evolution import SingleSlot, reflector
+
+    seed = _read_text_target(str(ctx.spec.target))
+    knobs: Dict[str, object] = {
+        "aggregator_factory": pareto_aggregator_factory(
             artifact_id=ctx.spec.artifact_id(), seed=int(p["seed"]),
-            eval_concurrency=int(p["eval_concurrency"]))},
+            eval_concurrency=int(p["eval_concurrency"])),
+        # GEPA mutates whole prompts; keep SingleSlot + a full-rewrite propose
+        # so the default kind=text SeededAppendRules path does not apply (#837).
+        "strategy": SingleSlot(initial_value=seed),
+    }
+    if callable(ctx.reflect):
+        knobs["propose"] = reflector(ctx.reflect, template=_GEPA_PROPOSE_TMPL)
+    return Overrides(
+        knobs=knobs,
         notes=["algorithm gepa: the Pareto pool replaces the merge/acceptance path; "
                "the spec's agent/reflect still run the rollouts and mutations.",
+               "algorithm gepa: SingleSlot + full-rewrite propose (genetic prompt "
+               "mutation), not SeededAppendRules (#837).",
                "algorithm gepa: the pool is in memory and re-seeds from dev on a "
                "resumed ledger; the example's ReflectiveFusion merge is example-only."])
 

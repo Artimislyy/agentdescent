@@ -238,6 +238,7 @@ def claude_agent(model: str = "claude-opus-4-8", max_tokens: int = 1024) -> LLMA
 from .strategies import (  # noqa: E402
     AppendRules,
     KeyedRules,
+    SeededAppendRules,
     SingleSlot,
     Strategy,
     rule_id,

@@ -13,7 +13,7 @@ means the parameter has none.
 Each section links to the page that explains *why* the module is shaped the
 way it is; this page is the *what*.
 
-603 public names across 121 modules.
+604 public names across 121 modules.
 
 ---
 
@@ -5613,6 +5613,10 @@ What environment one rollout needs. Must survive JSON: it crosses processes.
 ### `SearchTree`
 
 A state tree over rendered artifact values, searched by UCB.
+
+### `SeededAppendRules`
+
+Keep `seed` verbatim; append content-addressed rules under `title`.
 
 ### `SelfImproveConfig`
 

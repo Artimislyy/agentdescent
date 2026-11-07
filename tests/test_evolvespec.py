@@ -19,7 +19,7 @@ from agentdescent.advantage import AdvantageAcceptance, AdvantageConflict
 from agentdescent.evolvespec import (
     KIND_ROWS, KINDS, SHORT_REFS, build_policies, estimate, to_ref,
 )
-from agentdescent.evolution import SingleSlot
+from agentdescent.evolution import SeededAppendRules, SingleSlot
 from agentdescent.fusion import KeepContradictions, ReflectiveFusion
 from agentdescent.governance import HARNESS_BLAST_RADIUS, SKILL_BLAST_RADIUS
 from agentdescent.sampling import DifficultyWeighted
@@ -192,7 +192,7 @@ def test_text_still_composes_with_a_plain_completion():
         data={"inline": [{"prompt": "q", "gold": "a"}] * 6},
         agent="echo")
     comp = compose(spec)
-    assert isinstance(comp.kwargs["strategy"], SingleSlot)
+    assert isinstance(comp.kwargs["strategy"], SeededAppendRules)
 
 
 def test_text_template_must_carry_both_slots():
@@ -282,8 +282,8 @@ def test_text_composes_the_dataset_quickstart():
                       score="exact", agent="echo")
     comp = compose(spec)
     k = comp.kwargs
-    assert isinstance(k["strategy"], SingleSlot)
-    assert k["strategy"].initial_value == "You are a helpful assistant."
+    assert isinstance(k["strategy"], SeededAppendRules)
+    assert k["strategy"].seed == "You are a helpful assistant."
     assert k["blast_radius"] == SKILL_BLAST_RADIUS
     assert k["rounds"] == 8 and k["patience"] == 3 and k["target_reward"] == 0.98
     assert k["n_workers"] == 8 and k["max_concurrency"] == 8    # min(8, 14 train tasks)
@@ -298,7 +298,7 @@ def test_text_target_may_be_a_file(tmp_path):
     p.write_text("Be terse.")
     spec = EvolveSpec(kind="text", target=str(p), agent="echo",
                       data={"inline": [{"prompt": "q", "gold": "a"}] * 6})
-    assert compose(spec).kwargs["strategy"].initial_value == "Be terse."
+    assert compose(spec).kwargs["strategy"].seed == "Be terse."
 
 
 def test_spec_evolve_block_overrides_kind_defaults_and_caller_overrides_win(tmp_path):
@@ -450,7 +450,11 @@ def test_a_text_spec_runs_end_to_end_offline():
 
 def make_model():
     def model(prompt):
-        skill, _, q = prompt.partition("\n\n")
+        # kind=text template is ``{skill}\n\n{prompt}``; SeededAppendRules may
+        # put blank lines inside the skill, so split from the right (#837).
+        skill, sep, q = prompt.rpartition("\n\n")
+        if not sep:
+            return prompt
         return q[::-1] if "reversed" in skill else q
     return model
 

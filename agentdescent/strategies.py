@@ -11,7 +11,7 @@ its own, so the same concept was filed two different ways depending on when it w
 written. The engine imports from here; ``from agentdescent.evolution import
 AppendRules`` still works.
 
-* here -- text artifacts: one slot, a playbook, keyed categories;
+* here -- text artifacts: one slot, a seeded playbook, a bare playbook, keyed categories;
 * :mod:`agentdescent.treestrategy` -- a **directory**, one key per file path.
 
 The key space is the design decision, because it is what can be merged
@@ -28,7 +28,7 @@ from typing import Dict, Optional, Protocol, Sequence, runtime_checkable
 
 from .evolvable import Diff
 
-__all__ = ["Strategy", "AppendRules", "SingleSlot", "KeyedRules", "rule_id"]
+__all__ = ["Strategy", "AppendRules", "SeededAppendRules", "SingleSlot", "KeyedRules", "rule_id"]
 
 
 def rule_id(text: str) -> str:
@@ -82,6 +82,44 @@ class AppendRules:
             return None
         return Diff(diff_id=f"{author}:{rid}:{base_version}", target=target,
                     ops={rid: proposal}, author=author)
+
+
+@dataclass
+class SeededAppendRules:
+    """Keep ``seed`` verbatim; append content-addressed rules under ``title``.
+
+    The default ``kind=text`` compose path pairs the one-sentence propose
+    template with this strategy so the first accepted rule cannot wipe a
+    multi-paragraph system prompt the way :class:`SingleSlot` would (#837).
+    Use :class:`SingleSlot` when every proposal is meant to be a full rewrite
+    (GEPA's genetic prompt loop does that explicitly).
+    """
+
+    seed: str = ""
+    title: str = "# Learned rules"
+
+    def initial(self) -> Dict[str, str]:
+        return {}
+
+    def render(self, state: Dict[str, str]) -> str:
+        # Empty state must round-trip the seed bytes (incl. trailing newline) so
+        # apply is a no-op when the run accepted nothing (#849 CI / #837).
+        seed = self.seed or ""
+        if not state:
+            return seed if seed else f"{self.title}\n(empty)"
+        body = seed.rstrip()
+        rules = "\n".join([self.title] + [f"- {state[k]}" for k in sorted(state)])
+        return f"{body}\n\n{rules}" if body else rules
+
+    def to_diff(self, state, proposal, author, base_version, target) -> Optional[Diff]:
+        text = (proposal or "").strip()
+        if not text:
+            return None
+        rid = rule_id(text)
+        if rid in state:
+            return None
+        return Diff(diff_id=f"{author}:{rid}:{base_version}", target=target,
+                    ops={rid: text}, author=author)
 
 
 @dataclass
