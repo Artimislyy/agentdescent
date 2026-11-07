@@ -38,12 +38,12 @@ Full research ports still use the
 
 ## `ace`
 
-ACE's sectioned playbook: append content-addressed lessons, refuse near-duplicates, and grow-and-refine instead of gating each bullet on held-out reward.
+ACE's grow-and-refine playbook: append content-addressed lessons (optional section :: prefix; else ## general), refuse near-duplicates, and admit without a per-bullet held-out gate.
 
 - **Kinds:** `text`
 - **Fidelity:** `mechanism_microport`
 - **Surface:** `card` (Algorithm card)
-- **Cost:** none (one reflection call per failed rollout, as the default recipe)
+- **Cost:** one reflection call per failed rollout (same as the default recipe)
 - **Research port:** `examples/ace/` — separate source-only path; Algorithm card (mechanism_microport) — not the benchmark-faithful research port at examples/ace/ (docs/port-fidelity.md). Same name, different propose/strategy path.
 - **Source:** ACE: Agentic Context Engineering (Zhang et al., 2025)
 - **Details:** [algo-ace.md](algo-ace.md)

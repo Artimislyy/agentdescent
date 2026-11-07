@@ -205,17 +205,17 @@ class GrowAndRefine:
             observed_delta=cand - base)
 
 
-# ACE separates the Reflector from the Curator "to avoid conflating what to learn
-# with how to store it" (paper Section 3.2). The Curator is this framework's
-# deterministic aggregator, so here we only need the Reflector prompt.
-_GENERATOR_TMPL = (
+# Domain-locked FiNER/XBRL prompt drafts kept for the examples/ace research
+# port only — the Algorithm card does not install them (#842). Prefer the
+# engine's default propose template (or examples/ace) for XBRL runs.
+_FINER_GENERATOR_TMPL = (
     "You are an expert financial-analysis agent tagging figures in SEC filings "
     "with US-GAAP XBRL concepts.\n\n{artifact}\n\n"
     "Use the playbook above. Read the sentence and output ONLY the single XBRL "
     "tag for the amount wrapped in <<>>. Choose exactly one tag from the "
     "candidate list; output the tag name and nothing else.\n\n{prompt}"
 )
-_REFLECTOR_TMPL = (
+_FINER_REFLECTOR_TMPL = (
     "You are the ACE Reflector. The agent mis-tagged an XBRL amount (score "
     "{reward:.2f}).\n\nPlaybook so far:\n{artifact}\n\nTask:\n{prompt}\n\n"
     "The agent answered:\n{output}\n\n"
@@ -224,6 +224,9 @@ _REFLECTOR_TMPL = (
     "as `section :: lesson` where `section` is the XBRL concept family (e.g. "
     "`revenue`, `debt`, `shares`). Output only that one line, or NONE."
 )
+# Back-compat aliases for anything that still imported the old names.
+_GENERATOR_TMPL = _FINER_GENERATOR_TMPL
+_REFLECTOR_TMPL = _FINER_REFLECTOR_TMPL
 
 
 def _build(ctx: BuildContext, p: Dict[str, object]) -> Overrides:
@@ -234,20 +237,21 @@ def _build(ctx: BuildContext, p: Dict[str, object]) -> Overrides:
                                        dedup_threshold=float(p["dedup_threshold"]),
                                        seed=seed)},
         policies={"acceptance": GrowAndRefine()},
-        notes=["algorithm ace: grow-and-refine admits every structural delta "
-               "(no held-out gate per bullet) and de-duplicates near-identical "
-               "lessons in the same section; utility counters are upstream's job, "
-               "not this engine's. The target text is the seed prompt; an empty "
-               "playbook renders it verbatim so apply is a noop (#731). Re-opening "
-               "an applied artifact parses the trailing playbook back into state "
-               "so a second run does not duplicate the header (#741)."])
+        notes=["algorithm ace: grow-and-refine admits every delta that clears "
+               "same-section Jaccard dedup (no held-out gate per bullet); "
+               "proposals without `section ::` land under ## general (#842). "
+               "Utility counters are upstream's job, not this engine's. The "
+               "target text is the seed prompt; an empty playbook renders it "
+               "verbatim so apply is a noop (#731). Re-opening an applied "
+               "artifact parses the trailing playbook back into state so a "
+               "second run does not duplicate the header (#741)."])
 
 
 register(Algorithm(
     name="ace",
-    summary="ACE's sectioned playbook: append content-addressed lessons, refuse "
-            "near-duplicates, and grow-and-refine instead of gating each bullet on "
-            "held-out reward.",
+    summary="ACE's grow-and-refine playbook: append content-addressed lessons "
+            "(optional section :: prefix; else ## general), refuse near-duplicates, "
+            "and admit without a per-bullet held-out gate.",
     kinds=("text",),
     fidelity="mechanism_microport",
     params=(
@@ -258,5 +262,5 @@ register(Algorithm(
     ),
     build=_build,
     source="ACE: Agentic Context Engineering (Zhang et al., 2025)",
-    extra_calls="none (one reflection call per failed rollout, as the default recipe)",
+    extra_calls="one reflection call per failed rollout (same as the default recipe)",
     doc="algo-ace.md"))
