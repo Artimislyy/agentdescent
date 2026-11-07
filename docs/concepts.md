@@ -324,6 +324,16 @@ mechanism:
   still runs on clusters. The design also calls for a **tail canary
   set** inside held-out eval; that is **not implemented** — held-out is one
   undifferentiated split.
+
+!!! note "Select-set vs reported score (#843)"
+    Path A / card runs use **one** held-out split both to decide which candidate
+    to keep and to print `final_reward` / status held-out accuracy. That number
+    is therefore an **optimistic** generalisation estimate (the artifact was
+    chosen to look good on the same tasks used to report it). A locked test
+    partition that never enters accept/select is tracked in #843 and is not
+    shipped yet — read reported rewards as select-set scores unless a run
+    explicitly documents a separate test split.
+
 - **L-value (signal layer)** — most diffs are marginal, a few are high-value
   refactors. The **AuditScheduler** spends the scarce oracle budget by
   `blast_radius × uncertainty / trust`, where *trust* is how often the cheap layer
