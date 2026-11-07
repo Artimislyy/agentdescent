@@ -105,13 +105,15 @@ class LRScheduler:
 
     def step(self) -> int:
         import math
+        # Clamp so steps past total_steps stay at min_lr instead of climbing
+        # back up the cosine/linear curve (#840).
+        denom = max(1, self.total_steps - 1)
+        frac = min(1.0, max(0.0, self._t / denom))
         if self.mode == "constant":
             budget = self.max_lr
         elif self.mode == "linear":
-            frac = self._t / max(1, self.total_steps - 1)
             budget = round(self.max_lr + (self.min_lr - self.max_lr) * frac)
         else:  # cosine (repo default)
-            frac = self._t / max(1, self.total_steps - 1)
             cos = 0.5 * (1 + math.cos(math.pi * frac))
             budget = round(self.min_lr + (self.max_lr - self.min_lr) * cos)
         self._t += 1
@@ -432,7 +434,7 @@ register(Algorithm(
     params=(
         Param("max_lr", "int", 4, "largest edit budget per step", minimum=1),
         Param("min_lr", "int", 2, "smallest edit budget per step", minimum=1),
-        Param("total_steps", "int", 8, "steps the budget anneals over", minimum=1),
+        Param("total_steps", "int", 8, "steps the budget anneals over (independent of evolve rounds; past this, budget stays at min_lr)", minimum=1),
         Param("mode", "str", "cosine", "anneal schedule",
               choices=("cosine", "linear", "constant")),
     ),

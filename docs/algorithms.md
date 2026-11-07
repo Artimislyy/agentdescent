@@ -173,5 +173,5 @@ SkillOpt's skill-document training: bounded edit patches, a strict held-out gate
 |---|---|---|---|
 | `max_lr` | `int` | `4` | largest edit budget per step |
 | `min_lr` | `int` | `2` | smallest edit budget per step |
-| `total_steps` | `int` | `8` | steps the budget anneals over |
+| `total_steps` | `int` | `8` | steps the budget anneals over (independent of evolve rounds; past this, budget stays at min_lr) |
 | `mode` | `str` | `cosine` | anneal schedule |
