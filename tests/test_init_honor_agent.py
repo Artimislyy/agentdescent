@@ -74,11 +74,43 @@ def test_policy_slot_keeps_explicit_agent(ws):
     assert json.loads((ws / "spec.json").read_text())["agent"] == {"ref": "host_model"}
 
 
-@pytest.mark.parametrize("ref,hint", [("claude-code", "claude_code"),
-                                      ("grok-bot", None), ("bogus", None)])
-def test_unknown_agent_refused_before_writing(ws, capsys, ref, hint):
-    # A name `plan` can never resolve (here: install's host spelling) used to be
-    # written anyway, with an error listing policy classes as agents (#745).
+@pytest.mark.parametrize("raw,canonical,target,kind", [
+    ("claude-code", "claude_code", "my-skill", []),
+    ("CLAUDE_CODE", "claude_code", "my-skill", []),
+    ("cli-agent", "cli_agent", "my-skill", []),
+    ("openai-compatible", "openai_compatible", "prompt.txt", ["--kind", "text"]),
+    ("Host-Model", "host_model", "prompt.txt", ["--kind", "text"]),
+])
+def test_agent_hyphen_case_aliases_fold(ws, raw, canonical, target, kind):
+    # Same case / "-" / "_" fold as --kind and algorithm params (#884).
+    path = "prompt.txt" if target == "prompt.txt" else str(ws / target)
+    assert _init(path, *kind, "--agent", raw) == 0
+    assert json.loads((ws / "spec.json").read_text())["agent"]["ref"] == canonical
+
+
+def test_algorithms_run_folds_host_spelling(ws):
+    rc = cli.main(["algorithms", "run", "archive_selection", str(ws / "my-skill"),
+                   "--agent", "claude-code", "--out", "spec.json"])
+    # Plan may still fail later (no cases / placeholder model). The alias must
+    # no longer be refused before write; the spec stores the canonical ref.
+    assert (ws / "spec.json").exists()
+    assert json.loads((ws / "spec.json").read_text())["agent"]["ref"] == "claude_code"
+    assert rc in (0, 2)
+
+
+def test_text_refuses_folded_workspace_host_spelling(ws, capsys):
+    # Folding must not bypass the kind mismatch gate (#456).
+    assert _init("prompt.txt", "--kind", "text", "--agent", "claude-code") == 2
+    assert not (ws / "spec.json").exists()
+    err = capsys.readouterr().err
+    assert "kind='text'" in err and "claude_code" in err
+
+
+@pytest.mark.parametrize("ref", ["grok-bot", "bogus"])
+def test_unknown_agent_refused_before_writing(ws, capsys, ref):
+    # A name `plan` can never resolve used to be written anyway, with an
+    # error listing policy classes as agents (#745). Hyphen/case aliases of
+    # a real worker now fold (#884); leftover unknowns still refuse first.
     (ws / "spec.json").write_text('{"keep": 1}')
     assert _init(str(ws / "my-skill"), "--agent", ref) == 2
     assert json.loads((ws / "spec.json").read_text()) == {"keep": 1}
@@ -87,15 +119,7 @@ def test_unknown_agent_refused_before_writing(ws, capsys, ref, hint):
     assert f"--agent {ref}: not a known agent" in err
     assert "claude_code" in err and "opencode" in err
     assert "Beam" not in err and "DefaultFusion" not in err
-    assert ("did you mean `--agent claude_code`" in err) == (hint is not None)
-
-
-def test_algorithms_run_refuses_unknown_agent(ws, capsys):
-    rc = cli.main(["algorithms", "run", "archive_selection", str(ws / "my-skill"),
-                   "--agent", "claude-code", "--out", "spec.json"])
-    assert rc == 2
-    assert not (ws / "spec.json").exists()
-    assert "did you mean `--agent claude_code`" in capsys.readouterr().err
+    assert "did you mean `--agent claude_code`" not in err
 
 
 @pytest.mark.parametrize("ref", ["claude_code", "dsh", "codex", "cli_agent", "echo"])
@@ -131,3 +155,17 @@ def test_plain_unknown_agent_gets_no_host_hint(ws, capsys):
     assert _init(str(ws / "my-skill"), "--agent", "bogus") == 2
     err = capsys.readouterr().err
     assert "install host" not in err and "did you mean" not in err
+
+
+@pytest.mark.parametrize("raw,canonical", [
+    ("claude-code", "claude_code"),
+    ("CLAUDE_CODE", "claude_code"),
+    ("openai-compatible", "openai_compatible"),
+    ("cli-agent", "cli_agent"),
+    ("deepseek-harness", "deepseek-harness"),
+    ("mypkg.models:mine", "mypkg.models:mine"),
+    ("claude_code", "claude_code"),
+])
+def test_fold_agent_ref(raw, canonical):
+    assert cli.fold_agent_ref(raw) == canonical
+

@@ -892,13 +892,31 @@ _WORKSPACE_REFS = ("claude_code", "codex", "dsh", "opencode", "cli_agent")
 _PLAIN_REFS = ("openai_compatible", "host_model", "claude", "echo")
 
 
+def fold_agent_ref(ref: str) -> str:
+    """Canonical built-in agent short ref when ``ref`` is a case/hyphen alias.
+
+    ``claude-code`` and ``CLAUDE_CODE`` become ``claude_code``. A value that
+    is not such an alias — including ``module:attribute`` and install-only
+    host names like ``deepseek-harness`` — is returned unchanged, so
+    :func:`init_agent_unknown` can still hint or refuse it.
+    """
+    if not isinstance(ref, str) or ":" in ref:
+        return ref
+    folded = ref.strip().casefold().replace("-", "_")
+    if folded in _WORKSPACE_REFS + _PLAIN_REFS:
+        return folded
+    return ref
+
+
 def init_agent_unknown(ref: str) -> Optional[str]:
     """Why ``--agent ref`` can never resolve, or None (#745).
 
     ``plan`` would refuse a name that is neither a built-in agent short ref nor
     ``module:attribute``; say so before a spec is written, list only the agent
     refs (not the policy classes ``SHORT_REFS`` also holds), and point a host
-    name such as ``claude-code`` at its ref spelling.
+    name such as ``deepseek-harness`` at its worker spelling. Callers should
+    run :func:`fold_agent_ref` first so ``claude-code`` is stored as
+    ``claude_code`` rather than rejected (#884).
     """
     agents = _WORKSPACE_REFS + _PLAIN_REFS
     if ref in agents or ":" in ref:
@@ -1113,6 +1131,7 @@ def write_starter_spec(
         agent, found = default_agent_ref()
     else:
         found = True
+        agent = fold_agent_ref(agent)
     # Refuse a missing PATH before kind guess / agent mismatch / writing (#706).
     missing = require_existing_target(path, kind)
     if missing:
