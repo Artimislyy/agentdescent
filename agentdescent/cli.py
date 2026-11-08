@@ -308,8 +308,11 @@ def algorithm_override(name: Optional[str], params: Optional[Mapping[str, Any]],
             alg, kind, target=target, prefix="--algorithm"))
     if params:
         params = algorithms._canonical_param_map(alg, params, where="algorithm.params")
-    algorithms.resolve_params(alg, params)      # validates types/unknowns/choices
-    return name if not params else {"name": name, "params": dict(params)}
+    resolved = algorithms.resolve_params(alg, params)  # types/unknowns/choices
+    if not params:
+        return name
+    # Store user-supplied keys only, with coerced (folded) values (#888).
+    return {"name": name, "params": {k: resolved[k] for k in params}}
 
 
 def missing_target_message(path: str) -> str:

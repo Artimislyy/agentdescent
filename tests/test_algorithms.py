@@ -163,6 +163,39 @@ def test_a_failed_builtin_load_keeps_its_original_error(monkeypatch):
 def test_choices_are_enforced():
     with pytest.raises(AlgorithmError, match=r"sampling: must be one of \[.*'best'"):
         resolve_params(algorithms.get("archive_selection"), {"sampling": "greedy"})
+    with pytest.raises(AlgorithmError) as e:
+        resolve_params(algorithms.get("archive_selection"), {"sampling": "greedy"})
+    assert "did you mean" not in str(e.value)
+
+
+def test_resolve_params_folds_choice_value_aliases():
+    """#888: `sigmoid-novelty` / `KEEP_ALL` resolve like parameter-name aliases."""
+    arch = resolve_params(algorithms.get("archive_selection"),
+                          {"sampling": "sigmoid-novelty"})
+    assert arch["sampling"] == "sigmoid_novelty"
+    assert resolve_params(
+        algorithms.get("archive_selection"),
+        {"sampling": "SIGMOID_NOVELTY"},
+    )["sampling"] == "sigmoid_novelty"
+    assert resolve_params(
+        algorithms.get("dgm"), {"archive_mode": "keep-all"},
+    )["archive_mode"] == "keep_all"
+    assert resolve_params(
+        algorithms.get("dgm"), {"archive_mode": "KEEP_ALL"},
+    )["archive_mode"] == "keep_all"
+    assert resolve_params(
+        algorithms.get("skillopt"), {"mode": "Linear"},
+    )["mode"] == "linear"
+
+
+@pytest.mark.parametrize("alg,param,typo,meant", [
+    ("archive_selection", "sampling", "novlty", "novelty"),
+    ("dgm", "archive_mode", "keep_al", "keep_all"),
+    ("skillopt", "mode", "cosin", "cosine"),
+])
+def test_invalid_choice_names_the_near_miss(alg, param, typo, meant):
+    with pytest.raises(AlgorithmError, match=rf"did you mean '{meant}'\?$"):
+        resolve_params(algorithms.get(alg), {param: typo})
 
 
 def test_the_registry_works_from_a_wheel_without_examples():

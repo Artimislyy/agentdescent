@@ -261,6 +261,32 @@ def test_algorithms_run_param_hyphen_alias(tmp_path, capsys, monkeypatch):
     assert spec["algorithm"]["params"]["batch_size"] == 2
 
 
+def test_algorithms_run_param_choice_hyphen_alias(tmp_path, capsys, monkeypatch):
+    """#888: `--param sampling=sigmoid-novelty` stores the canonical choice."""
+    monkeypatch.chdir(tmp_path)
+    prompt, cases = _prompt_and_cases(tmp_path)
+    out = tmp_path / "s.json"
+    rc = cli.main(["algorithms", "run", "archive_selection", str(prompt), str(cases),
+                   "--param", "sampling=sigmoid-novelty",
+                   "--model", "m", "--base-url", "https://example.test/v1",
+                   "--out", str(out)])
+    assert rc in (0, 2)
+    capsys.readouterr()
+    spec = json.loads(out.read_text())
+    params = spec["algorithm"]["params"] if isinstance(spec["algorithm"], dict) else None
+    assert params is not None and params["sampling"] == "sigmoid_novelty"
+
+
+def test_algorithms_run_invalid_choice_names_near_miss(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    prompt, cases = _prompt_and_cases(tmp_path)
+    assert cli.main(["algorithms", "run", "archive_selection", str(prompt), str(cases),
+                     "--param", "sampling=novlty"]) == 2
+    err = capsys.readouterr().err
+    assert "must be one of" in err and "did you mean 'novelty'?" in err
+    assert not list(tmp_path.glob("agentdescent.*.spec.json"))
+
+
 def test_algorithms_run_unknown_param_names_near_miss(tmp_path, capsys, monkeypatch):
     monkeypatch.chdir(tmp_path)
     skill = _skill(tmp_path)

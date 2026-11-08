@@ -77,6 +77,11 @@ class Param:
         Strict about type -- ``"3"`` is not an ``int`` and ``true`` is not a
         number -- except that an ``int`` is a valid ``float``, which JSON does
         not distinguish.
+
+        A string that matches exactly one ``choices`` entry once case and
+        ``-``/``_`` are ignored resolves to it (``sigmoid-novelty`` →
+        ``sigmoid_novelty``). A remaining unknown that is a close typo of one
+        choice names that guess (#888).
         """
         t = self.type
         if t == "bool":
@@ -96,7 +101,23 @@ class Param:
         if t == "list[str]":
             value = list(value)
         if self.choices is not None and value not in self.choices:
-            raise AlgorithmError(f"{where}: must be one of {list(self.choices)}, got {value!r}")
+            if isinstance(value, str):
+                folded = _fold(value)
+                matches = [c for c in self.choices
+                           if isinstance(c, str) and _fold(c) == folded]
+                if len(matches) == 1:
+                    value = matches[0]
+            if value not in self.choices:
+                msg = (f"{where}: must be one of {list(self.choices)}, "
+                       f"got {value!r}")
+                if isinstance(value, str):
+                    import difflib
+                    named = [c for c in self.choices if isinstance(c, str)]
+                    close = difflib.get_close_matches(
+                        _fold(value), named, n=1, cutoff=0.75)
+                    if close:
+                        msg += f"; did you mean {close[0]!r}?"
+                raise AlgorithmError(msg)
         if self.minimum is not None and isinstance(value, (int, float)) and value < self.minimum:
             raise AlgorithmError(f"{where}: must be >= {self.minimum}, got {value!r}")
         if self.maximum is not None and isinstance(value, (int, float)) and value > self.maximum:
