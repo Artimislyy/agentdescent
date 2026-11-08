@@ -106,6 +106,36 @@ def test_resolve_params_fills_defaults_and_widens_int_to_float():
     assert out["b_max"] == 3 and out["T"] == RRsiConfig().T and out["protected"] == []
 
 
+def test_resolve_params_folds_hyphen_and_case_aliases():
+    """#876: `batch-size` / `NOISE_BAND` resolve like algorithm-name aliases."""
+    evoskill = resolve_params(algorithms.get("evoskill"), {"batch-size": 2})
+    assert evoskill["batch_size"] == 2
+    rrsi = resolve_params(algorithms.get("rrsi"), {"NOISE_BAND": 0.25})
+    assert rrsi["noise_band"] == 0.25
+
+
+def test_resolve_params_refuses_duplicate_after_folding():
+    with pytest.raises(AlgorithmError, match=r"batch-size.*batch_size.*both refer"):
+        resolve_params(algorithms.get("evoskill"), {"batch_size": 1, "batch-size": 2})
+
+
+@pytest.mark.parametrize("typo, meant", [
+    ("bacth_size", "batch_size"),
+    ("maxlr", "max_lr"),
+    ("noize_band", "noise_band"),
+])
+def test_unknown_parameter_names_the_near_miss(typo, meant):
+    alg = {"bacth_size": "evoskill", "maxlr": "skillopt", "noize_band": "rrsi"}[typo]
+    with pytest.raises(AlgorithmError, match=rf"did you mean '{meant}'\?$"):
+        resolve_params(algorithms.get(alg), {typo: 1})
+
+
+def test_unknown_parameter_without_near_miss_has_no_guess():
+    with pytest.raises(AlgorithmError) as e:
+        resolve_params(algorithms.get("rrsi"), {"nope": 1})
+    assert "did you mean" not in str(e.value)
+
+
 def test_a_zero_temperature_is_refused_by_the_schema_not_deep_in_build():
     with pytest.raises(AlgorithmError, match=r"temperature: must be >="):
         resolve_params(algorithms.get("archive_selection"), {"temperature": 0})

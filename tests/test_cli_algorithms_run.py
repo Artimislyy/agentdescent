@@ -247,6 +247,30 @@ def test_algorithms_run_agent_passthrough(tmp_path, capsys, monkeypatch):
     assert spec["algorithm"] == {"name": "evoskill", "params": {"batch_size": 1}}
 
 
+def test_algorithms_run_param_hyphen_alias(tmp_path, capsys, monkeypatch):
+    """#876: `--param batch-size=2` is the same as `batch_size=2`."""
+    monkeypatch.chdir(tmp_path)
+    skill = _skill(tmp_path)
+    _, cases = _prompt_and_cases(tmp_path)
+    out = tmp_path / "s.json"
+    rc = cli.main(["algorithms", "run", "evoskill", str(skill), str(cases),
+                   "--param", "batch-size=2", "--out", str(out)])
+    assert rc in (0, 2)
+    capsys.readouterr()
+    spec = json.loads(out.read_text())
+    assert spec["algorithm"]["params"]["batch_size"] == 2
+
+
+def test_algorithms_run_unknown_param_names_near_miss(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    skill = _skill(tmp_path)
+    assert cli.main(["algorithms", "run", "evoskill", str(skill),
+                     "--param", "bacth_size=1"]) == 2
+    err = capsys.readouterr().err
+    assert "no parameter" in err and "did you mean 'batch_size'?" in err
+    assert not list(tmp_path.glob("agentdescent.*.spec.json"))
+
+
 def test_algorithms_run_agent_mismatch_refused(tmp_path, capsys, monkeypatch):
     monkeypatch.chdir(tmp_path)
     skill = _skill(tmp_path)

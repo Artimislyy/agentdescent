@@ -305,6 +305,8 @@ def algorithm_override(name: Optional[str], params: Optional[Mapping[str, Any]],
     if kind not in alg.kinds:
         raise algorithms.AlgorithmError(algorithms.kind_mismatch_message(
             alg, kind, target=target, prefix="--algorithm"))
+    if params:
+        params = algorithms._canonical_param_map(alg, params, where="algorithm.params")
     algorithms.resolve_params(alg, params)      # validates types/unknowns/choices
     return name if not params else {"name": name, "params": dict(params)}
 
@@ -429,7 +431,11 @@ def starter_spec(path: str, *, kind: Optional[str] = None, data: Optional[str] =
     if algorithm:
         from . import algorithms as _algs
         try:
-            if _algs.get(algorithm, where="init").name == "evoskill":
+            alg = _algs.get(algorithm, where="init")
+            params = _algs._canonical_param_map(alg, params, where="algorithm.params")
+            if alg.name == "evoskill":
+                # Honour a hyphen/case alias (`batch-size`) so setdefault
+                # does not collide with it in resolve_params (#876).
                 params.setdefault("batch_size", 1)
         except _algs.AlgorithmError:
             pass

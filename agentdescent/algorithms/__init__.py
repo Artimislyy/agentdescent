@@ -393,16 +393,48 @@ def kind_mismatch_message(algorithm: Algorithm, kind: str, *,
     return msg
 
 
+def _canonical_param_map(algorithm: Algorithm, params: Mapping[str, Any], *,
+                         where: str) -> Dict[str, Any]:
+    """Rewrite keys to declared names. Alias collisions are errors (#876)."""
+    known = {p.name: p for p in algorithm.params}
+    canonical: Dict[str, Any] = {}
+    seen_as: Dict[str, str] = {}
+    for key, value in params.items():
+        name = key if (not isinstance(key, str) or key in known) else _resolve_alias(key, known)
+        if name in canonical and seen_as.get(name) != key:
+            raise AlgorithmError(
+                f"{where}: {key!r} and {seen_as[name]!r} both refer to "
+                f"{algorithm.name}'s {name!r} parameter")
+        canonical[name] = value
+        if isinstance(key, str):
+            seen_as[name] = key
+    return canonical
+
+
 def resolve_params(algorithm: Algorithm, params: Optional[Mapping[str, Any]], *,
                    where: str = "algorithm.params") -> Dict[str, Any]:
-    """Defaults, overridden by ``params``; unknown names and wrong types are errors."""
-    params = dict(params or {})
+    """Defaults, overridden by ``params``; unknown names and wrong types are errors.
+
+    A name that matches exactly one declared parameter once case and
+    ``-``/``_`` are ignored resolves to it (``batch-size``, ``BATCH_SIZE``),
+    matching algorithm-name aliasing (#876). A remaining unknown that is a
+    close typo of one parameter names that guess (``bacth_size``).
+    """
+    params = _canonical_param_map(algorithm, dict(params or {}), where=where)
     known = {p.name: p for p in algorithm.params}
     unknown = sorted(set(params) - set(known))
     if unknown:
-        raise AlgorithmError(
-            f"{where}: {algorithm.name!r} has no parameter(s) {unknown}; "
-            f"parameters: {sorted(known) or 'none'}")
+        msg = (f"{where}: {algorithm.name!r} has no parameter(s) {unknown}; "
+               f"parameters: {sorted(known) or 'none'}")
+        # A near-miss typo (`bacth_size`, `maxlr`) names the parameter it most
+        # likely meant, so the fix is one word rather than a list scan (#876).
+        if len(unknown) == 1 and isinstance(unknown[0], str):
+            import difflib
+            close = difflib.get_close_matches(
+                _fold(unknown[0]), sorted(known), n=1, cutoff=0.75)
+            if close:
+                msg += f"; did you mean {close[0]!r}?"
+        raise AlgorithmError(msg)
     out = {p.name: p.default for p in algorithm.params}
     for key, value in params.items():
         out[key] = known[key].coerce(value, where=f"{where}.{key}")
