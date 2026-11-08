@@ -4578,8 +4578,51 @@ def cmd_mcp(a: argparse.Namespace) -> int:
 
 
 # Sub-commands that exist for AgentDescent's own use and are kept out of
-# `--help` and the usage line.
+# `--help`, the usage line, and unknown-verb ``choose from`` lists (#420, #886).
 _INTERNAL_COMMANDS = frozenset({"run"})
+
+
+def _visible_choices(action: argparse.Action) -> List[Any]:
+    """``action.choices`` without internal commands, in registration order."""
+    if action.choices is None:
+        return []
+    return [c for c in action.choices if c not in _INTERNAL_COMMANDS]
+
+
+def _did_you_mean_choice(value: Any, choices: Sequence[Any]) -> Optional[str]:
+    """The unique visible choice ``value`` most likely meant, or ``None``.
+
+    An exact match after folding case and ``-``/``_`` wins (``compile_skill``
+    → ``compile-skill``). Otherwise a single close typo at cutoff 0.75, the
+    same bar as unknown algorithm names (#874).
+    """
+    if not isinstance(value, str) or not choices:
+        return None
+    folded = value.strip().casefold().replace("_", "-")
+    pool: Dict[str, Any] = {}
+    for choice in choices:
+        key = str(choice).casefold().replace("_", "-")
+        # Two visible names that fold together are ambiguous; skip both.
+        if key in pool:
+            pool[key] = None
+        else:
+            pool[key] = choice
+    if folded in pool and pool[folded] is not None:
+        return str(pool[folded])
+    close = difflib.get_close_matches(
+        folded, [k for k, v in pool.items() if v is not None], n=1, cutoff=0.75)
+    return str(pool[close[0]]) if close else None
+
+
+def _invalid_choice_message(action: argparse.Action, value: Any) -> str:
+    """argparse's invalid-choice text, minus internal verbs, plus a hint (#886)."""
+    visible = _visible_choices(action)
+    shown = ", ".join(repr(c) for c in visible)
+    msg = f"invalid choice: {value!r} (choose from {shown})"
+    guess = _did_you_mean_choice(value, visible)
+    if guess is not None:
+        msg += f"; did you mean {guess!r}?"
+    return msg
 
 
 class _CliParser(argparse.ArgumentParser):
@@ -4590,6 +4633,9 @@ class _CliParser(argparse.ArgumentParser):
     ``--json`` that leaves a script with nothing to parse on stdout, so the
     same exit code instead comes with one ``{"ok": false, "error", "usage"}``
     object.  Subparsers inherit this class through ``add_subparsers``.
+
+    ``_check_value`` hides internal verbs such as ``run`` from the
+    ``choose from`` list and appends ``did you mean`` for a near-miss (#886).
     """
 
     json_errors = False
@@ -4600,6 +4646,11 @@ class _CliParser(argparse.ArgumentParser):
                   "usage": self.format_usage().strip()}, as_json=True)
             self.exit(2)
         super().error(message)
+
+    def _check_value(self, action, value):  # type: ignore[override]
+        if action.choices is None or value in action.choices:
+            return
+        raise argparse.ArgumentError(action, _invalid_choice_message(action, value))
 
 
 def _wants_json(argv: Sequence[str]) -> bool:
@@ -4701,7 +4752,8 @@ def build_parser() -> argparse.ArgumentParser:
     # agentdescent.cli run --run-dir <dir>`); not a user verb.  argparse does
     # not honour help=SUPPRESS on a sub-parser (it prints "==SUPPRESS==" and
     # keeps the name in the {...} list), so register it with no help at all
-    # -- no help line -- and leave it out of the metavar below (#420).
+    # -- no help line -- leave it out of the metavar below (#420), and strip
+    # it from unknown-verb ``choose from`` lists (#886).
     s = sub.add_parser("run", description="internal: the worker `agentdescent evolve "
                                           "--detach` starts; use `evolve` instead")
     s.add_argument("--run-dir", required=True, dest="run_dir")

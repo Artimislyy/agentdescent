@@ -90,3 +90,44 @@ def test_runstore_still_spawns_the_run_verb():
     # The detached worker's command line is what keeps `run` alive.
     src = open(runstore.__file__, encoding="utf-8").read()
     assert '"agentdescent.cli", "run", "--run-dir"' in src
+
+def _unknown_verb(capsys, argv):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(argv)
+    assert exc.value.code == 2
+    return capsys.readouterr()
+
+
+def test_unknown_verb_error_does_not_list_run(capsys):
+    """A typo must not advertise the internal ``run`` worker (#886)."""
+    out, err = _unknown_verb(capsys, ["algoritms"])
+    assert out == ""
+    assert "'run'" not in err
+    assert "invalid choice: 'algoritms'" in err
+    assert "did you mean 'algorithms'?" in err
+
+
+@pytest.mark.parametrize("verb", ["compile_skill", "COMPILE-SKILL"])
+def test_unknown_verb_suggests_hyphen_or_case_fold(capsys, verb):
+    _, err = _unknown_verb(capsys, [verb])
+    assert "did you mean 'compile-skill'?" in err
+    assert "'run'" not in err
+
+
+def test_unknown_verb_json_hides_run_and_suggests(capsys):
+    import json
+
+    out, err = _unknown_verb(capsys, ["--json", "algoritms"])
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["ok"] is False
+    assert "did you mean 'algorithms'?" in payload["error"]
+    assert "'run'" not in payload["error"]
+    assert "'run'" not in payload["usage"]
+
+
+def test_nonsense_verb_has_no_guess_and_hides_run(capsys):
+    _, err = _unknown_verb(capsys, ["no-such-verb"])
+    assert "invalid choice: 'no-such-verb'" in err
+    assert "did you mean" not in err
+    assert "'run'" not in err
