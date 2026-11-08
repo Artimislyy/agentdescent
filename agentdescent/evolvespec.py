@@ -1179,10 +1179,8 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
             run=run, propose=reflector(reflect),
             strategy=SeededAppendRules(seed=_read_text_target(spec.target)),
             blast_radius=SKILL_BLAST_RADIUS)
-        notes.append(
-            "kind=text: SeededAppendRules keeps the seed prompt and appends each "
-            "accepted one-sentence rule under '# Learned rules' (#837); pass "
-            "strategy=SingleSlot(...) in evolve knobs for full-rewrite semantics")
+        # The SeededAppendRules note is added after knobs merge, once we know
+        # whether a card or caller replaced strategy (#879).
         # Inline text is supported, but a path-looking missing file is almost
         # certainly a typo -- warn so plan surfaces it (#706).
         if looks_like_path_target(spec.target) and not os.path.isfile(
@@ -1348,6 +1346,14 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
     # -- knobs: kind defaults < spec.evolve < caller overrides ------------------
     knobs: Dict[str, Any] = {**defaults, **(ov.knobs if ov else {}),
                              **_evolve_pass_through(spec.evolve), **overrides}
+    # kind=text defaults to SeededAppendRules above; a card (gepa/ace/dgm/
+    # skillopt) or compose(strategy=...) puts "strategy" in knobs and then
+    # overwrites that default. Don't also claim SeededAppendRules (#879).
+    if spec.kind == "text" and "strategy" not in knobs:
+        notes.append(
+            "kind=text: SeededAppendRules keeps the seed prompt and appends each "
+            "accepted one-sentence rule under '# Learned rules' (#837); pass "
+            "strategy=SingleSlot(...) in evolve knobs for full-rewrite semantics")
     # The dedicated field and the pass-through agree; an explicit `spec.evolve`
     # entry wins, exactly as it would for any other knob.
     if spec.extra_artifacts:

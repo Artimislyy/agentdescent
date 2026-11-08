@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from agentdescent.evolution import SeededAppendRules, SingleSlot, Task, evolve
 from agentdescent.evolvespec import EvolveSpec, compose
 from agentdescent.strategies import rule_id
@@ -81,3 +83,43 @@ def test_empty_state_preserves_seed_trailing_newline():
     """apply no-op depends on empty render matching the on-disk seed (#849)."""
     seed = "original\n"
     assert SeededAppendRules(seed=seed).render({}) == seed
+
+
+_SEEDED_NOTE_PREFIX = "kind=text: SeededAppendRules"
+
+
+def _text_spec(**extra):
+    return EvolveSpec(
+        kind="text",
+        target=SEED,
+        data={"inline": [{"prompt": f"q{i}", "gold": "a"} for i in range(8)]},
+        agent="echo",
+        reflect="echo",
+        **extra,
+    )
+
+
+def _has_default_seeded_note(notes):
+    return any(n.startswith(_SEEDED_NOTE_PREFIX) for n in notes)
+
+
+@pytest.mark.parametrize("algorithm, expect_note", [
+    (None, True),
+    ("rrsi", True),
+    ("ace", False),
+    ("dgm", False),
+    ("gepa", False),
+    ("skillopt", False),
+])
+def test_text_seeded_append_note_follows_actual_strategy(algorithm, expect_note):
+    """Cards that replace strategy must not also claim SeededAppendRules (#879)."""
+    extra = {} if algorithm is None else {"algorithm": algorithm}
+    comp = compose(_text_spec(**extra))
+    assert _has_default_seeded_note(comp.notes) is expect_note
+
+
+def test_text_seeded_append_note_drops_when_caller_sets_strategy():
+    """A compose(strategy=...) override is the same as a card knob (#879)."""
+    comp = compose(_text_spec(), strategy=SingleSlot(initial_value=SEED))
+    assert isinstance(comp.kwargs["strategy"], SingleSlot)
+    assert not _has_default_seeded_note(comp.notes)
