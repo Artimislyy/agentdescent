@@ -4770,12 +4770,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=cmd_status)
 
     s = sub.add_parser("watch", help="follow a run's rounds until it ends")
-    s.add_argument("run_id")
+    s.add_argument("run_id", help="a run id, or `latest` for the newest run")
     s.add_argument("--interval", type=float, default=5.0)
     s.set_defaults(fn=cmd_watch)
 
     s = sub.add_parser("show", help="the evolved artifact, and the diff against the original")
-    s.add_argument("run_id")
+    s.add_argument("run_id", help="a run id, or `latest` for the newest run")
     s.add_argument("--diff", action="store_true", default=True)
     s.add_argument("--no-diff", action="store_false", dest="diff")
     s.set_defaults(fn=cmd_show)
@@ -5002,7 +5002,7 @@ def build_parser() -> argparse.ArgumentParser:
     s2.set_defaults(fn=cmd_algorithms)
 
     s = sub.add_parser("diagnose", help="why a run learned nothing (or stopped)")
-    s.add_argument("run_id")
+    s.add_argument("run_id", help="a run id, or `latest` for the newest run")
     s.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                    help="machine-readable output")
     s.set_defaults(fn=cmd_diagnose)
@@ -5424,6 +5424,33 @@ def _accept_json_after_verb(sub: "argparse._SubParsersAction") -> None:
                             help="machine-readable output")
 
 
+#: Words that stand for "the newest run in the store" wherever a run id goes (#892).
+LATEST_RUN_ALIASES = ("latest", "last")
+
+
+def _resolve_latest_run(a: argparse.Namespace) -> None:
+    """Swap ``latest`` / ``last`` for the newest run id on run-id commands.
+
+    A real run directory with that name still wins, and an empty store is a
+    clear error rather than ``no run 'latest'``.
+    """
+    if getattr(a, "fn", None) not in (cmd_status, cmd_watch, cmd_show, cmd_apply,
+                                      cmd_cancel, cmd_resume, cmd_diagnose):
+        return
+    rid = getattr(a, "run_id", None)
+    if not isinstance(rid, str) or rid.lower() not in LATEST_RUN_ALIASES:
+        return
+    store = getattr(a, "store", None)
+    if os.path.isdir(os.path.join(runstore.store_path(store), rid)):
+        return
+    runs = runstore.list_runs(store=store)
+    if not runs:
+        raise runstore.RunStoreError(
+            f"no runs under {runstore.store_path(store)} yet, so {rid!r} has nothing "
+            "to point at; start one with `agentdescent demo` or `agentdescent evolve`")
+    a.run_id = runs[0].run_id
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     _CliParser.json_errors = _wants_json(args)
@@ -5432,6 +5459,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     finally:
         _CliParser.json_errors = False
     try:
+        _resolve_latest_run(a)
         return a.fn(a)
     except (SpecError, runstore.RunStoreError) as e:
         # `--json` callers get the same object `_spec_error` prints (#658).
