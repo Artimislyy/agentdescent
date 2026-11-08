@@ -191,7 +191,8 @@ def diagnose_payload(run_id: str, *, store: Optional[str] = None) -> DiagnosisRe
             run_id, "cancelled", "the run was cancelled before it finished",
             evidence={"stop_reason": payload.get("stop_reason"),
                       "outcomes": payload.get("outcomes") or {}},
-            recommendations=("resume the run if the answer is still wanted",))
+            recommendations=("resume it if the answer is still wanted: "
+                             f"`agentdescent resume {run_id}`",))
     if payload.get("error"):
         evidence = {"error": payload["error"]}
         if payload.get("propose_error"):
@@ -205,7 +206,8 @@ def diagnose_payload(run_id: str, *, store: Optional[str] = None) -> DiagnosisRe
             run_id, "running", "the run is still running; there is no verdict yet",
             evidence={"stop_reason": payload.get("stop_reason"),
                       "history": payload.get("history") or []},
-            recommendations=("use `watch`/`status` and diagnose again when done",))
+            recommendations=(f"follow it with `agentdescent watch {run_id}`, then "
+                             f"`agentdescent diagnose {run_id}` when it ends",))
 
     final = payload.get("final_reward")
     final_value = float(final) if final is not None else None
@@ -228,7 +230,10 @@ def diagnose_payload(run_id: str, *, store: Optional[str] = None) -> DiagnosisRe
                                f"held-out reward is {final_value:.3f}",
                                evidence={"final_reward": final_value,
                                          "outcomes": outcomes},
-                               recommendations=("review and apply the artifact",))
+                               recommendations=(
+                                   f"review the diff: `agentdescent show {run_id}`",
+                                   f"preview the write: `agentdescent apply {run_id} "
+                                   "--dry-run`, then rerun it without --dry-run"))
 
     perr = payload.get("propose_errors") or 0
     if perr and not committed:
@@ -273,7 +278,8 @@ def diagnose_payload(run_id: str, *, store: Optional[str] = None) -> DiagnosisRe
                       "final_reward": final_value, "outcomes": outcomes,
                       "committed": committed},
             recommendations=("raise rounds or n_workers for another attempt",
-                             "inspect the remaining failures in `show --json`"))
+                             "inspect the remaining failures in "
+                             f"`agentdescent show {run_id} --json`"))
 
     if rejected:
         top = rejected[-1]

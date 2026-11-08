@@ -14,10 +14,10 @@ The verdicts are deliberately few and ordered so the strongest evidence wins:
 | Verdict | Meaning | First thing to try |
 |---|---|---|
 | `seed-already-solved` | the seed already scored the target before any round; nothing was learned | add cases the seed gets wrong, a stricter score, or a higher `target_reward` |
-| `solved` | the target was reached | review and apply |
+| `solved` | the target was reached | `agentdescent show <run_id>`, then `apply <run_id> --dry-run` |
 | `partial-improvement` | candidates committed and held-out reward rose above the seed's, still below target | more rounds/workers |
-| `running` | the run has not finished | `status` / `watch`, then diagnose again |
-| `cancelled` | the run was cancelled | resume if the answer is still wanted |
+| `running` | the run has not finished | `agentdescent watch <run_id>`, then diagnose again |
+| `cancelled` | the run was cancelled | `agentdescent resume <run_id>` if the answer is still wanted |
 | `run-failed` | the run reported an error | `log.txt` / `status.json`; include `propose_error` when present |
 | `reflector-error` | reflector calls failed and nothing committed | model/endpoint/key (`doctor`) |
 | `scoring-mismatch` | untruncated samples' output equals gold but reward is low | inspect the scorer |
@@ -36,6 +36,8 @@ The verdicts are deliberately few and ordered so the strongest evidence wins:
   (a named algorithm's `dgm-select` / `gepa-select` parent picks commit every
   round) fall through to the later verdicts (#756).
 - Running and cancelled runs are named instead of being diagnosed as finished.
+- Next steps for `solved`, `running`, `cancelled` and `partial-improvement`
+  name the runnable command with the resolved run id (also for `latest`) (#898).
 - `diagnose_payload` calls `show_payload(..., diff=False)`, so it does not build
   an artifact diff it would throw away.
 

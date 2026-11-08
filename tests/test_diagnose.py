@@ -178,3 +178,30 @@ def test_a_real_gain_names_both_rewards(monkeypatch):
     assert report.verdict == "partial-improvement"
     assert "0.250 -> 0.750" in report.summary
     assert report.evidence["initial_reward"] == 0.25
+
+
+@pytest.mark.parametrize("payload,verdict,commands", [
+    ({"run_id": "20260101-000000-abc123", "final_reward": 1.0,
+      "outcomes": {"committed": 1}},
+     "solved", ["agentdescent show 20260101-000000-abc123",
+                "agentdescent apply 20260101-000000-abc123 --dry-run"]),
+    ({"run_id": "20260101-000000-abc123", "state": "cancelled"},
+     "cancelled", ["agentdescent resume 20260101-000000-abc123"]),
+    ({"run_id": "20260101-000000-abc123", "state": "running"},
+     "running", ["agentdescent watch 20260101-000000-abc123",
+                 "agentdescent diagnose 20260101-000000-abc123"]),
+    ({"run_id": "20260101-000000-abc123", "final_reward": 0.5,
+      "initial_reward": 0.0, "outcomes": {"committed": 1}},
+     "partial-improvement",
+     ["agentdescent show 20260101-000000-abc123 --json"]),
+])
+def test_next_steps_name_the_resolved_run_id(monkeypatch, payload, verdict,
+                                             commands):
+    # Asked as `latest`; the next step must carry the id show resolved (#898).
+    _patch(monkeypatch, payload)
+    report = diagnose_payload("latest")
+    assert report.verdict == verdict
+    text = " ".join(report.recommendations)
+    for command in commands:
+        assert command in text
+    assert "latest" not in text
