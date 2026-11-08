@@ -309,10 +309,12 @@ def algorithm_override(name: Optional[str], params: Optional[Mapping[str, Any]],
     if params:
         params = algorithms._canonical_param_map(alg, params, where="algorithm.params")
     resolved = algorithms.resolve_params(alg, params)  # types/unknowns/choices
+    # Write the registered name, not the alias the user typed (`GEPA`,
+    # `archive-selection`), so the spec reads the same as `algorithms list`.
     if not params:
-        return name
+        return alg.name
     # Store user-supplied keys only, with coerced (folded) values (#888).
-    return {"name": name, "params": {k: resolved[k] for k in params}}
+    return {"name": alg.name, "params": {k: resolved[k] for k in params}}
 
 
 def missing_target_message(path: str) -> str:

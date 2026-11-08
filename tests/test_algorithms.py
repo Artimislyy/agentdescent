@@ -474,6 +474,27 @@ def test_init_writes_the_algorithm_and_only_the_params_given(tmp_path, capsys):
     assert "wrote" in capsys.readouterr().out
 
 
+def test_init_writes_the_registered_name_for_an_alias(tmp_path, capsys):
+    # #894: `init --algorithm GEPA` / `archive-selection` validated but wrote
+    # the alias verbatim into the spec.
+    prompt = tmp_path / "prompt.txt"
+    prompt.write_text("be terse\n")
+    assert cli.main(["init", str(prompt), "--out", str(tmp_path / "a.json"),
+                     "--algorithm", "GEPA", "--model", "m"]) == 0
+    assert json.loads((tmp_path / "a.json").read_text())["algorithm"] == "gepa"
+    assert cli.main(["init", str(prompt), "--out", str(tmp_path / "b.json"),
+                     "--algorithm", "RRSI", "--param", 'protected=["s"]',
+                     "--model", "m"]) == 0
+    assert json.loads((tmp_path / "b.json").read_text())["algorithm"] == {
+        "name": "rrsi", "params": {"protected": ["s"]}}
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("---\nname: s\ndescription: d\n---\nbody\n")
+    assert cli.main(["init", str(skill), "--out", str(tmp_path / "c.json"),
+                     "--algorithm", "archive-selection", "--agent", "opencode"]) == 0
+    assert json.loads((tmp_path / "c.json").read_text())["algorithm"] == "archive_selection"
+
+
 def test_init_refuses_an_unknown_algorithm_or_wrong_kind(tmp_path, capsys):
     prompt = tmp_path / "prompt.txt"
     prompt.write_text("be terse\n")
