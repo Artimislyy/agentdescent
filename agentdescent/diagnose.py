@@ -183,6 +183,8 @@ def diagnose_payload(run_id: str, *, store: Optional[str] = None) -> DiagnosisRe
     from .cli import show_payload
 
     payload = show_payload(run_id, store=store, diff=False)
+    # show_payload maps latest/last (#896); report the resolved id.
+    run_id = str(payload.get("run_id") or run_id)
     state = str(payload.get("state") or "")
     if state == "cancelled":
         return DiagnosisReport(

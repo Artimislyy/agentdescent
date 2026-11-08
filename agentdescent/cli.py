@@ -2125,6 +2125,7 @@ def cmd_run(a: argparse.Namespace) -> int:
 def status_payload(run_id: Optional[str], *, store: Optional[str] = None,
                    recent_rounds: int = 3) -> Any:
     if run_id:
+        run_id = resolve_run_id(run_id, store=store)
         rd = runstore.get(run_id, store=store)
         st = rd.status().to_dict()
         st["recent_rounds"] = rd.rounds()[-recent_rounds:]
@@ -2387,6 +2388,7 @@ def _partial_show(rd: "runstore.RunDir", st: Any) -> Dict[str, Any]:
 
 def show_payload(run_id: str, *, store: Optional[str] = None, diff: bool = True,
                  max_chars: int = 40_000) -> Dict[str, Any]:
+    run_id = resolve_run_id(run_id, store=store) or run_id
     rd = runstore.get(run_id, store=store)
     st = rd.status()
     result = rd.result()
@@ -2551,6 +2553,7 @@ def resolve_apply_dest(to: Optional[str], install_to: Optional[str]) -> Optional
 
 def apply_payload(run_id: str, *, to: Optional[str] = None, store: Optional[str] = None,
                   dry_run: bool = False, backup: bool = True) -> Dict[str, Any]:
+    run_id = resolve_run_id(run_id, store=store) or run_id
     rd = runstore.get(run_id, store=store)
     result = rd.result()
     if result is None:
@@ -5426,8 +5429,31 @@ def _accept_json_after_verb(sub: "argparse._SubParsersAction") -> None:
                             help="machine-readable output")
 
 
-#: Words that stand for "the newest run in the store" wherever a run id goes (#892).
+#: Words that stand for "the newest run in the store" wherever a run id goes (#892, #896).
 LATEST_RUN_ALIASES = ("latest", "last")
+
+
+def resolve_run_id(run_id: Optional[str], *, store: Optional[str] = None
+                   ) -> Optional[str]:
+    """Map ``latest`` / ``last`` to the newest run id.
+
+    A real run directory named ``latest`` or ``last`` still wins. An empty
+    store raises :class:`~agentdescent.runstore.RunStoreError` with the same
+    wording the CLI uses (#892), so MCP tools and payload helpers match
+    ``agentdescent show latest`` instead of looking up a folder named
+    ``latest`` (#896). Any other value, including ``None``, is returned
+    unchanged.
+    """
+    if not isinstance(run_id, str) or run_id.lower() not in LATEST_RUN_ALIASES:
+        return run_id
+    if os.path.isdir(os.path.join(runstore.store_path(store), run_id)):
+        return run_id
+    runs = runstore.list_runs(store=store)
+    if not runs:
+        raise runstore.RunStoreError(
+            f"no runs under {runstore.store_path(store)} yet, so {run_id!r} has nothing "
+            "to point at; start one with `agentdescent demo` or `agentdescent evolve`")
+    return runs[0].run_id
 
 
 def _resolve_latest_run(a: argparse.Namespace) -> None:
@@ -5440,17 +5466,9 @@ def _resolve_latest_run(a: argparse.Namespace) -> None:
                                       cmd_cancel, cmd_resume, cmd_diagnose):
         return
     rid = getattr(a, "run_id", None)
-    if not isinstance(rid, str) or rid.lower() not in LATEST_RUN_ALIASES:
-        return
-    store = getattr(a, "store", None)
-    if os.path.isdir(os.path.join(runstore.store_path(store), rid)):
-        return
-    runs = runstore.list_runs(store=store)
-    if not runs:
-        raise runstore.RunStoreError(
-            f"no runs under {runstore.store_path(store)} yet, so {rid!r} has nothing "
-            "to point at; start one with `agentdescent demo` or `agentdescent evolve`")
-    a.run_id = runs[0].run_id
+    resolved = resolve_run_id(rid, store=getattr(a, "store", None))
+    if resolved is not None:
+        a.run_id = resolved
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

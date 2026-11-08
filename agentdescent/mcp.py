@@ -37,7 +37,7 @@ from typing import Annotated, Any, Dict, Optional, Sequence, Tuple
 from . import __version__, runstore
 from .cli import (NESTED_ENV, apply_from_payload, apply_payload, doctor_report,
                  plan_payload, require_cli_on_path, require_resume_host_on_path,
-                 show_payload, status_payload)
+                 resolve_run_id, show_payload, status_payload)
 from .evolvespec import (EvolveSpec, SpecError, budget_round_overshoot_warning,
                          compose, estimate)
 
@@ -147,24 +147,27 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
         "Progress of one run (round, best held-out reward, calls, dollars if priced, "
         "state, the last few rounds, and `audit_store` when the run has one) or, with no "
         "run_id, {store, runs} where `runs` is "
-        "every run newest first and is empty when there are none. Cheap; safe to poll. "
+        "every run newest first and is empty when there are none. `run_id` may be "
+        "`latest` or `last` for the newest run (same as the CLI). Cheap; safe to poll. "
         "Summarise round-to-round deltas for the user rather than pasting JSON."),
     "show": (
         "The evolved artifact when a run is done: for a directory, the list of files, a "
         "unified diff against the original, and the plan `apply` would execute (files "
         "written, extra files, backups); for text, the evolved instruction. Also the "
-        "outcomes() histogram that says why proposals were committed or refused. Explain "
-        "what changed and why; do not paste the whole tree."),
+        "outcomes() histogram that says why proposals were committed or refused. Pass the "
+        "run_id from start, or `latest`/`last` for the newest run (same as the CLI). "
+        "Explain what changed and why; do not paste the whole tree."),
     "diagnose": (
         "Explain why a run ended where it did: solved, seed-already-solved, "
         "partial-improvement, running, "
         "cancelled, run-failed, reflector-error, scoring-mismatch, agent-failures, "
         "gate-rejected, no-improvement or unknown, with bounded evidence and the next "
-        "step. Call this after `show` when the run learned little, instead of guessing "
+        "step. `run_id` may be `latest` or `last` for the newest run (same as the CLI). "
+        "Call this after `show` when the run learned little, instead of guessing "
         "from the outcome histogram."),
     "apply": (
         "DESTRUCTIVE: write an evolved artifact back over a target. Pass `run_id` to "
-        "install a finished run's result (optional `to` / `install_to` overrides the run's target; `install_to` is the host-skills-root form for skill_library), OR "
+        "install a finished run's result (`latest`/`last` = newest run, same as the CLI; optional `to` / `install_to` overrides the run's target; `install_to` is the host-skills-root form for skill_library), OR "
         "pass `from` + `to` to install an on-disk artifact such as a campaign "
         "`final_target` -- same rules as CLI `apply --from` (from requires to; mutually "
         "exclusive with run_id; symlinks refused). Backs the original up first unless "
@@ -173,11 +176,13 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
         "already matched, so nothing was written and no backup exists -- tell the user "
         "nothing changed. Otherwise tell them the backup path afterwards."),
     "cancel": (
-        "Stop a running evolution and every worker agent it started. The run keeps its "
+        "Stop a running evolution and every worker agent it started. `run_id` may be "
+        "`latest` or `last` for the newest run (same as the CLI). The run keeps its "
         "ledger and can be resumed."),
     "resume": (
         "Continue a stopped, failed or cancelled run on its existing ledger (the engine "
-        "picks up where it left off). Returns the new status."),
+        "picks up where it left off). `run_id` may be `latest` or `last` for the newest "
+        "run (same as the CLI). Returns the new status."),
     "audit_status": (
         "Read a sparse-audit JSONL: how biased the run's cheap verifier is against ground "
         "truth (`delta_hat`), how *scattered* that error is (`resid_sd` -- the number the "
@@ -680,6 +685,7 @@ class Tools:
 
     def cancel(self, run_id: str) -> Dict[str, Any]:
         try:
+            run_id = resolve_run_id(run_id, store=self.store) or run_id
             return runstore.cancel(run_id, store=self.store).to_dict()
         except runstore.RunStoreError as e:
             return {"error": str(e)}
@@ -689,6 +695,7 @@ class Tools:
         try:
             # A resumed run gets the *current* bridge: the session that started
             # it is likely gone, and its address with it.
+            run_id = resolve_run_id(run_id, store=self.store) or run_id
             runstore.require_budget_pair(budget_usd, usd_per_call)
             # Same host gate as CLI resume: an absent plugin host must not
             # relaunch and report running (#370).
