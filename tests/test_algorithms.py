@@ -489,7 +489,11 @@ def test_mcp_lists_and_describes_the_registry():
         ["archive_selection", "evoskill"]
     assert [a["name"] for a in t.list_algorithms("agent_dir")["algorithms"]] == \
         ["archive_selection", "evoskill"]
+    assert [a["name"] for a in t.list_algorithms("skill-library")["algorithms"]] == \
+        [a["name"] for a in t.list_algorithms("skill_library")["algorithms"]]
     assert "unknown kind" in t.list_algorithms("nope")["error"]
+    err = t.list_algorithms("skil_library")["error"]
+    assert "unknown kind" in err and "did you mean 'skill_library'?" in err
     card = t.describe_algorithm("rrsi")
     assert card["name"] == "rrsi" and any(p["name"] == "b_max" for p in card["params"])
     assert "unknown algorithm" in t.describe_algorithm("nope")["error"]

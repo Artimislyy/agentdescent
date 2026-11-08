@@ -47,7 +47,8 @@ from urllib.parse import urlparse
 
 from . import runstore
 from .evolvespec import (KINDS, EvolveSpec, SpecError, budget_round_overshoot_warning,
-                         compose, estimate, load_spec, _POLICY_SLOTS)
+                         compose, estimate, fold_kind, load_spec, resolve_kind,
+                         _POLICY_SLOTS)
 
 __all__ = ["main", "doctor_report", "starter_spec"]
 
@@ -1105,6 +1106,8 @@ def write_starter_spec(
         if value is not None and (isinstance(value, bool) or not isinstance(value, int)
                                   or value < 1):
             raise ValueError(f"{flag} must be an integer >= 1, got {value!r}")
+    if kind is not None:
+        kind = resolve_kind(kind, where="--kind")
     agent_explicit = agent is not None
     if agent is None:
         agent, found = default_agent_ref()
@@ -3341,8 +3344,8 @@ def cmd_algorithms(a: argparse.Namespace) -> int:
               file=sys.stderr)
     as_json = getattr(a, "json", False)
     if a.action in (None, "list"):
-        if a.kind is not None and a.kind not in KINDS:
-            raise SpecError(f"--kind must be one of {list(KINDS)}, got {a.kind!r}")
+        if a.kind is not None:
+            a.kind = resolve_kind(a.kind, where="--kind")
         found = algorithms.listing(a.kind)
         # Same explanation MCP list_algorithms already returns for this kind
         # (#799): policy_slot evolves a policy value, so no named algorithm
@@ -3441,11 +3444,13 @@ def algorithms_run_payload(
     except algorithms.AlgorithmError as e:
         return {"ok": False, "error": str(e), "_stage": "pre"}
     out = out or f"agentdescent.{name}.spec.json"
-    if kind is not None and kind not in KINDS:
-        # The group-level --kind is free text; fail closed with the real choices
-        # before anything is written (#688).
-        return {"ok": False, "_stage": "pre",
-                "error": f"--kind must be one of {list(KINDS)}, got {kind!r}"}
+    if kind is not None:
+        # The group-level --kind is free text; fold aliases and fail closed
+        # with the real choices before anything is written (#688, #882).
+        try:
+            kind = resolve_kind(kind, where="--kind")
+        except SpecError as e:
+            return {"ok": False, "_stage": "pre", "error": str(e)}
     # The name is positional here: say so, route the one-file fix through
     # `algorithms run`, and name --kind when the kind was only guessed (#702).
     alg = algorithms.get(name)
@@ -4617,8 +4622,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("init", help="write a starter spec for a path")
     s.add_argument("path")
-    s.add_argument("--kind", choices=("text", "skill_dir", "skill_library", "agent_dir",
-                                  "agent_code", "plugin", "policy_slot"))
+    s.add_argument("--kind", type=fold_kind, choices=KINDS)
     s.add_argument("--data", help="cases file, or a module:attribute problems ref for policy_slot")
     s.add_argument("--agent", default=None,
                    help="worker agent short name (default: the first of claude_code, "
@@ -4905,8 +4909,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="endpoint URL for that model (written as default_base_url)")
     s2.add_argument("--key-env", dest="key_env", default=None,
                     help="environment variable holding its key")
-    s2.add_argument("--kind", choices=("text", "skill_dir", "skill_library", "agent_dir",
-                                       "agent_code", "plugin", "policy_slot"),
+    s2.add_argument("--kind", type=fold_kind, choices=KINDS,
                     default=argparse.SUPPRESS,
                     help="spec kind (default: guessed from PATH, as init --kind)")
     s2.add_argument("--out", help="where to write the spec "

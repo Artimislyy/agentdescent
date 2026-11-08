@@ -45,6 +45,7 @@ there is nothing to diff against and ``apply`` has to be told a destination.
 from __future__ import annotations
 
 import csv
+import difflib
 import json
 import os
 import shlex
@@ -73,6 +74,8 @@ __all__ = [
     "KINDS",
     "KIND_ROWS",
     "SHORT_REFS",
+    "fold_kind",
+    "resolve_kind",
     "Composition",
     "EvolveSpec",
     "SpecError",
@@ -88,6 +91,40 @@ __all__ = [
 #: package, a Claude Code plugin directory); see :func:`~agentdescent.runners.plugin_runner`.
 KINDS: Tuple[str, ...] = ("text", "skill_dir", "skill_library", "agent_dir",
                           "agent_code", "plugin", "policy_slot")
+
+
+def fold_kind(value: Any) -> Any:
+    """Canonical :data:`KINDS` entry when ``value`` is a case/hyphen alias.
+
+    ``skill-library`` and ``SKILL_LIBRARY`` become ``skill_library``. A value
+    that is not such an alias is returned unchanged, so argparse ``choices=``
+    can still report an unknown flag.
+    """
+    if isinstance(value, str):
+        folded = value.strip().casefold().replace("-", "_")
+        if folded in KINDS:
+            return folded
+    return value
+
+
+def resolve_kind(value: Any, *, where: str = "kind") -> str:
+    """The :data:`KINDS` entry ``value`` names, ignoring case and ``-`` vs ``_``.
+
+    Raises :class:`SpecError` when nothing matches. A near-miss typo
+    (``skil_library``) appends ``did you mean 'skill_library'?``.
+    """
+    folded = fold_kind(value)
+    if folded in KINDS:
+        return folded
+    shown = list(KINDS) if where.startswith("-") else KINDS
+    msg = f"{where} must be one of {shown}, got {value!r}"
+    if isinstance(value, str) and value.strip():
+        close = difflib.get_close_matches(
+            value.strip().casefold().replace("-", "_"), list(KINDS), n=1,
+            cutoff=0.75)
+        if close:
+            msg += f"; did you mean {close[0]!r}?"
+    raise SpecError(msg)
 
 #: The composition table, for readers and for the test that checks it against
 #: the quickstarts. Values are the *names* of what is assembled; :func:`compose`
@@ -264,6 +301,12 @@ class EvolveSpec:
     #: :func:`compose` call ignores it.
     record_rollouts: bool = True
     version: int = 1
+
+    def __post_init__(self) -> None:
+        # Aliases such as ``skill-library`` become the canonical kind so later
+        # checks (absolutise, compose) see ``skill_library``. Unknown values
+        # stay as written; :func:`compose` / :func:`resolve_kind` name them.
+        self.kind = fold_kind(self.kind)
 
     # -- (de)serialisation ------------------------------------------------
 
@@ -1117,8 +1160,9 @@ def compose(spec: EvolveSpec, *, usage: Optional[Usage] = None,
     defaults the kind wants. Raises :class:`SpecError` for anything the spec
     gets wrong, *before* a single rollout runs -- which is what ``plan`` is for.
     """
-    if spec.kind not in KINDS:
-        raise SpecError(f"kind must be one of {KINDS}, got {spec.kind!r}")
+    resolved = resolve_kind(spec.kind)
+    if resolved != spec.kind:
+        spec = replace(spec, kind=resolved)
     if spec.agent is None:
         raise SpecError("agent is required (for kind='text' it is the model)")
     if spec.version != 1:

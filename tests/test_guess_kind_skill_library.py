@@ -68,3 +68,32 @@ def test_algorithms_run_evoskill_on_library(tmp_path, capsys, monkeypatch):
                       .read_text(encoding="utf-8"))
     assert spec["kind"] == "skill_library"
     assert spec["algorithm"]["name"] == "evoskill"
+
+
+
+def test_init_kind_alias_writes_canonical_skill_library(tmp_path, capsys, monkeypatch):
+    """#882: `init --kind skill-library` writes the same spec as `--kind skill_library`."""
+    monkeypatch.chdir(tmp_path)
+    lib = tmp_path / "skills"
+    _skill(lib, "alpha")
+    _skill(lib, "beta")
+    assert cli.main(["init", "skills", "--kind", "skill-library", "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["kind"] == "skill_library"
+    spec = json.loads(Path(out["spec"]).read_text(encoding="utf-8"))
+    assert spec["kind"] == "skill_library"
+    assert spec["layout"] == "skill_library"
+
+
+def test_algorithms_run_kind_alias_on_library(tmp_path, capsys, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    lib = tmp_path / "skills"
+    _skill(lib, "alpha")
+    _skill(lib, "beta")
+    cli.main(["algorithms", "run", "evoskill", "skills",
+              "--kind", "SKILL_LIBRARY", "--json"])
+    capsys.readouterr()
+    spec = json.loads((tmp_path / "agentdescent.evoskill.spec.json")
+                      .read_text(encoding="utf-8"))
+    assert spec["kind"] == "skill_library"
+    assert spec["algorithm"]["name"] == "evoskill"

@@ -49,3 +49,27 @@ def test_bare_algorithms_bad_kind_names_the_flag(capsys):
 def test_show_refuses_kind(capsys):
     assert cli.main(["algorithms", "--kind", "text", "show", "gepa"]) == 2
     assert "--kind" in capsys.readouterr().err
+
+
+def test_list_kind_folds_hyphen_and_case(capsys):
+    """#882: `--kind skill-library` / `SKILL_LIBRARY` filter like `skill_library`."""
+    assert cli.main(["algorithms", "list", "--kind", "skill_library", "--json"]) == 0
+    canonical = [card["name"] for card in json.loads(capsys.readouterr().out)]
+    assert "evoskill" in canonical and "archive_selection" in canonical
+    assert "gepa" not in canonical
+    for alias in ("skill-library", "SKILL_LIBRARY"):
+        assert cli.main(["algorithms", "list", "--kind", alias, "--json"]) == 0
+        assert [card["name"] for card in json.loads(capsys.readouterr().out)] == canonical
+        assert cli.main(["algorithms", "--kind", alias, "--json"]) == 0
+        assert [card["name"] for card in json.loads(capsys.readouterr().out)] == canonical
+
+
+def test_list_kind_suggests_a_near_miss(capsys):
+    assert cli.main(["algorithms", "list", "--kind", "skil_library"]) == 2
+    err = capsys.readouterr().err
+    assert "--kind must be one of" in err
+    assert "did you mean 'skill_library'?" in err
+    assert cli.main(["--json", "algorithms", "list", "--kind", "skil_library"]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    assert "did you mean 'skill_library'?" in payload["error"]

@@ -428,10 +428,17 @@ class Tools:
 
     def list_algorithms(self, kind: Optional[str] = None) -> Dict[str, Any]:
         from . import algorithms
-        from .evolvespec import KINDS
+        from .evolvespec import KINDS, SpecError, resolve_kind
 
-        if kind is not None and kind not in KINDS:
-            return {"error": f"unknown kind {kind!r}; choose from {list(KINDS)}"}
+        if kind is not None:
+            try:
+                kind = resolve_kind(kind)
+            except SpecError as e:
+                extra = ""
+                text = str(e)
+                if "did you mean" in text:
+                    extra = "; " + text.split("; ", 1)[1]
+                return {"error": f"unknown kind {kind!r}; choose from {list(KINDS)}{extra}"}
         payload: Dict[str, Any] = {
             "algorithms": [a.describe() for a in algorithms.listing(kind)],
             "surface": "card",
