@@ -23,8 +23,8 @@ engine:
 
 The token is read from an environment variable named by ``token_env`` and is
 never accepted as a command-line argument, written into the proposal or printed.
-A proposal branch may be force-updated (it is the agent's own branch); the base
-branch is never written.
+The base branch and the repository's default branch are never written, and an
+existing proposal branch is only ever fast-forwarded, never force-updated.
 """
 
 from __future__ import annotations
@@ -274,12 +274,18 @@ class GitHubClient:
                  payload: Optional[Mapping[str, Any]] = None) -> Any:
         return self.transport.request(method, self.root + path, payload)
 
+    def get_repo(self) -> Dict[str, Any]:
+        return self._request("GET", "")
+
     def get_ref(self, ref: str) -> Dict[str, Any]:
         encoded = urllib.parse.quote(f"heads/{ref}", safe="")
         return self._request("GET", f"/git/ref/{encoded}")
 
     def get_commit(self, sha: str) -> Dict[str, Any]:
         return self._request("GET", f"/git/commits/{sha}")
+
+    def compare_commits(self, base_sha: str, head_sha: str) -> Dict[str, Any]:
+        return self._request("GET", f"/compare/{base_sha}...{head_sha}")
 
     def create_blob(self, content: Union[str, bytes]) -> str:
         raw = content.encode("utf-8") if isinstance(content, str) else bytes(content)
@@ -305,9 +311,11 @@ class GitHubClient:
             "ref": f"refs/heads/{branch}", "sha": sha})
 
     def update_ref(self, branch: str, sha: str) -> Any:
+        # Never `force: true`: GitHub then refuses a non-fast-forward write
+        # itself, so a rewritten proposal history cannot slip through (#913).
         encoded = urllib.parse.quote(f"heads/{branch}", safe="")
         return self._request("PATCH", f"/git/refs/{encoded}", {
-            "sha": sha, "force": True})
+            "sha": sha, "force": False})
 
     def find_pull(self, branch: str, base: str) -> Optional[Dict[str, Any]]:
         query = urllib.parse.urlencode({
@@ -395,26 +403,55 @@ def _dry_run_payload(proposal: Proposal, config: GitHubConfig) -> Dict[str, Any]
     }
 
 
+def _require_fast_forward(client: GitHubClient, branch: str, old_sha: str,
+                          base_sha: str) -> None:
+    """Refuse to rewrite an existing proposal branch (#913).
+
+    The new commit is built on ``base_sha``, so the branch can be fast-forwarded
+    exactly when its current head is an ancestor of that base. Anything else
+    (a rewound or diverged branch) is a history rewrite this surface must not do.
+    """
+    status = client.compare_commits(old_sha, base_sha).get("status", "")
+    if status not in ("ahead", "identical"):
+        raise GitHubError(
+            f"proposal branch {branch!r} is not a fast-forward of base "
+            f"{base_sha[:12]} ({status or 'unknown'}); refusing to rewrite it")
+
+
 def publish_proposal(config: GitHubConfig, proposal: Proposal, *,
                      dry_run: bool = True, transport: Any = None) -> Dict[str, Any]:
     """Create/update a proposal branch, commit, PR and optional check run.
 
-    ``dry_run=True`` makes no network call and needs no token. The base branch
-    is never written; only ``proposal.branch`` may be force-updated.
+    ``dry_run=True`` makes no network call and needs no token. Neither the base
+    branch nor the repository's default branch is ever written, and an existing
+    proposal branch is only fast-forwarded (never force-updated).
     """
     if not isinstance(config, GitHubConfig):
         raise GitHubError("config must be a GitHubConfig")
     if not isinstance(proposal, Proposal):
         raise GitHubError("proposal must be a Proposal")
     base = proposal.base or config.base
-    if proposal.branch == base:
+    if proposal.branch in (base, config.base):
         raise GitHubError("a proposal branch cannot be the base branch")
     if dry_run:
         return _dry_run_payload(proposal, config)
 
     client = GitHubClient(config, transport=transport)
+    default_branch = client.get_repo().get("default_branch", "")
+    if proposal.branch in (base, config.base, default_branch):
+        raise GitHubError(
+            f"a proposal branch cannot be the repository default branch "
+            f"{default_branch!r}")
     base_ref = client.get_ref(base)
     base_sha = base_ref["object"]["sha"]
+    try:
+        existing = client.get_ref(proposal.branch)["object"]["sha"]
+    except GitHubError as error:
+        if error.status != 404:
+            raise
+        existing = None
+    if existing is not None:
+        _require_fast_forward(client, proposal.branch, existing, base_sha)
     base_commit = client.get_commit(base_sha)
     base_tree = base_commit["tree"]["sha"]
 
@@ -425,12 +462,19 @@ def publish_proposal(config: GitHubConfig, proposal: Proposal, *,
                         "sha": blob})
     tree = client.create_tree(base_tree, entries)
     commit = client.create_commit(proposal.title, tree, [base_sha])
-    try:
-        client.create_ref(proposal.branch, commit)
-    except GitHubError as error:
-        if error.status != 422:
-            raise
+    if existing is not None:
         client.update_ref(proposal.branch, commit)
+    else:
+        try:
+            client.create_ref(proposal.branch, commit)
+        except GitHubError as error:
+            if error.status != 422:
+                raise
+            # The branch appeared between the read and the write: re-read it and
+            # fast-forward only, instead of the old blind force update (#913).
+            current = client.get_ref(proposal.branch)["object"]["sha"]
+            _require_fast_forward(client, proposal.branch, current, base_sha)
+            client.update_ref(proposal.branch, commit)
 
     body = _body(proposal)
     existing = client.find_pull(proposal.branch, base)

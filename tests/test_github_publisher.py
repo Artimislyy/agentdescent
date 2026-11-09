@@ -21,6 +21,8 @@ class FakeGitHub:
     def __init__(self, *, existing_pull=None):
         self.calls = []
         self.refs = {"main": "base123"}
+        self.default_branch = "main"
+        self.compare_status = {}
         self.pulls = []
         self.existing_pull = existing_pull
         self.labels = []
@@ -36,6 +38,12 @@ class FakeGitHub:
         root = "/repos/o/r"
         assert path.startswith(root), path
         path = path[len(root):]
+        if method == "GET" and path == "":
+            return {"default_branch": self.default_branch}
+        if method == "GET" and path.startswith("/compare/"):
+            base, _, head = path[len("/compare/"):].partition("...")
+            return {"status": self.compare_status.get(
+                (base, head), "identical" if base == head else "ahead")}
         if method == "GET" and path.startswith("/git/ref/heads"):
             ref = urllib.parse.unquote(path[len("/git/ref/"):])
             branch = ref.split("heads/", 1)[1]
@@ -163,6 +171,60 @@ def test_publish_refuses_base_branch_and_path_traversal(monkeypatch):
         _proposal(files={"../escape": "x"})
     with pytest.raises(GitHubError):
         _proposal(files={"/absolute": "x"})
+
+
+def test_publish_refuses_the_default_branch_before_any_write(monkeypatch):
+    # A proposal that names the default branch must never reach a ref write, even
+    # when its own base is something else (#913).
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    with pytest.raises(GitHubError) as error:
+        publish_proposal(GitHubConfig("o", "r", base="develop"),
+                         _proposal(branch="main", base="develop"),
+                         dry_run=False, transport=fake)
+    assert "default branch" in str(error.value)
+    writes = [(method, path) for method, path, _ in fake.calls
+              if method in ("POST", "PATCH")]
+    assert writes == []
+
+
+def test_publish_refuses_the_configured_base_without_a_network_call():
+    # The configured base is knowable offline, so even a dry run refuses it
+    # instead of printing a plan that would write `main`.
+    with pytest.raises(GitHubError) as error:
+        publish_proposal(GitHubConfig("o", "r", base="main"),
+                         _proposal(branch="main", base="develop"),
+                         dry_run=True, transport=FakeGitHub())
+    assert "base branch" in str(error.value)
+
+
+def test_publish_refuses_to_rewrite_a_diverged_proposal_branch(monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.refs["agent/skill-csv"] = "old-head"
+    fake.compare_status[("old-head", "base123")] = "diverged"
+    with pytest.raises(GitHubError) as error:
+        publish_proposal(GitHubConfig("o", "r"), _proposal(), dry_run=False,
+                         transport=fake)
+    assert "fast-forward" in str(error.value)
+    writes = [(method, path) for method, path, payload in fake.calls
+              if method in ("POST", "PATCH")]
+    assert writes == []
+    assert fake.refs["agent/skill-csv"] == "old-head"
+
+
+def test_publish_fast_forwards_an_existing_branch_without_force(monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.refs["agent/skill-csv"] = "old-head"
+    fake.compare_status[("old-head", "base123")] = "ahead"
+    payload = publish_proposal(GitHubConfig("o", "r"), _proposal(),
+                               dry_run=False, transport=fake)
+    updates = [payload_ for method, path, payload_ in fake.calls
+               if method == "PATCH" and "/git/refs/" in path]
+    assert len(updates) == 1 and updates[0]["force"] is False
+    assert "force\": true" not in json.dumps(fake.calls)
+    assert fake.refs["agent/skill-csv"] == payload["head"]
 
 
 def test_publish_requires_a_token(monkeypatch):
