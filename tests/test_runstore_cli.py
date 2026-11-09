@@ -355,6 +355,11 @@ def test_cli_resume_with_a_relative_store(tmp_path, monkeypatch):
     code, out = _cli("--store", "./store", "--json", "evolve", path)
     assert code == 0, out
     rid = json.loads(out)["run_id"]
+    rd = runstore.get(rid, store="./store")
+    _wait(rd)
+    # The offline spec solves its task and CLI resume refuses a solved run
+    # (#900), so record a bound-stopped run to exercise the relaunch itself.
+    rd.update_status(stop_reason="max_iters")
     code, out = _cli("--store", "./store", "resume", rid)
     assert code == 0 and rid in out
     assert _wait(runstore.get(rid, store="./store")).state == "done"

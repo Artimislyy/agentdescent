@@ -37,6 +37,7 @@ from typing import Annotated, Any, Dict, Optional, Sequence, Tuple
 from . import __version__, runstore
 from .cli import (NESTED_ENV, apply_from_payload, apply_payload, doctor_report,
                  plan_payload, require_cli_on_path, require_resume_host_on_path,
+                 require_resume_not_solved,
                  resolve_run_id, show_payload, status_payload)
 from .evolvespec import (EvolveSpec, SpecError, budget_round_overshoot_warning,
                          compose, estimate)
@@ -697,8 +698,9 @@ class Tools:
             # it is likely gone, and its address with it.
             run_id = resolve_run_id(run_id, store=self.store) or run_id
             runstore.require_budget_pair(budget_usd, usd_per_call)
-            # Same host gate as CLI resume: an absent plugin host must not
-            # relaunch and report running (#370).
+            # Same gates as CLI resume: a solved run is not relaunched (#900),
+            # and an absent plugin host must not relaunch and report running (#370).
+            require_resume_not_solved(run_id, store=self.store)
             require_resume_host_on_path(run_id, store=self.store)
             return runstore.resume(run_id, store=self.store, budget_usd=budget_usd,
                                    usd_per_call=usd_per_call,

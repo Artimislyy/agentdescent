@@ -1612,6 +1612,22 @@ def require_cli_on_path(spec: EvolveSpec) -> None:
         raise SpecError("; ".join(msgs))
 
 
+def require_resume_not_solved(run_id: str, *, store: Optional[str] = None) -> None:
+    """Refuse to relaunch a run that already reached its target (#900).
+
+    A ``done [target_reward]`` run has nothing left to search for; relaunching
+    it spent calls again and overwrote its recorded initial reward and outcomes
+    with the no-op rerun, so ``show``/``diagnose`` lost what it had learned.
+    Runs that stopped on a bound, were cancelled or failed still resume.
+    """
+    st = runstore.get(run_id, store=store).status()
+    if st.state == "done" and st.stop_reason == "target_reward":
+        raise SpecError(
+            f"cannot resume {run_id}: it already reached its target "
+            f"(done [target_reward]) -- see `agentdescent show {run_id}` or "
+            f"`agentdescent apply {run_id} --dry-run`")
+
+
 def require_resume_host_on_path(run_id: str, *, store: Optional[str] = None) -> None:
     """Refuse to relaunch a stopped plugin run whose ``host`` CLI is not on PATH (#370).
 
@@ -2805,6 +2821,7 @@ def cmd_resume(a: argparse.Namespace) -> int:
     # from an agent session and resumed from a shell has lost whatever
     # `host_model` was borrowing.
     runstore.require_budget_pair(a.budget, a.usd_per_call)
+    require_resume_not_solved(a.run_id, store=a.store)
     # Hard gate, unlike the warnings below: a missing plugin host cannot run a
     # single rollout, so do not relaunch the detached process at all (#370).
     require_resume_host_on_path(a.run_id, store=a.store)
