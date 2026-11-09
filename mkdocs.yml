@@ -114,6 +114,7 @@ nav:
     - Continual experience: continual-experience.md
   - Product surfaces:
     - Release a candidate: release.md
+    - GitHub proposal publisher: github.md
     - Trajectory evidence: traces.md
     - Governed harness change: governed-harness.md
     - Tenant cycle: tenant.md

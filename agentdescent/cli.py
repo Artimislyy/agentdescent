@@ -3361,6 +3361,51 @@ def cmd_hgm(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_github(a: argparse.Namespace) -> int:
+    """``agentdescent github`` -- publish a proposal branch/PR or read a PR."""
+    from .github_surface import (
+        GitHubConfig, GitHubError, github_status, load_proposal,
+        publish_proposal,
+    )
+
+    action = getattr(a, "github_cmd", None)
+    try:
+        config = GitHubConfig(
+            a.owner, a.repo, base=a.base, token_env=a.token_env)
+        if action == "publish":
+            payload = publish_proposal(
+                config, load_proposal(a.proposal), dry_run=not a.apply)
+        elif action == "status":
+            payload = github_status(config, a.pr)
+        else:
+            raise GitHubError("github needs publish or status")
+    except (GitHubError, OSError, ValueError) as error:
+        return _surface_error(a, error)
+    if a.json:
+        _out(payload, as_json=True)
+    else:
+        if action == "publish":
+            print(f"dry_run: {payload['dry_run']}  branch: {payload['branch']}  "
+                  f"base: {payload['base']}")
+            for path in payload.get("files") or ():
+                print(f"file: {path}")
+            if payload.get("url"):
+                print(f"pull request: #{payload['pull_request']}  {payload['url']}")
+            if payload.get("head"):
+                print(f"head: {payload['head']}")
+            for step in payload.get("next") or ():
+                print(f"next: {step}")
+        else:
+            print(f"#{payload['pull_request']}  {payload['title']}  "
+                  f"state={payload['state']}  draft={payload['draft']}")
+            print(f"head={payload['head']}  base={payload['base']}  "
+                  f"mergeable={payload['mergeable']}")
+            for check in payload["checks"]:
+                print(f"check: {check['name']}  {check['status']}  "
+                      f"{check['conclusion']}")
+    return 0
+
+
 def cmd_audit(a: argparse.Namespace) -> int:
     """``agentdescent audit <run_id> --archive PATH`` -- trace one adoption
     through its evidence rings."""
@@ -4913,6 +4958,29 @@ def build_parser() -> argparse.ArgumentParser:
     sp = hgm_sub.add_parser("report", help="per-node clade evidence")
     sp.add_argument("--tree", required=True, help="HGM tree JSON")
     sp.set_defaults(fn=cmd_hgm)
+    s = sub.add_parser(
+        "github", help="publish a proposal branch/PR or read a PR")
+    github_sub = s.add_subparsers(dest="github_cmd", required=True)
+    sp = github_sub.add_parser(
+        "publish", help="publish a proposal JSON as a branch, PR and check")
+    sp.add_argument("--proposal", required=True, help="proposal JSON file")
+    sp.add_argument("--owner", required=True, help="repository owner")
+    sp.add_argument("--repo", required=True, help="repository name")
+    sp.add_argument("--base", default="main", help="base branch (default main)")
+    sp.add_argument("--token-env", default="AGENTDESCENT_GITHUB_TOKEN",
+                    dest="token_env",
+                    help="environment variable holding the token")
+    sp.add_argument("--apply", action="store_true",
+                    help="perform the writes; without it the command is a plan")
+    sp.set_defaults(fn=cmd_github)
+    sp = github_sub.add_parser("status", help="read a PR and its check runs")
+    sp.add_argument("--pr", type=int, required=True, help="pull request number")
+    sp.add_argument("--owner", required=True)
+    sp.add_argument("--repo", required=True)
+    sp.add_argument("--base", default="main")
+    sp.add_argument("--token-env", default="AGENTDESCENT_GITHUB_TOKEN",
+                    dest="token_env")
+    sp.set_defaults(fn=cmd_github)
 
 
 
