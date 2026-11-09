@@ -269,3 +269,31 @@ def test_demo_labels_itself_smoke_and_points_at_library_example(tmp_path, monkey
     assert code == 0, out
     assert "smoke trajectory" in out
     assert "skill_library_evolution" in out
+
+
+@pytest.mark.parametrize("name", ["gepa", "archive_selection"])
+def test_demo_algorithm_next_steps_keep_the_algorithm(tmp_path, monkeypatch, name):
+    # #902: after `demo --algorithm NAME` the "your own run" steps must run
+    # NAME for real, not fall back to a generic init spec.
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "home"))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                         "--dir", str(tmp_path / "work"), "--algorithm", name])
+    out = buf.getvalue()
+    assert code == 0, out
+    assert f"agentdescent algorithms run {name} " in out, out
+    assert f"agentdescent evolve agentdescent.{name}.spec.json" in out
+    assert "agentdescent doctor" in out
+    assert "--out spec.json" not in out
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cli.main(["--store", str(tmp_path / "runs2"), "demo",
+                         "--dir", str(tmp_path / "work2"), "--algorithm", name, "--json"])
+    payload = json.loads(buf.getvalue())
+    assert code == 0
+    assert any(s.startswith(f"agentdescent algorithms run {name} ") for s in payload["next"])
+    assert f"agentdescent evolve agentdescent.{name}.spec.json" in payload["next"]
+    target = "<your-skill-dir>" if payload["kind"] != "text" else "<your-prompt.txt>"
+    assert any(target in s for s in payload["next"])

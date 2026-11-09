@@ -1,0 +1,2 @@
+Fixed
+`agentdescent demo --algorithm NAME` now ends with the one command that runs that algorithm on your own data (`agentdescent algorithms run NAME <your-prompt.txt|your-skill-dir> <your-cases.jsonl> --model <model> ...`, then `agentdescent evolve agentdescent.NAME.spec.json`), in both the text footer and `--json` `next`, instead of a generic `init` that dropped the algorithm. `demo` without `--algorithm` is unchanged (#902).

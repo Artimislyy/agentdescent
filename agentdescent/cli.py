@@ -735,22 +735,33 @@ def cmd_demo(a: argparse.Namespace) -> int:
     init = getattr(result, "initial_reward", None)
     learned = demo_mod.learned_summary(result.state, kind=kind)
     ok = result.final_reward >= 1.0
-    if kind == "text":
-        next_steps = [
-            f"agentdescent show  {rd.run_id}",
-            f"agentdescent apply {rd.run_id} --dry-run",
-            "agentdescent init <your-prompt.txt> --kind text --data <your-cases.jsonl> --out spec.json",
+    # #902: one list feeds both the human footer and --json.next, and with
+    # --algorithm NAME the "your own run" steps keep the algorithm just shown.
+    target = "<your-prompt.txt>" if kind == "text" else "<your-skill-dir>"
+    if algo:
+        own_steps = [
+            f"agentdescent algorithms run {algo} {target} <your-cases.jsonl> "
+            f"--model <model> [--base-url <url>] --rounds 1 --workers 1",
+            "agentdescent doctor",
+            f"agentdescent evolve agentdescent.{algo}.spec.json",
+        ]
+    elif kind == "text":
+        own_steps = [
+            f"agentdescent init {target} --kind text --data <your-cases.jsonl> --out spec.json",
             "agentdescent doctor",
             "agentdescent plan spec.json",
         ]
     else:
-        next_steps = [
-            f"agentdescent show  {rd.run_id}",
-            f"agentdescent apply {rd.run_id} --dry-run",
-            "agentdescent init <your-skill-dir> --data <your-cases.jsonl> --out spec.json",
+        own_steps = [
+            f"agentdescent init {target} --data <your-cases.jsonl> --out spec.json",
             "agentdescent doctor",
             "agentdescent plan spec.json",
         ]
+    next_steps = [
+        f"agentdescent show  {rd.run_id}",
+        f"agentdescent apply {rd.run_id} --dry-run",
+        *own_steps,
+    ]
 
     if as_json:
         # #862: honour the advertised --json flag so hosts can assert an
@@ -794,6 +805,10 @@ def cmd_demo(a: argparse.Namespace) -> int:
         print("\n(that is lower than expected for the demo; the run store has the detail:")
         print(f" {rd.path})")
         return 1
+    own = "\n".join(f"  {step}" + ("        # what is missing before a real run"
+                                     if step == "agentdescent doctor" and kind != "text"
+                                     else "")
+                     for step in own_steps)
     if kind == "text":
         print(f"""
 The prompt on disk is untouched -- an evolved artifact only lands when you say so:
@@ -803,9 +818,7 @@ The prompt on disk is untouched -- an evolved artifact only lands when you say s
 
 Your own run is the same shape with a real model instead of the offline pair:
 
-  agentdescent init <your-prompt.txt> --kind text --data <your-cases.jsonl> --out spec.json
-  agentdescent doctor
-  agentdescent plan spec.json""")
+{own}""")
     else:
         print(f"""
 The skill on disk is untouched -- an evolved artifact only lands when you say so:
@@ -816,9 +829,7 @@ The skill on disk is untouched -- an evolved artifact only lands when you say so
 Your own run is the same spec with three things changed -- your directory, your
 cases.jsonl, and a real agent instead of the offline one:
 
-  agentdescent init <your-skill-dir> --data <your-cases.jsonl> --out spec.json
-  agentdescent doctor        # what is missing before a real run
-  agentdescent plan spec.json""")
+{own}""")
     return 0
 
 
