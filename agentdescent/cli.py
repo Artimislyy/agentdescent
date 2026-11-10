@@ -3406,6 +3406,53 @@ def cmd_github(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_skills(a: argparse.Namespace) -> int:
+    """``agentdescent skills`` -- report, audit or search a skill bank."""
+    from .skill_bank import SkillBank, SkillBankError
+
+    action = getattr(a, "skills_cmd", None)
+    try:
+        bank = SkillBank(a.store)
+        if action == "report":
+            payload = bank.report()
+        elif action == "audit":
+            payload = bank.audit(
+                min_uses=a.min_uses, min_lift=a.min_lift, apply=a.apply)
+        elif action == "search":
+            payload = bank.search(a.query, k=a.k)
+        else:
+            raise SkillBankError("skills needs report, audit or search")
+    except (SkillBankError, OSError, ValueError) as error:
+        return _surface_error(a, error)
+    if a.json:
+        _out(payload, as_json=True)
+    else:
+        if action == "report":
+            counts = payload["counts"]
+            print(f"store: {payload['store']}  skills: {counts['skills']}  "
+                  f"active: {counts['active']}  quarantined: "
+                  f"{counts['quarantined']}  retired: {counts['retired']}")
+            print(f"baseline: {payload['baseline']:.3f}")
+            for row in payload["best"]:
+                print(f"best: {row['skill_id']}  lift={row['lift']:+.3f}  "
+                      f"uses={row['uses']}")
+            for row in payload["worst"]:
+                print(f"worst: {row['skill_id']}  lift={row['lift']:+.3f}  "
+                      f"uses={row['uses']}")
+        elif action == "audit":
+            print(f"baseline: {payload['baseline']:.3f}  "
+                  f"applied: {payload['applied']}")
+            for row in payload["actions"]:
+                lift = "-" if row["lift"] is None else f"{row['lift']:+.3f}"
+                print(f"{row['skill_id']}  {row['status']}  {row['action']}  "
+                      f"lift={lift}  uses={row['uses']}")
+        else:
+            print(f"query: {payload['query']}  hits: {len(payload['hits'])}")
+            for hit in payload["hits"]:
+                print(f"{hit['score']:.4f}  {hit['skill_id']}")
+    return 0
+
+
 def cmd_audit(a: argparse.Namespace) -> int:
     """``agentdescent audit <run_id> --archive PATH`` -- trace one adoption
     through its evidence rings."""
@@ -4981,6 +5028,24 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--token-env", default="AGENTDESCENT_GITHUB_TOKEN",
                     dest="token_env")
     sp.set_defaults(fn=cmd_github)
+    s = sub.add_parser(
+        "skills", help="report, audit or search a durable skill bank")
+    skills_sub = s.add_subparsers(dest="skills_cmd", required=True)
+    sp = skills_sub.add_parser("report", help="statuses, baseline and best/worst lifts")
+    sp.add_argument("--store", required=True, help="skill-bank JSON snapshot")
+    sp.set_defaults(fn=cmd_skills)
+    sp = skills_sub.add_parser("audit", help="quarantine skills below the lift bar")
+    sp.add_argument("--store", required=True)
+    sp.add_argument("--min-uses", type=int, default=5, dest="min_uses")
+    sp.add_argument("--min-lift", type=float, default=0.0, dest="min_lift")
+    sp.add_argument("--apply", action="store_true",
+                    help="persist quarantine decisions (default: report only)")
+    sp.set_defaults(fn=cmd_skills)
+    sp = skills_sub.add_parser("search", help="retrieve active skills by text")
+    sp.add_argument("--store", required=True)
+    sp.add_argument("--query", required=True)
+    sp.add_argument("--k", type=int, default=5)
+    sp.set_defaults(fn=cmd_skills)
 
 
 

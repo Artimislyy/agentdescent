@@ -112,6 +112,7 @@ nav:
     - Adaptive compute: compute-policy.md
     - Capability foundry: capability-foundry.md
     - Continual experience: continual-experience.md
+    - Skill bank lifecycle: skill-bank.md
   - Product surfaces:
     - Release a candidate: release.md
     - GitHub proposal publisher: github.md
