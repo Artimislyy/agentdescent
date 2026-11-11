@@ -2,8 +2,9 @@
 
 A PASS is what lets a T0/T1 PR auto-merge and what a T2/T3 PR needs before
 Danyang's click (AGENTS.md › Merge policy), so the parser must not accept a
-PASS for another commit, a PASS that ran nothing, or a PASS a later FAIL
-replaced.
+PASS for another commit or a PASS a later FAIL replaced. A PASS with no
+evidence still counts, but it is marked ``weak: no Ran:/Not run:`` so an
+evidence-less PASS is visible in the result and in the rendered report.
 """
 
 import importlib.util
@@ -16,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "review-gate.yml"
 POLICY = json.loads((ROOT / ".github" / "agent" / "review-policy.json").read_text())
 HEAD = "0123456789abcdef0123456789abcdef01234567"
+WEAK = "no Ran:/Not run:"
 
 
 def _mod():
@@ -78,11 +80,90 @@ def test_newest_report_at_the_tip_wins():
     assert not rg.decide(HEAD, "Birfy", [c(report("PASS"), at=same), c(report("INC"), at=same)], POLICY)["ok"]
 
 
-def test_a_pass_must_list_what_ran_and_what_did_not():
-    r = rg.decide(HEAD, "Birfy", [c(report(ran=()))], POLICY)
-    assert not r["ok"] and "no command" in r["reason"]
-    r = rg.decide(HEAD, "Birfy", [c(report(not_run=False))], POLICY)
-    assert not r["ok"] and "Not run" in r["reason"]
+def test_a_pass_without_evidence_counts_but_is_marked_weak():
+    for body in (report(ran=()), report(not_run=False)):
+        r = rg.decide(HEAD, "Birfy", [c(body)], POLICY)
+        assert r["ok"] and r["weak"] == WEAK
+        assert WEAK in rg.render(r, 7, HEAD, "Birfy")
+    strong = rg.decide(HEAD, "Birfy", [c(report())], POLICY)
+    assert strong["ok"] and not strong["weak"]
+
+
+def test_a_verdict_above_the_tip_line_counts():
+    # #774, 2026-11-09: Verdict first, then the Tip SHA it is about.
+    body = "\n".join([
+        "**Verdict: PASS**",
+        "",
+        f"Tip SHA: `{HEAD}`",
+        "Ran:",
+        "  - pytest -q → pass",
+        "Not run:",
+        "  - Ark real-model run — no code path to a model changed",
+    ])
+    parsed = rg.parse_report(body)
+    assert parsed["tip"] == HEAD and parsed["verdict"] == "PASS"
+    r = rg.decide(HEAD, "Birfy", [c(body)], POLICY)
+    assert r["ok"] and r["by"] == "Birfy"
+
+
+def test_a_verdict_carrying_its_tip_inline_counts():
+    # #776/#782, 2026-11-09: `Verdict: PASS (tip b0a30224)`, no Tip SHA line.
+    head = "b0a30224" + HEAD[8:]
+    body = "\n".join([
+        "Ran:",
+        "  - pytest -q → pass",
+        "Not run:",
+        "  - Ark real-model run — no code path to a model changed",
+        "",
+        "**Verdict: PASS (tip b0a30224)**",
+    ])
+    parsed = rg.parse_report(body)
+    assert parsed["tip"] == "b0a30224" and parsed["verdict"] == "PASS"
+    r = rg.decide(head, "HugoXK", [c(body)], POLICY)
+    assert r["ok"] and r["by"] == "Birfy" and r["tip"] == "b0a30224"
+
+
+def test_a_verdict_above_a_bare_tip_label_counts():
+    # #905, 2026-11-09: `Verdict: PASS`, then a `Tip: <sha>` line of its own, and
+    # `What I ran (...)` as the evidence list.
+    body = "\n".join([
+        "Verdict: PASS",
+        "",
+        f"Tip: {HEAD}",
+        "",
+        "What I ran (shared venv):",
+        "- tests/test_mcp.py",
+        "- tests/test_demo.py",
+        "",
+        "Not run:",
+        "  - Ark real-model run — no model path changed",
+    ])
+    parsed = rg.parse_report(body)
+    assert parsed["tip"] == HEAD and parsed["verdict"] == "PASS"
+    assert parsed["ran"] == ["- tests/test_mcp.py", "- tests/test_demo.py"]
+    r = rg.decide(HEAD, "HugoXK", [c(body)], POLICY)
+    assert r["ok"] and r["by"] == "Birfy" and not r["weak"]
+
+
+def test_a_seven_hex_tip_that_is_not_the_head_stays_not_pass():
+    body = "\n".join([
+        "Ran:",
+        "  - pytest -q → pass",
+        "Not run:",
+        "  - Ark real-model run — no code path to a model changed",
+        "",
+        "**Verdict: PASS (tip abcdef0)**",
+    ])
+    assert not rg.decide(HEAD, "HugoXK", [c(body)], POLICY)["ok"]
+
+
+def test_a_tip_in_another_comment_does_not_count():
+    # The verdict and its tip must be in one report: no cross-body stitching.
+    reports = [
+        c("**Verdict: PASS**", at="2026-11-09T10:00:00Z"),
+        c(f"Tip SHA: `{HEAD}`", at="2026-11-09T10:01:00Z"),
+    ]
+    assert not rg.decide(HEAD, "HugoXK", reports, POLICY)["ok"]
 
 
 def test_review_bodies_count_like_comments():

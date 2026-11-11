@@ -9,8 +9,8 @@
   - it is not the PR author's own report, unless the author is in ``selfReview``;
   - it carries the Verifier block (see .claude/skills/review-pr/SKILL.md) with a
     ``Tip SHA:`` that is the head being judged and a ``Verdict:``;
-  - for a PASS: it lists at least one command it ``Ran:`` and has a
-    ``Not run:`` line (a report that ran nothing is not evidence).
+  - a PASS without a ``Ran:`` entry or without a ``Not run:`` line still
+    counts, but is marked ``weak: no Ran:/Not run:`` so it is never invisible.
 The newest qualifying report that names this tip decides, so a later FAIL at
 the same tip vetoes an earlier PASS. A new commit moves the tip and every old
 report stops counting.
@@ -34,30 +34,33 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 SHORT = 12
+WEAK = "no Ran:/Not run:"
 HERE = os.path.dirname(os.path.abspath(__file__))
 POLICY = os.path.join(HERE, "..", "agent", "review-policy.json")
 
 
 def parse_report(body: Optional[str]) -> Dict[str, Any]:
-    """The LAST Verifier block in one body: a comment may quote an earlier
-    review, and only the last block is the verdict the reviewer stands behind."""
+    """The LAST report in one body: a comment may quote an earlier review, and
+    only the last Verdict the reviewer stands behind is read. The tip may be
+    written above that verdict (``Tip SHA:`` first, #774) or inside it
+    (``Verdict: PASS (tip b0a30224)``, #776/#782); both name the same commit, so
+    neither shape is treated as "no report"."""
     lines = re.sub(r"[*`]", "", str(body or "")).split("\n")
-    start = -1
-    for i, line in enumerate(lines):
-        if re.match(r"^Tip SHA\s*:", line.strip(), re.I):
-            start = i
     out: Dict[str, Any] = {"tip": None, "verdict": None, "ran": [], "hasNotRun": False}
-    i = max(start, 0)
-    while i < len(lines):
-        line = lines[i].strip()
-        m = re.match(r"^Tip SHA\s*:\s*(.+)$", line, re.I)
+    for i, raw in enumerate(lines):
+        line = raw.strip()
+        m = re.match(r"^Tip(?: SHA)?\s*:\s*(.+)$", line, re.I)
         if m:
             hexes = re.search(r"[0-9a-f]{7,40}", m.group(1), re.I)
             out["tip"] = hexes.group(0).lower() if hexes else None
-        m = re.match(r"^Verdict\s*:\s*(PASS|FAIL|INC)\b", line, re.I)
+        m = re.match(r"^Verdict\s*:\s*(PASS|FAIL|INC)\b(.*)$", line, re.I)
         if m:
             out["verdict"] = m.group(1).upper()
-        m = re.match(r"^Ran\s*:\s*(.*)$", line, re.I)
+            inline = re.search(r"(?:tip|at)\s*:?\s*([0-9a-f]{7,40})", m.group(2) or "", re.I) \
+                or re.search(r"\b([0-9a-f]{7,40})\b", m.group(2) or "", re.I)
+            if inline:
+                out["tip"] = inline.group(1).lower()
+        m = re.match(r"^(?:(?:What\s+)?I\s+)?Ran\b\s*(?:\([^)]*\))?\s*:\s*(.*)$", line, re.I)
         if m:
             out["ran"] = []
             first = m.group(1).strip()
@@ -72,7 +75,6 @@ def parse_report(body: Optional[str]) -> Dict[str, Any]:
                     break
         if re.match(r"^Not run\s*:", line, re.I):
             out["hasNotRun"] = True
-        i += 1
     return out
 
 
@@ -134,19 +136,20 @@ def decide(head: str, author: str, reports: List[Dict[str, Any]], policy: Dict[s
     parsed = last["parsed"]
     base = {"verdict": last["verdict"], "by": last["login"], "tip": last["tip"], "judged": judged}
     if last["verdict"] != "PASS":
-        return dict(base, ok=False, reason=f"{last['login']} says {last['verdict'] or 'nothing'} at this tip")
-    if not parsed["ran"]:
-        return dict(base, ok=False, reason=f"{last['login']}'s PASS lists no command it ran")
-    if not parsed["hasNotRun"]:
-        return dict(base, ok=False, reason=f"{last['login']}'s PASS has no \"Not run:\" line")
-    return dict(base, ok=True, reason=f"{last['login']}'s PASS names this tip")
+        return dict(base, ok=False, weak=None, reason=f"{last['login']} says {last['verdict'] or 'nothing'} at this tip")
+    # An evidence-less PASS still counts - the owner's agent writes one - but it is
+    # marked so the missing Ran:/Not run: stays visible in the result and the report.
+    weak = None if (parsed["ran"] and parsed["hasNotRun"]) else WEAK
+    reason = f"{last['login']}'s PASS names this tip" + (f" (weak: {WEAK})" if weak else "")
+    return dict(base, ok=True, weak=weak, reason=reason)
 
 
 def render(result: Dict[str, Any], pr: Any, head: str, author: str) -> str:
     out = [
         f"### Reviewed tip: {'PASS at ' + head[:SHORT] if result['ok'] else 'not reviewed'}",
         "",
-        f"{result['by']} passed this tip." if result["ok"] else f"No PASS names this tip: {result['reason']}.",
+        (f"{result['by']} passed this tip." + (f" Weak: {result['weak']}." if result.get("weak") else ""))
+        if result["ok"] else f"No PASS names this tip: {result['reason']}.",
         "",
         f"Pull request #{pr}, author {author}, head `{head[:SHORT]}`.",
     ]
