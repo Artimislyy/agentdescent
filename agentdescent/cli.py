@@ -3364,7 +3364,7 @@ def cmd_hgm(a: argparse.Namespace) -> int:
 def cmd_github(a: argparse.Namespace) -> int:
     """``agentdescent github`` -- publish a proposal branch/PR or read a PR."""
     from .github_surface import (
-        GitHubConfig, GitHubError, github_status, load_proposal,
+        GitHubConfig, GitHubError, github_review, github_status, load_proposal,
         publish_proposal,
     )
 
@@ -3377,8 +3377,13 @@ def cmd_github(a: argparse.Namespace) -> int:
                 config, load_proposal(a.proposal), dry_run=not a.apply)
         elif action == "status":
             payload = github_status(config, a.pr)
+        elif action == "review":
+            resolved = tuple(part.strip() for part in
+                             (getattr(a, "resolved", "") or "").split(",")
+                             if part.strip())
+            payload = github_review(config, a.pr, resolved_ids=resolved)
         else:
-            raise GitHubError("github needs publish or status")
+            raise GitHubError("github needs publish, status or review")
     except (GitHubError, OSError, ValueError) as error:
         return _surface_error(a, error)
     if a.json:
@@ -3395,6 +3400,21 @@ def cmd_github(a: argparse.Namespace) -> int:
                 print(f"head: {payload['head']}")
             for step in payload.get("next") or ():
                 print(f"next: {step}")
+        elif action == "review":
+            counts = payload["reviews"]
+            print(f"#{payload['pull_request']}  {payload['title']}  "
+                  f"state={payload['state']}  draft={payload['draft']}")
+            print(f"reviews: approved={counts['approved']} "
+                  f"changes={counts['changes_requested']}  "
+                  f"checks={payload['checks_state']}")
+            for row in payload["constraints"]:
+                print(f"constraint: {row['severity']} {row['kind']} "
+                      f"({row['source']}) {row['text']}")
+            readiness = payload["merge_readiness"]
+            print(f"ready: {readiness['ready']}  "
+                  f"requires_human_click: {readiness['requires_human_click']}")
+            for blocker in readiness["blockers"]:
+                print(f"blocker: {blocker}")
         else:
             print(f"#{payload['pull_request']}  {payload['title']}  "
                   f"state={payload['state']}  draft={payload['draft']}")
@@ -5061,6 +5081,18 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--apply", action="store_true",
                     help="perform the writes; without it the command is a plan")
     sp.set_defaults(fn=cmd_github)
+    sp = github_sub.add_parser(
+        "review", help="read reviews, review constraints and merge readiness")
+    sp.add_argument("--pr", type=int, required=True, help="pull request number")
+    sp.add_argument("--owner", required=True)
+    sp.add_argument("--repo", required=True)
+    sp.add_argument("--base", default="main")
+    sp.add_argument("--token-env", default="AGENTDESCENT_GITHUB_TOKEN",
+                    dest="token_env")
+    sp.add_argument("--resolved", default="",
+                    help="comma-separated review/comment ids known to be resolved")
+    sp.set_defaults(fn=cmd_github)
+
     sp = github_sub.add_parser("status", help="read a PR and its check runs")
     sp.add_argument("--pr", type=int, required=True, help="pull request number")
     sp.add_argument("--owner", required=True)

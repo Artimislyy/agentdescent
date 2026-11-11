@@ -11,6 +11,8 @@ from agentdescent.github_surface import (
     GitHubConfig,
     GitHubError,
     Proposal,
+    extract_review_constraints,
+    github_review,
     github_status,
     load_proposal,
     publish_proposal,
@@ -27,6 +29,8 @@ class FakeGitHub:
         self.existing_pull = existing_pull
         self.labels = []
         self.checks = []
+        self.reviews = []
+        self.review_comments = []
         self._n = 0
 
     def _next(self, prefix):
@@ -93,6 +97,10 @@ class FakeGitHub:
             return check
         if method == "GET" and path == "/pulls/7":
             return self.pulls[0]
+        if method == "GET" and path.startswith("/pulls/7/reviews"):
+            return self.reviews
+        if method == "GET" and path.startswith("/pulls/7/comments"):
+            return self.review_comments
         if method == "GET" and path.startswith("/commits/") and "/check-runs" in path:
             return {"check_runs": self.checks}
         raise AssertionError(f"unexpected call {method} {path}")
@@ -272,6 +280,75 @@ def test_cli_publish_dry_run_and_missing_proposal(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["ok"] is False
 
 
+def test_review_extracts_constraints_and_blocks_readiness(monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [{"id": 1, "state": "CHANGES_REQUESTED", "body": "Please add a test for empty input"}]
+    fake.review_comments = [
+        {"id": 2, "body": "This must handle the timeout path.",
+         "path": "src/f.py", "pull_request_review_id": 1},
+        {"id": 3, "body": "Thanks!", "path": "src/f.py", "pull_request_review_id": 1},
+    ]
+    fake.checks = [{"name": "build", "status": "completed", "conclusion": "success"}]
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    kinds = {row["kind"] for row in payload["constraints"]}
+    assert "test" in kinds and "behavior" in kinds
+    assert all(row["severity"] == "blocking" for row in payload["constraints"])
+    assert len(payload["constraints"]) == 2  # "Thanks!" is a note, not a task
+    assert payload["merge_readiness"]["ready"] is False
+    assert payload["merge_readiness"]["requires_human_click"] is True
+    assert any("changes" in b for b in payload["merge_readiness"]["blockers"])
+    assert any("constraint" in b for b in payload["merge_readiness"]["blockers"])
+
+
+def test_review_ready_only_when_checks_green_and_no_changes(monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [{"id": 1, "state": "APPROVED", "body": "Looks good"}]
+    fake.review_comments = []
+    fake.checks = [{"name": "build", "status": "completed", "conclusion": "success"}]
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    assert payload["constraints"] == []
+    assert payload["merge_readiness"]["ready"] is True
+    assert payload["merge_readiness"]["requires_human_click"] is True
+
+
+def test_review_failed_check_blocks_even_with_approval(monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [{"id": 1, "state": "APPROVED", "body": ""}]
+    fake.checks = [{"name": "test", "status": "completed", "conclusion": "failure"}]
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    assert payload["checks_state"] == "failure"
+    assert payload["merge_readiness"]["ready"] is False
+
+
+def test_review_resolved_ids_clear_a_blocking_constraint():
+    constraints = extract_review_constraints(
+        [], [{"id": 2, "body": "must add a test", "path": "a.py"}],
+        resolved_ids=["comment:2"])
+    assert constraints[0].resolved is True
+
+
+def test_cli_review_requires_a_token(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("AGENTDESCENT_GITHUB_TOKEN", raising=False)
+    code = cli.main(["github", "review", "--pr", "7", "--owner", "o",
+                     "--repo", "r", "--json"])
+    assert code == 2
+    assert "token is not set" in json.loads(capsys.readouterr().out)["error"]
+
 def test_publish_updates_an_existing_branch_with_an_encoded_ref(monkeypatch):
     monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
     fake = FakeGitHub()
@@ -282,3 +359,177 @@ def test_publish_updates_an_existing_branch_with_an_encoded_ref(monkeypatch):
                     if method == "PATCH" and "/git/refs/" in path]
     assert update_calls == ["/repos/o/r/git/refs/heads%2Fagent%2Fskill-csv"]
     assert fake.refs["agent/skill-csv"] == payload["head"]
+
+
+def _green_checks():
+    return [{"name": "build", "status": "completed", "conclusion": "success"}]
+
+
+def test_a_later_approval_clears_that_reviewers_change_request(monkeypatch):
+    # "Please re-review" is this repository's normal flow: a reviewer who asked
+    # for changes and then approved it again must stop blocking the packet.
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [
+        {"id": 1, "state": "CHANGES_REQUESTED",
+         "body": "Please add a test for the empty input",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-10T02:00:00Z"},
+        {"id": 2, "state": "APPROVED", "body": "Looks good now",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-11T02:00:00Z"},
+    ]
+    fake.review_comments = [
+        {"id": 3, "body": "This must handle the timeout path.",
+         "path": "src/f.py", "pull_request_review_id": 1},
+    ]
+    fake.checks = _green_checks()
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    readiness = payload["merge_readiness"]
+    assert readiness["ready"] is True
+    assert readiness["blockers"] == []
+    assert payload["reviews"]["approved"] == 1
+    assert payload["reviews"]["changes_requested"] == 0
+    blocking = [row for row in payload["constraints"]
+                if row["severity"] == "blocking"]
+    assert blocking == []
+
+
+def test_a_superseded_change_request_stays_a_suggestion(monkeypatch):
+    # Only the reviewer's latest review decides; the superseded one is kept as
+    # evidence but its constraints no longer block.
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [
+        {"id": 1, "state": "CHANGES_REQUESTED",
+         "body": "Please add a test for the empty input",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-10T02:00:00Z"},
+        {"id": 2, "state": "APPROVED", "body": "Looks good now",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-11T02:00:00Z"},
+    ]
+    fake.review_comments = [
+        {"id": 4, "body": "This must handle the timeout path.",
+         "path": "src/f.py", "pull_request_review_id": 1},
+    ]
+    fake.checks = _green_checks()
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    by_text = {row["text"]: row["severity"] for row in payload["constraints"]}
+    assert by_text["Please add a test for the empty input"] == "suggestion"
+    assert by_text["This must handle the timeout path."] == "suggestion"
+    assert payload["merge_readiness"]["ready"] is True
+    assert payload["reviews"]["changes_requested"] == 0
+
+
+def test_another_reviewers_change_request_still_blocks(monkeypatch):
+    # Clearing one reviewer's stale request must not clear a different one.
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [
+        {"id": 1, "state": "CHANGES_REQUESTED",
+         "body": "Please add a test for the empty input",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-10T02:00:00Z"},
+        {"id": 2, "state": "APPROVED", "body": "Looks good now",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-11T02:00:00Z"},
+        {"id": 3, "state": "CHANGES_REQUESTED",
+         "body": "Please rename the flag",
+         "user": {"login": "bob"}, "submitted_at": "2026-11-11T03:00:00Z"},
+    ]
+    fake.checks = _green_checks()
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    assert payload["reviews"]["approved"] == 1
+    assert payload["reviews"]["changes_requested"] == 1
+    assert payload["merge_readiness"]["ready"] is False
+    assert "1 reviewer(s) requested changes" in payload["merge_readiness"]["blockers"]
+    blocking = {row["text"] for row in payload["constraints"]
+                if row["severity"] == "blocking"}
+    assert blocking == {"Please rename the flag"}
+
+
+def test_a_plain_comment_does_not_clear_a_change_request(monkeypatch):
+    # GitHub keeps a change request until an approval or a dismissal, so a
+    # later COMMENTED review must not read as if the block were lifted.
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [
+        {"id": 1, "state": "CHANGES_REQUESTED",
+         "body": "Please add a test for the empty input",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-10T02:00:00Z"},
+        {"id": 2, "state": "COMMENTED", "body": "Please fix the typo in the docstring",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-11T02:00:00Z"},
+    ]
+    fake.checks = _green_checks()
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    readiness = payload["merge_readiness"]
+    assert payload["reviews"]["changes_requested"] == 1
+    assert payload["reviews"]["commented"] == 0
+    assert readiness["ready"] is False
+    assert "1 reviewer(s) requested changes" in readiness["blockers"]
+    by_text = {row["text"]: row["severity"] for row in payload["constraints"]}
+    assert by_text["Please add a test for the empty input"] == "blocking"
+    assert by_text["Please fix the typo in the docstring"] == "suggestion"
+
+
+def test_a_comment_after_an_approval_keeps_the_approval(monkeypatch):
+    # A later COMMENTED review must not degrade the reviewer's approval either.
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [
+        {"id": 1, "state": "CHANGES_REQUESTED",
+         "body": "Please add a test for the empty input",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-10T02:00:00Z"},
+        {"id": 2, "state": "APPROVED", "body": "Looks good now",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-11T02:00:00Z"},
+        {"id": 3, "state": "COMMENTED", "body": "One small nit in the docstring",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-11T03:00:00Z"},
+    ]
+    fake.checks = _green_checks()
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    readiness = payload["merge_readiness"]
+    assert payload["reviews"]["approved"] == 1
+    assert payload["reviews"]["changes_requested"] == 0
+    assert payload["reviews"]["commented"] == 0
+    assert readiness["ready"] is True
+    assert readiness["blockers"] == []
+
+
+def test_a_dismissed_change_request_stops_blocking(monkeypatch):
+    # Dismissal is the other way GitHub clears a change request.
+    monkeypatch.setenv("AGENTDESCENT_GITHUB_TOKEN", "secret-token")
+    fake = FakeGitHub()
+    fake.pulls = [{"number": 7, "html_url": "https://github.com/o/r/pull/7",
+                   "title": "feat", "state": "open", "draft": False,
+                   "head": {"sha": "abc"}, "base": {"ref": "main"},
+                   "mergeable": True}]
+    fake.reviews = [
+        {"id": 1, "state": "CHANGES_REQUESTED",
+         "body": "Please add a test for the empty input",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-10T02:00:00Z"},
+        {"id": 2, "state": "DISMISSED", "body": "",
+         "user": {"login": "alice"}, "submitted_at": "2026-11-11T02:00:00Z"},
+    ]
+    fake.checks = _green_checks()
+    payload = github_review(GitHubConfig("o", "r"), 7, transport=fake)
+    readiness = payload["merge_readiness"]
+    assert payload["reviews"]["changes_requested"] == 0
+    assert payload["reviews"]["dismissed"] == 1
+    assert readiness["ready"] is True
+    by_text = {row["text"]: row["severity"] for row in payload["constraints"]}
+    assert by_text["Please add a test for the empty input"] == "suggestion"
