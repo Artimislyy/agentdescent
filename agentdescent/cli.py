@@ -3406,6 +3406,47 @@ def cmd_github(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_harness(a: argparse.Namespace) -> int:
+    """``agentdescent harness`` -- inspect or enforce a harness manifest."""
+    from .harness_manifest import HarnessManifestError, load_manifest
+    from .surface_common import load_json
+
+    action = getattr(a, "harness_cmd", None)
+    try:
+        manifest = load_manifest(a.spec)
+        if action == "manifest":
+            payload = manifest.to_dict()
+            payload["tree"] = manifest.tree_kwargs()
+        elif action == "check":
+            changes = load_json(a.changes, name="changes")
+            payload = manifest.check(changes)
+        else:
+            raise HarnessManifestError("harness needs manifest or check")
+    except (HarnessManifestError, OSError, ValueError) as error:
+        return _surface_error(a, error)
+    if a.json:
+        _out(payload, as_json=True)
+    else:
+        if action == "manifest":
+            print(f"components: {len(payload['components'])}  "
+                  f"max_files: {payload['max_files']}  "
+                  f"max_lines: {payload['max_lines']}")
+            for row in payload["components"]:
+                print(f"{row['name']}  {row['responsibility']}  "
+                      f"editable={row['editable']}  frozen={row['frozen']}  "
+                      f"paths={','.join(row['paths'])}")
+            print(f"editable: {','.join(payload['tree']['editable'])}")
+            print(f"frozen: {','.join(payload['tree']['frozen'])}")
+        else:
+            print(f"ok: {payload['ok']}  files: {payload['files']}  "
+                  f"lines: {payload['lines']}")
+            for violation in payload["violations"]:
+                print(f"violation: {violation}")
+    if action == "check":
+        return 0 if payload["ok"] else 1
+    return 0
+
+
 def cmd_skills(a: argparse.Namespace) -> int:
     """``agentdescent skills`` -- report, audit or search a skill bank."""
     from .skill_bank import SkillBank, SkillBankError
@@ -5028,6 +5069,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--token-env", default="AGENTDESCENT_GITHUB_TOKEN",
                     dest="token_env")
     sp.set_defaults(fn=cmd_github)
+    s = sub.add_parser(
+        "harness", help="inspect or enforce a harness component manifest")
+    harness_sub = s.add_subparsers(dest="harness_cmd", required=True)
+    sp = harness_sub.add_parser("manifest", help="show components and FileTree globs")
+    sp.add_argument("--spec", required=True, help="harness manifest JSON")
+    sp.set_defaults(fn=cmd_harness)
+    sp = harness_sub.add_parser("check", help="validate edits against the contract")
+    sp.add_argument("--spec", required=True, help="harness manifest JSON")
+    sp.add_argument("--changes", required=True,
+                    help="JSON mapping of path -> content (or a path list)")
+    sp.set_defaults(fn=cmd_harness)
     s = sub.add_parser(
         "skills", help="report, audit or search a durable skill bank")
     skills_sub = s.add_subparsers(dest="skills_cmd", required=True)
