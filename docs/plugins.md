@@ -170,7 +170,11 @@ agentdescent serve &            # http://127.0.0.1:8787/ -- GET only
 The panel is a plain browser page as well, so it is useful without dsh. The
 server answers a cross-origin read **only for a loopback `Origin`**, so the dsh
 page on `:3080` can read it and a website you happen to visit cannot; without
-the server running the panel just says how to start it.
+the server running the panel just says how to start it. A host that needs to
+follow a run without polling can read `GET /api/runs/<id>/events`, a
+Server-Sent Events stream of status changes and new rounds; event ids are the
+round index, so a reconnect can send `Last-Event-ID` and resume. It is
+read-only and loopback-only like the JSON endpoints.
 
 Two things a dsh plugin needs that are easy to miss, both found by installing it
 for real: `package.json` must carry `"dsh": {"bundle": {"patch":

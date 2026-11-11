@@ -901,6 +901,31 @@ def execute(rd: RunDir, *, budget_usd: Optional[float] = None,
 DEFAULT_HTTP_HOST = "127.0.0.1"
 DEFAULT_HTTP_PORT = 8787
 
+#: How often ``GET /api/runs/<id>/events`` checks ``rounds.jsonl`` for a new
+#: line. The stream is a local read model, not a message bus: polling a small
+#: append-only file is cheaper than wiring a thread-safe pub/sub just for this
+#: endpoint, and it keeps the server read-only. Tests pass a smaller value.
+EVENT_POLL_SECONDS = 0.5
+
+#: How long an idle stream waits before writing a ``: keep-alive`` comment.
+#: A module constant rather than a literal so a test can exercise the branch;
+#: proxies and browsers otherwise drop a connection that says nothing for a
+#: while, and the client would silently stop following a run with long rounds.
+EVENT_KEEPALIVE_SECONDS = 15.0
+
+
+def _run_id_in(rest: str) -> Optional[str]:
+    """The run id in the path after ``/api/runs/``, or ``None`` if it is not one.
+
+    A run id indexes a directory under the store, so a separator or a dot entry
+    is a traversal attempt. Both endpoints that take an id use this one check so
+    the SSE route and the JSON route cannot drift apart.
+    """
+    if not rest or "/" in rest or rest in (".", ".."):
+        return None
+    return rest
+
+
 _PANEL_HTML = """<!doctype html>
 <meta charset="utf-8"><title>AgentDescent runs</title>
 <style>
@@ -965,7 +990,7 @@ def _is_loopback_origin(origin: str) -> bool:
     return (parsed.hostname or "").lower() in ("127.0.0.1", "::1", "localhost")
 
 
-def _http_handler(store: Optional[str]):
+def _http_handler(store: Optional[str], event_poll: float):
     from http.server import BaseHTTPRequestHandler
 
     class Handler(BaseHTTPRequestHandler):
@@ -996,6 +1021,86 @@ def _http_handler(store: Optional[str]):
                               allow_nan=False).encode()
             self._send(code, body, "application/json")
 
+        def _events(self, run_id: str) -> None:
+            """Stream this run's status and new rounds as Server-Sent Events.
+
+            The JSON endpoint answers "what is the state now"; a panel or a
+            platform needs "tell me when the next round lands" without polling.
+            The stream is read-only and poll-based: ``rounds.jsonl`` is appended
+            by the run's own process, so no in-process event bus is needed and
+            the server keeps its single read-only boundary.
+
+            Event ids are the round index, so a reconnecting client can send
+            ``Last-Event-ID`` and resume after the last round it saw.
+            """
+            try:
+                rd = get(run_id, store=store)
+            except RunStoreError as e:
+                return self._json(404, {"error": str(e)})
+
+            last_id = -1
+            raw_id = self.headers.get("Last-Event-ID")
+            if raw_id:
+                try:
+                    last_id = int(raw_id)
+                except ValueError:
+                    last_id = -1
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.close_connection = True
+            # A reverse proxy that buffers would hold every event until the
+            # response ends, which for a live run is never.
+            self.send_header("X-Accel-Buffering", "no")
+            origin = self.headers.get("Origin")
+            if origin and _is_loopback_origin(origin):
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+            self.end_headers()
+
+            def emit(event: str, payload: Any,
+                     event_id: Optional[int] = None) -> None:
+                if event_id is not None:
+                    self.wfile.write(f"id: {event_id}\n".encode())
+                self.wfile.write(f"event: {event}\n".encode())
+                body = json.dumps(_sanitize_jsonable(payload), default=str,
+                                  allow_nan=False)
+                self.wfile.write(("data: " + body + "\n\n").encode())
+                self.wfile.flush()
+
+            try:
+                # The client should reconnect after a dropped stream; the
+                # event ids make that resume rather than replay.
+                self.wfile.write(b"retry: 1000\n\n")
+                self.wfile.flush()
+                state = rd.status()
+                emit("status", state.to_dict())
+                last_state = state.state
+                last_keepalive = time.monotonic()
+                while True:
+                    state = rd.status()
+                    if state.state != last_state:
+                        emit("status", state.to_dict())
+                        last_state = state.state
+                    for row in rd.rounds():
+                        index = row.get("round")
+                        if isinstance(index, int) and index > last_id:
+                            emit("round", row, index)
+                            last_id = index
+                    if state.state in ("done", "failed", "cancelled"):
+                        self.close_connection = True
+                        return
+                    if time.monotonic() - last_keepalive >= EVENT_KEEPALIVE_SECONDS:
+                        self.wfile.write(b": keep-alive\n\n")
+                        self.wfile.flush()
+                        last_keepalive = time.monotonic()
+                    time.sleep(event_poll)
+            except (BrokenPipeError, ConnectionResetError):
+                # The panel closed the tab; that is a normal end for a stream.
+                return
+
         def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's spelling
             path = self.path.split("?", 1)[0].rstrip("/") or "/"
             if path in ("/", "/index.html"):
@@ -1003,10 +1108,14 @@ def _http_handler(store: Optional[str]):
             if path == "/api/runs":
                 return self._json(200, [s.to_dict() for s in list_runs(store=store)])
             if path.startswith("/api/runs/"):
-                run_id = path[len("/api/runs/"):]
-                # The id indexes a directory, so anything with a separator in it
-                # is a traversal attempt rather than a run.
-                if not run_id or "/" in run_id or run_id in (".", ".."):
+                rest = path[len("/api/runs/"):]
+                if rest.endswith("/events"):
+                    run_id = _run_id_in(rest[:-len("/events")])
+                    if run_id is None:
+                        return self._json(400, {"error": "bad run id"})
+                    return self._events(run_id)
+                run_id = _run_id_in(rest)
+                if run_id is None:
                     return self._json(400, {"error": "bad run id"})
                 try:
                     rd = get(run_id, store=store)
@@ -1022,16 +1131,24 @@ def _http_handler(store: Optional[str]):
 
 
 def serve_http(*, host: str = DEFAULT_HTTP_HOST, port: int = DEFAULT_HTTP_PORT,
-               store: Optional[str] = None, serve_forever: bool = True):
+               store: Optional[str] = None, serve_forever: bool = True,
+               event_poll: float = EVENT_POLL_SECONDS):
     """Serve the run store read-only on loopback, for a host UI to embed.
 
-    ``GET /`` is a small self-refreshing page, ``GET /api/runs`` the list and
-    ``GET /api/runs/<id>`` one run with its rounds. Returns the server so a
-    caller (a test) can drive it; with ``serve_forever`` it blocks.
+    ``GET /`` is a small self-refreshing page, ``GET /api/runs`` the list,
+    ``GET /api/runs/<id>`` one run with its rounds, and
+    ``GET /api/runs/<id>/events`` a Server-Sent Events stream of status changes
+    and new rounds. Returns the server so a caller (a test) can drive it; with
+    ``serve_forever`` it blocks.
+
+    ``event_poll`` is how often the stream checks ``rounds.jsonl``; it is a
+    wall-clock knob for a local read model, not a result knob.
     """
     from http.server import ThreadingHTTPServer
 
-    httpd = ThreadingHTTPServer((host, port), _http_handler(store))
+    if event_poll <= 0:
+        raise ValueError("event_poll must be positive")
+    httpd = ThreadingHTTPServer((host, port), _http_handler(store, event_poll))
     if serve_forever:
         try:
             httpd.serve_forever()
