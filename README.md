@@ -105,7 +105,7 @@ print(result.outcomes())      # why it went that way
 On 40 HotpotQA items (12 held out) this took held-out exact match from **0.167
 to 0.583**, learning *"Respond with only the requested answer, omitting any extra
 explanation or restatement."* That evolves an **instruction** (`SingleSlot`), not
-an Agent Skill folder — for a library run `python -m examples.skill_library_evolution --dry-run`.
+an Agent Skill folder — for a library run `agentdescent demo --kind skill_library`.
 Pass `agent=LLMAgent(claude_code())` (or any
 [agent or LLM](https://thinkflowlab.github.io/agentdescent/agents/)) instead of
 `run`/`propose` to evolve against a tool-using CLI agent.
@@ -203,7 +203,7 @@ for you to check first.
 `agent_dir`, `agent_code`, `policy_slot` — or **`plugin`**: the host plugins
 themselves are evolvable, each rollout in an isolated copy of the host with
 hooks and permissions frozen and a recursion guard. Flagship library demo:
-`python -m examples.skill_library_evolution --dry-run`.
+`agentdescent demo --kind skill_library`.
 [The plugin, step by step →](https://thinkflowlab.github.io/agentdescent/plugin-quickstart/)
 · [set it up and test it →](https://thinkflowlab.github.io/agentdescent/testing-guide/)
 

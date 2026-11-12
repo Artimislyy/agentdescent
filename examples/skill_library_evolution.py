@@ -2,12 +2,12 @@
 Evolve a multi-file Agent Skill library an agent reads off disk.
 
 Flagship skill path: ≥2 ``*/SKILL.md`` with YAML frontmatter, ``layout="skill_library"``.
-Offline agent fails if it does not open those files. Contrast
-``examples.skill_evolution`` (AppendRules playbook), ``examples.skill_dir_evolution``
-(one skill), ``examples.evoskill`` (paper port). Seed is wrong: ``COLUMN: id`` /
-``FIELD: month``.
+The installed command is ``agentdescent demo --kind skill_library`` (any cwd, no
+key). This module is the source-checkout CLI: ``--dry-run``, ``--agent
+claude-code`` / ``codex``, and ``--install-to``.
 
-    python -m examples.skill_library_evolution --dry-run
+    agentdescent demo --kind skill_library
+    python -m examples.skill_library_evolution --dry-run   # source checkout
     python -m examples.skill_library_evolution
     python -m examples.skill_library_evolution --install-to ~/.claude/skills
 """
@@ -15,99 +15,27 @@ Offline agent fails if it does not open those files. Contrast
 from __future__ import annotations
 
 import argparse
-import json
-import os
-import random
 import shutil
-import sys
-import tempfile
-from typing import Dict, List, Mapping, Optional
+from typing import Dict
 
 from agentdescent import (
     AggregatorConfig, FileTree, Policies, evolve, load_tree, scorer,
     tree_reflector, tree_runner,
 )
-from agentdescent.agents import claude_code, cli_agent, codex, openai_compatible
+from agentdescent.agents import claude_code, codex, openai_compatible
+from agentdescent.demo import (
+    LIBRARY_SKILL_NAMES as SKILL_NAMES,
+    library_rows as make_rows,
+    library_validator,
+    make_library_dir,
+    offline_library_agent as offline_agent,
+    offline_library_reflector as _offline_library_reflector,
+)
 from agentdescent.governance import SKILL_BLAST_RADIUS
-from agentdescent.skillspec import validate_skill_tree
-
-SKILL_NAMES = ("csv-total", "date-parse")
-
-_CSV_SKILL = """\
----
-name: csv-total
-description: Total one column of data.csv. Use when asked for a CSV column sum.
----
-# csv-total
-STATUS: draft
-Read `references/rules.md` for the column; reply with only the sum.
-"""
-
-_DATE_SKILL = """\
----
-name: date-parse
-description: Extract a calendar field from date.txt. Use when asked for year/month/day.
----
-# date-parse
-STATUS: draft
-Read `references/rules.md` for the field; parse `date.txt` (YYYY-MM-DD); reply with only that value.
-"""
 
 
-def make_library_dir() -> str:
-    root = tempfile.mkdtemp(prefix="agentdescent-skill-library-")
-    for name, skill, rules in (
-        ("csv-total", _CSV_SKILL, "COLUMN: id\n"),
-        ("date-parse", _DATE_SKILL, "FIELD: month\n"),
-    ):
-        path = os.path.join(root, name, "references")
-        os.makedirs(path)
-        open(os.path.join(root, name, "SKILL.md"), "w").write(skill)
-        open(os.path.join(path, "rules.md"), "w").write(rules)
-    return root
-
-
-def library_validator(state: Mapping[str, Optional[str]]) -> Optional[str]:
-    names = {p.split("/", 1)[0] for p in state if p and "/" in p}
-    for name in sorted(names):
-        skill_state = {}
-        for p, body in state.items():
-            if p == f"{name}/SKILL.md":
-                skill_state["SKILL.md"] = body
-            elif p.startswith(f"{name}/"):
-                skill_state[p[len(name) + 1:]] = body
-        if "SKILL.md" not in skill_state:
-            continue
-        errors = validate_skill_tree(skill_state, root_name=name)
-        if errors:
-            return f"skill-library-{name}-{errors[0]}"
-    return None
-
-
-def make_rows(n: int = 16, seed: int = 0) -> List[dict]:
-    rng = random.Random(seed)
-    rows = []
-    for i in range(n // 2):
-        amounts = [rng.randint(1, 99) for _ in range(rng.randint(3, 6))]
-        csv = "id,amount,note\n" + "\n".join(
-            f"{j + 1},{a},row-{j}" for j, a in enumerate(amounts))
-        rows.append({
-            "kind": "csv",
-            "prompt": "What is the total of the requested column in data.csv?",
-            "gold": str(sum(amounts)),
-            "fixtures": {"data.csv": csv},
-        })
-    rng2 = random.Random(seed + 17)
-    for i in range(n - n // 2):
-        y, m, d = rng2.randint(1990, 2025), rng2.randint(1, 12), rng2.randint(1, 28)
-        rows.append({
-            "kind": "date",
-            "prompt": "What year is recorded in date.txt?",
-            "gold": str(y),
-            "fixtures": {"date.txt": f"{y:04d}-{m:02d}-{d:02d}\n"},
-        })
-    rng.shuffle(rows)
-    return rows
+def offline_reflector():
+    return _offline_library_reflector
 
 
 def to_tasks(rows):
@@ -115,71 +43,6 @@ def to_tasks(rows):
     return [Task(id=f"t{i}", prompt=r["prompt"],
                  meta={"gold": r["gold"], "fixtures": r["fixtures"], "kind": r["kind"]})
             for i, r in enumerate(rows)]
-
-
-_OFFLINE_AGENT = r"""
-import csv, os, re, sys
-skills = os.path.join('.claude', 'skills')
-
-def read_rules(name):
-    p = os.path.join(skills, name, 'references', 'rules.md')
-    return open(p).read() if os.path.exists(p) else ''
-
-if os.path.exists('data.csv'):
-    rules = read_rules('csv-total')
-    if not rules:
-        print('MISSING_SKILL'); sys.exit(0)
-    m = re.search(r'COLUMN:\s*(\w+)', rules)
-    column = m.group(1) if m else 'id'
-    rows = list(csv.DictReader(open('data.csv')))
-    print(sum(int(r[column]) for r in rows if r.get(column, '').strip().isdigit()))
-elif os.path.exists('date.txt'):
-    rules = read_rules('date-parse')
-    if not rules:
-        print('MISSING_SKILL'); sys.exit(0)
-    m = re.search(r'FIELD:\s*(\w+)', rules)
-    field = (m.group(1) if m else 'month').lower()
-    y, mo, d = open('date.txt').read().strip().split('-')
-    print({'year': str(int(y)), 'month': str(int(mo)), 'day': str(int(d))}.get(field, 'UNKNOWN'))
-else:
-    print('NO_FIXTURE')
-"""
-
-
-def offline_agent():
-    return cli_agent([sys.executable, "-c", _OFFLINE_AGENT])
-
-
-def offline_reflector():
-    def complete(prompt: str) -> str:
-        edits = []
-        # Per-skill STATUS flip from the inlined --- <slug>/SKILL.md --- sections (#847).
-        for name in SKILL_NAMES:
-            marker = f"--- {name}/SKILL.md ---"
-            if marker not in prompt:
-                continue
-            section = prompt.split(marker, 1)[1].split("\n--- ", 1)[0]
-            if "STATUS: draft" not in section:
-                continue
-            body = _CSV_SKILL if name == "csv-total" else _DATE_SKILL
-            edits.append({
-                "path": f"{name}/SKILL.md",
-                "content": body.replace("STATUS: draft", "STATUS: ready"),
-            })
-        if "COLUMN: amount" not in prompt:
-            edits.append({"path": "csv-total/references/rules.md",
-                          "content": "COLUMN: amount\n"})
-        if "FIELD: year" not in prompt:
-            edits.append({"path": "date-parse/references/rules.md",
-                          "content": "FIELD: year\n"})
-        if not edits:
-            edits.append({"path": "csv-total/references/rules.md",
-                          "content": "COLUMN: amount\n"})
-        return "<EDITS>" + json.dumps({
-            "rationale": "mark skills ready; sum amount; date tasks ask for year",
-            "edits": edits[:2],
-        }) + "</EDITS>"
-    return complete
 
 
 def estimate_calls(rounds: int, workers: int, tasks: int) -> Dict[str, int]:

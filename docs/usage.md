@@ -54,8 +54,10 @@ python -m examples.rq2_staleness
 ### Evolving a directory (a skill folder a real agent reads)
 
 ```bash
-python -m examples.skill_dir_evolution
-python -m examples.skill_library_evolution --dry-run
+agentdescent demo
+agentdescent demo --kind skill_library
+python -m examples.skill_dir_evolution             # source checkout only
+python -m examples.skill_library_evolution --dry-run  # source checkout only
 ```
 
 Materialises a candidate skill directory into a throwaway workspace at

@@ -259,7 +259,7 @@ def test_skip_reason_only_for_listed_skips():
 
 
 def test_demo_labels_itself_smoke_and_points_at_library_example(tmp_path, monkeypatch):
-    """#847: demo stays a one-commit smoke; multi-round lives in skill_library."""
+    """#878: default demo is a one-commit smoke; library path is the installed CLI."""
     monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "home"))
     buf = io.StringIO()
     with redirect_stdout(buf):
@@ -268,7 +268,114 @@ def test_demo_labels_itself_smoke_and_points_at_library_example(tmp_path, monkey
     out = buf.getvalue()
     assert code == 0, out
     assert "smoke trajectory" in out
-    assert "skill_library_evolution" in out
+    assert "demo --kind skill_library" in out
+    assert "skill_library_evolution" not in out
+
+
+def test_build_library_writes_two_valid_skills(tmp_path):
+    spec = demo.build(str(tmp_path), kind="skill_library")
+    assert spec["kind"] == "skill_library"
+    assert spec["target"] == str(tmp_path)
+    assert spec["agent"]["ref"].startswith("agentdescent.")
+    assert spec["reflect"]["ref"].startswith("agentdescent.")
+    assert (tmp_path / "csv-total" / "SKILL.md").exists()
+    assert (tmp_path / "date-parse" / "SKILL.md").exists()
+    assert (tmp_path / "csv-total" / "references" / "rules.md").read_text().strip() == "COLUMN: id"
+    assert (tmp_path / "date-parse" / "references" / "rules.md").read_text().strip() == "FIELD: month"
+    rows = [json.loads(l) for l in (tmp_path / "cases.jsonl").read_text().splitlines()]
+    assert len(rows) == 12
+    assert {r["kind"] for r in rows} == {"csv", "date"}
+
+
+def test_demo_kind_skill_library_runs_and_edits_a_skill_body(tmp_path, monkeypatch):
+    """#878: installed CLI evolves a ≥2-skill library and commits a SKILL.md edit."""
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "home"))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                         "--kind", "skill_library",
+                         "--dir", str(tmp_path / "work")])
+    out = buf.getvalue()
+    assert code == 0, out
+    assert "held-out reward: 0.000 -> 1.000" in out, out
+    assert "COLUMN: amount" in out and "FIELD: year" in out, out
+    assert "init <your-skill-library> --kind skill_library" in out
+    assert "python -m examples" not in out
+    rounds = [line for line in out.splitlines() if line.strip().startswith("round ")]
+    assert len(rounds) >= 2, out
+    runs = runstore.list_runs(store=str(tmp_path / "runs"))
+    assert len(runs) == 1 and runs[0].state == "done"
+    # disk stays at the seed; the body edit lives in the run result
+    assert "STATUS: draft" in (tmp_path / "work" / "csv-total" / "SKILL.md").read_text()
+    assert "csv-total/rules.md" in out and "date-parse/rules.md" in out
+    result = runstore.get(runs[0].run_id, store=str(tmp_path / "runs")).result()
+    assert result is not None
+    assert "STATUS: ready" in result.state["csv-total/SKILL.md"]
+    assert "COLUMN: amount" in result.state["csv-total/references/rules.md"]
+    assert "FIELD: year" in result.state["date-parse/references/rules.md"]
+
+
+def test_demo_kind_skill_library_json(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "home"))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                         "--kind", "skill_library", "--json",
+                         "--dir", str(tmp_path / "work")])
+    out = buf.getvalue()
+    assert code == 0, out
+    payload = json.loads(out)
+    assert payload["ok"] is True
+    assert payload["kind"] == "skill_library"
+    assert payload["initial_reward"] == 0.0
+    assert payload["final_reward"] == 1.0
+    assert payload["outcomes"].get("committed", 0) >= 1
+    assert "COLUMN: amount" in payload["learned"]
+    assert "FIELD: year" in payload["learned"]
+    assert any("skill_library" in step for step in payload["next"])
+    assert "A two-skill library" not in out
+
+
+def test_demo_kind_skill_library_with_archive_selection(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTDESCENT_HOME", str(tmp_path / "home"))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                         "--kind", "skill_library",
+                         "--algorithm", "archive_selection",
+                         "--dir", str(tmp_path / "work")])
+    out = buf.getvalue()
+    assert code == 0, out
+    assert "algorithm: archive_selection" in out
+    assert "held-out reward: 0.000 -> 1.000" in out, out
+    spec = json.loads((tmp_path / "work" / "spec.json").read_text())
+    assert spec["kind"] == "skill_library" and spec["algorithm"] == "archive_selection"
+
+
+def test_demo_kind_skill_library_refuses_text_only_card(tmp_path, capsys):
+    code = cli.main(["--store", str(tmp_path / "runs"), "demo",
+                     "--kind", "skill_library", "--algorithm", "gepa",
+                     "--dir", str(tmp_path / "work")])
+    err = capsys.readouterr().err
+    assert code == 2
+    assert "skill_library" in err and "gepa" in err
+    assert not (tmp_path / "work").exists()
+
+
+def test_docs_lead_with_installed_library_demo():
+    """#878: README / quickstart / usage name the wheel command first."""
+    files = [
+        os.path.join(ROOT, "README.md"),
+        os.path.join(ROOT, "docs", "quickstart-skill.md"),
+        os.path.join(ROOT, "docs", "usage.md"),
+    ]
+    for path in files:
+        text = open(path, encoding="utf-8").read()
+        assert "demo --kind skill_library" in text, path
+        for line in text.splitlines():
+            if "python -m examples.skill_library_evolution" in line:
+                lowered = line.lower()
+                assert "checkout" in lowered, f"{path}: {line!r} should say it needs a source checkout"
 
 
 @pytest.mark.parametrize("name", ["gepa", "archive_selection"])

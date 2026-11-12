@@ -7,7 +7,7 @@ description: Instruction / one Agent Skill / skill library — pick the artifact
 Pick the artifact: **instruction** (`SingleSlot` / `AppendRules`, this page /
 [`skill_evolution`](skill-evolution.md)), **one Agent Skill**
 ([`skill_dir_evolution`](quickstart-directory.md)), or a **skill library**
-(`python -m examples.skill_library_evolution --dry-run`, Path A `--kind skill_library`,
+(`agentdescent demo --kind skill_library`, Path A `init --kind skill_library`,
 [`evoskill`](algo-evoskill.md) or [`archive_selection`](algorithms.md)).
 A `SingleSlot` result is not an Agent Skill folder.
 
@@ -24,9 +24,10 @@ agentdescent plan spec.json
 # agentdescent evolve spec.json
 ```
 
-Offline smoke of the same *card* (skill_dir fixture, not a library tree):
-`agentdescent demo --algorithm archive_selection`. Multi-round library teaching
-still lives in `python -m examples.skill_library_evolution --dry-run`.
+Offline library teaching (two `*/SKILL.md`, no key):
+`agentdescent demo --kind skill_library`. The same *card* on the one-skill
+smoke is `agentdescent demo --algorithm archive_selection`; both work with
+`--algorithm archive_selection`.
 
 ---
 
@@ -140,7 +141,7 @@ custom optimizer (`aggregator_factory=`), a multi-step agent as `run=` — is
 
 ## Next
 
-* **Want a real Agent Skill / library?** Path A: `init --kind skill_library --algorithm archive_selection` (above), or `python -m examples.skill_library_evolution --dry-run` / [`evoskill`](algo-evoskill.md); then `agentdescent apply <run_id> --install-to ~/.claude/skills`, or [evolve a directory](quickstart-directory.md).
+* **Want a real Agent Skill / library?** Offline: `agentdescent demo --kind skill_library`. Path A: `init --kind skill_library --algorithm archive_selection` (above), or [`evoskill`](algo-evoskill.md); then `agentdescent apply <run_id> --install-to ~/.claude/skills`, or [evolve a directory](quickstart-directory.md).
 * **Want the knobs?** [The `evolve` method](evolution.md).
 * **Want to know why it works?** [Concepts](concepts.md), then
   [the aggregator](aggregator.md).
