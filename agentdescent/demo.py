@@ -499,6 +499,28 @@ def build(root: str, algorithm: Optional[str] = None,
     return spec
 
 
+#: How many rules a one-line ``learned`` summary names before it counts the rest.
+_RULES_SHOWN = 2
+
+
+def _rules_line(state: Dict[str, Any]) -> str:
+    """The learned rule text of a rule-id keyed state, without the ids (#927)."""
+    rules: List[str] = []
+    for value in state.values():
+        if not isinstance(value, str):
+            continue
+        text = value.strip()
+        if text and text not in rules:
+            rules.append(text)
+    if not rules:
+        return "rules -> (none)"
+    shown = rules[:_RULES_SHOWN]
+    line = " | ".join(shown)
+    if len(rules) > len(shown):
+        line = f"{line} (+{len(rules) - len(shown)} more)"
+    return f"rules -> {line!r}"
+
+
 def learned_summary(state: Dict[str, Any], *, kind: str) -> str:
     """One-line description of what the offline demo committed, for ``cmd_demo``."""
     if kind == "text":
@@ -511,7 +533,10 @@ def learned_summary(state: Dict[str, Any], *, kind: str) -> str:
         bullets = [v for k, v in state.items() if isinstance(v, str) and "::" in v]
         if bullets:
             return f"playbook -> {bullets[-1].strip()!r}"
-        return f"state -> {state!r}"
+        # #927: what is left is a mapping of internal rule ids to rule text
+        # (rrsi). Print the rules, never the ids or the dict repr -- `show`
+        # renders the same run as text, and a reader compares the two.
+        return _rules_line(state)
     if kind == "skill_library":
         parts = []
         for name in LIBRARY_SKILL_NAMES:
