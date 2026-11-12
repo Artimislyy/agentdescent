@@ -590,6 +590,11 @@ the run holds the resolved paths and is re-runnable from anywhere.
     log.txt        the detached process's output
 ```
 
+If the store cannot be created (a read-only home, a container without a
+writable `$HOME`, a mistyped `--store`, or a path that is a file), the CLI
+exits 2 with one `error: cannot create run store <path>: <reason>` line, or
+`{"ok": false, "error": ...}` under `--json`, instead of a traceback (#907).
+
 A run outlives the tool call that started it, but it **inherits the environment
 of the process that launched it** — including provider keys and, in sandboxed
 or proxied setups, `HTTPS_PROXY`. That is what you want from an interactive

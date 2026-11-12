@@ -542,12 +542,24 @@ def create(spec_dict: Dict[str, Any], *, run_id: Optional[str] = None,
            store: Optional[str] = None) -> RunDir:
     """Make a run directory and write the spec and an initial status. Runs nothing."""
     base = store_path(store)
-    os.makedirs(base, exist_ok=True)
+    if os.path.exists(base) and not os.path.isdir(base):
+        raise RunStoreError(f"cannot create run store {base}: not a directory")
+    try:
+        os.makedirs(base, exist_ok=True)
+    except OSError as e:
+        # A read-only HOME, a container without a writable home, or a mistyped
+        # --store used to escape as a raw traceback (#907).
+        raise RunStoreError(
+            f"cannot create run store {base}: {e.strerror or e}") from e
     rid = run_id or _new_id()
     rd = RunDir(os.path.join(base, rid))
     if os.path.exists(rd.path):
         raise RunStoreError(f"run {rid!r} already exists")
-    os.makedirs(rd.path)
+    try:
+        os.makedirs(rd.path)
+    except OSError as e:
+        raise RunStoreError(
+            f"cannot create run directory {rd.path}: {e.strerror or e}") from e
     _write_json(rd.spec_path, spec_dict)
     rd.update_status(state="created", kind=spec_dict.get("kind"),
                      target=spec_dict.get("target"),
