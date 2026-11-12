@@ -299,6 +299,26 @@ def test_opencode_keeps_the_other_servers_and_settings(tmp_path):
     assert after["theme"] == "dark"
 
 
+def test_empty_uninstall_omits_marketplace_for_file_only_hosts(tmp_path):
+    """#890: grok-bot / dsh / opencode are not installed via a host marketplace."""
+    for host in ("grok-bot", "dsh", "opencode"):
+        lines = uninstall(host, home=str(tmp_path))
+        assert lines == [
+            f"nothing to remove: agentdescent is not installed for {host}"
+        ], lines
+
+
+def test_empty_uninstall_mentions_marketplace_for_claude_code_and_codex(tmp_path):
+    """#890: those two hosts really can be wired through a marketplace."""
+    for host in ("claude-code", "codex"):
+        lines = uninstall(host, home=str(tmp_path))
+        assert len(lines) == 1, lines
+        assert lines[0].startswith(
+            f"nothing to remove: agentdescent is not installed for {host}")
+        assert "marketplace" in lines[0]
+        assert "plugin command" in lines[0]
+
+
 # -- the CLI ----------------------------------------------------------------------
 
 
@@ -327,6 +347,21 @@ def test_cli_exit_status_says_whether_anything_needs_a_manual_step(tmp_path, cap
 def test_cli_uninstall_rejects_an_unknown_host():
     with pytest.raises(SystemExit):
         cli.main(["uninstall", "vim"])
+
+
+def test_cli_empty_uninstall_grok_bot_omits_marketplace(tmp_path, capsys):
+    """#890: the user-facing grok-bot empty state has no marketplace aside."""
+    home = str(tmp_path)
+    assert cli.main(["uninstall", "grok-bot", "--home", home]) == 0
+    out = capsys.readouterr().out
+    assert "nothing to remove: agentdescent is not installed for grok-bot" in out
+    assert "marketplace" not in out
+    assert cli.main(["uninstall", "grok-bot", "--home", home, "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["lines"] == [
+        "nothing to remove: agentdescent is not installed for grok-bot"
+    ]
 
 
 def test_opencode_uninstall_undoes_the_opencode_json_fallback(tmp_path):

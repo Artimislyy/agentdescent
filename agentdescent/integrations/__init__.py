@@ -1810,6 +1810,21 @@ _UNINSTALL: Dict[str, Callable[[str, _Eraser], None]] = {
 }
 
 
+def _empty_uninstall_note(host: str) -> str:
+    """Line printed when uninstall finds none of this package's files.
+
+    Claude Code and Codex can also be wired through the host's own
+    marketplace (``/plugin install``, ``codex plugin add``), which leaves
+    nothing here. Grok Bot, dsh and OpenCode are only installed by
+    ``agentdescent install`` (#890).
+    """
+    msg = f"nothing to remove: agentdescent is not installed for {host}"
+    if host in ("claude-code", "codex"):
+        msg += (" (files from the host's own marketplace are removed "
+                "with its plugin command)")
+    return msg
+
+
 def uninstall(host: str, *, dry_run: bool = False, home: Optional[str] = None) -> List[str]:
     """Undo ``install(host)``. Returns the lines to print: what was removed or kept.
 
@@ -1817,9 +1832,11 @@ def uninstall(host: str, *, dry_run: bool = False, home: Optional[str] = None) -
     host's config. A config entry that is no longer exactly what ``install``
     writes -- you edited the launcher, or wrote it yourself -- is kept and
     reported, and a config file with comments (OpenCode's ``opencode.jsonc``) is
-    never rewritten. The run store under ``~/.agentdescent`` is untouched. An
-    install made through the host's own marketplace is removed with that host's
-    plugin command. ``dry_run`` reports without changing anything.
+    never rewritten. The run store under ``~/.agentdescent`` is untouched.
+    Claude Code and Codex can also be wired through the host's own marketplace,
+    which leaves no files here; those hosts' empty-state note points at the
+    host's plugin command. Grok Bot, dsh and OpenCode are only installed by
+    ``agentdescent install``. ``dry_run`` reports without changing anything.
     """
     host = canonical_host(host)
     if host not in HOSTS:
@@ -1828,6 +1845,5 @@ def uninstall(host: str, *, dry_run: bool = False, home: Optional[str] = None) -
     e = _Eraser(dry_run, honour_env=honour_env)
     _UNINSTALL[host](home, e)
     if not e.lines:
-        e.note(f"nothing to remove: agentdescent is not installed for {host} "
-               "(files from the host's own marketplace are removed with its plugin command)")
+        e.note(_empty_uninstall_note(host))
     return e.lines
