@@ -35,7 +35,7 @@ import os
 from typing import Annotated, Any, Dict, Optional, Sequence, Tuple
 
 from . import __version__, runstore
-from .cli import (NESTED_ENV, apply_from_payload, apply_payload, doctor_report,
+from .cli import (NESTED_ENV, apply_with_target, doctor_report,
                  plan_payload, require_cli_on_path, require_resume_host_on_path,
                  require_resume_not_quota_exhausted, require_resume_not_solved,
                  resolve_run_id, show_payload, status_payload)
@@ -168,10 +168,10 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
         "from the outcome histogram."),
     "apply": (
         "DESTRUCTIVE: write an evolved artifact back over a target. Pass `run_id` to "
-        "install a finished run's result (`latest`/`last` = newest run, same as the CLI; optional `to` / `install_to` overrides the run's target; `install_to` is the host-skills-root form for skill_library), OR "
-        "pass `from` + `to` to install an on-disk artifact such as a campaign "
-        "`final_target` -- same rules as CLI `apply --from` (from requires to; mutually "
-        "exclusive with run_id; symlinks refused). Backs the original up first unless "
+        "install a finished run's result (`latest`/`last` = newest run, same as the CLI; optional `to` / `install_to` overrides the run's target; `install_to` accepts a directory path or a host name/alias: `claude-code`, `codex`, `opencode`, `dsh`, `grok-bot`), OR "
+        "pass `from` + `to`/`install_to` to install an on-disk artifact such as a campaign "
+        "`final_target` -- same rules as CLI `apply --from` (`from` requires `to` or `install_to`; mutually "
+        "exclusive with `run_id`; symlinks refused; `grok-bot` never writes and returns manual save paths). Backs the original up first unless "
         "backup=false. Ask the user explicitly before calling this; use dry_run=true to "
         "preview. Returns written / unchanged / backup; `noop: true` means the target "
         "already matched, so nothing was written and no backup exists -- tell the user "
@@ -659,30 +659,26 @@ class Tools:
     def apply(self, run_id: Optional[str] = None, to: Optional[str] = None,
               dry_run: bool = False, backup: bool = True, *,
               source: Optional[str] = None,
-              install_to: Optional[str] = None) -> Dict[str, Any]:
+              install_to: Optional[str] = None,
+              home: Optional[str] = None) -> Dict[str, Any]:
         """Install a run result (`run_id`) or an on-disk artifact (`source` + dest).
 
         ``source`` is the MCP/`CLI` ``from`` path (campaign ``final_target``, etc.).
         ``run_id`` and ``source`` are mutually exclusive; ``source`` requires
-        ``to`` or ``install_to`` (alias for a host skills root such as
-        ``~/.claude/skills`` — same write/backup semantics as ``to``, no prune).
+        ``to`` or ``install_to`` (a path or a known host name/alias such as
+        ``codex``, ``opencode``, ``dsh``, ``claude-code``; ``grok-bot`` refuses
+        writes and returns user-skill save instructions).
         """
-        from .cli import resolve_apply_dest
         try:
-            dest = resolve_apply_dest(to, install_to)
-            if source:
-                if run_id:
-                    raise runstore.RunStoreError(
-                        "pass a run_id or from PATH, not both")
-                if not dest:
-                    raise runstore.RunStoreError(
-                        "from needs to/install_to PATH (where to install the artifact)")
-                return apply_from_payload(source, to=dest, dry_run=dry_run, backup=backup)
-            if not run_id:
-                raise runstore.RunStoreError(
-                    "apply needs a run_id, or from PATH and to/install_to PATH")
-            return apply_payload(run_id, to=dest, store=self.store, dry_run=dry_run,
-                                backup=backup)
+            payload, notes, _ = apply_with_target(
+                run_id, to=to, install_to=install_to, source=source,
+                store=self.store, home=home, dry_run=dry_run, backup=backup,
+                cli_flags=False)
+            if notes:
+                existing = payload.get("notes")
+                payload["notes"] = (
+                    list(existing) + notes if isinstance(existing, list) else notes)
+            return payload
         except (runstore.RunStoreError, OSError, ValueError) as e:
             return {"error": str(e)}
 
@@ -1318,9 +1314,10 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
     def apply(run_id: Optional[str] = None, to: Optional[str] = None,
               dry_run: bool = False, backup: bool = True,
               from_: Optional[str] = None,
-              install_to: Optional[str] = None) -> Dict[str, Any]:
+              install_to: Optional[str] = None,
+              home: Optional[str] = None) -> Dict[str, Any]:
         return t.apply(run_id, to, dry_run, backup, source=from_,
-                       install_to=install_to)
+                       install_to=install_to, home=home)
 
     apply.__annotations__["from_"] = Annotated[
         Optional[str],

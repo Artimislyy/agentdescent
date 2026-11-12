@@ -42,6 +42,7 @@ import re
 import shlex
 import shutil
 import sys
+import tempfile
 import time
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from urllib.parse import urlparse
@@ -2647,12 +2648,179 @@ def _text_plan(dest: str, rendered: str) -> Dict[str, Any]:
 
 
 
-def resolve_apply_dest(to: Optional[str], install_to: Optional[str]) -> Optional[str]:
-    """Combine ``--to`` and ``--install-to`` (alias). Error if both differ."""
-    if to and install_to and os.path.expanduser(to) != os.path.expanduser(install_to):
+class GrokBotInstallError(runstore.RunStoreError):
+    """Raised when ``--install-to`` targets ``grok-bot`` (read-only user skills)."""
+
+
+def _resolve_install_to(value: str, *, home: Optional[str]) -> Tuple[str, Optional[str], bool]:
+    """Map a bare known host name/alias to its user skills root when unambiguous."""
+    from .integrations import HOSTS, _resolve_home, canonical_host, host_skills_dir
+
+    canonical = canonical_host(value)
+    if canonical in HOSTS:
+        # Preserve local relative-path semantics if a same-named entry exists in cwd (#935).
+        if os.path.lexists(value):
+            if home is not None:
+                try:
+                    _resolve_home(home)
+                except ValueError as e:
+                    raise runstore.RunStoreError(str(e)) from None
+            return value, (
+                f"note: local path {value!r} exists in cwd; treating --install-to "
+                f"{value!r} as a path (pass ./{value} to silence)"), False
+        try:
+            skills_dir = host_skills_dir(canonical, home=home)
+        except ValueError as e:
+            raise runstore.RunStoreError(str(e)) from None
+        if skills_dir is None:
+            raise GrokBotInstallError(
+                "grok-bot does not allow direct writes ($AGENTDESCENT_GROK_BOT_SKILLS "
+                "is read-only); ask Grok Bot to save each SKILL.md as a user skill")
+        return skills_dir, f"install-to {value} -> {skills_dir}", True
+    if home is not None:
+        try:
+            _resolve_home(home)
+        except ValueError as e:
+            raise runstore.RunStoreError(str(e)) from None
+    return value, None, False
+
+
+def resolve_apply_dest(to: Optional[str], install_to: Optional[str], *,
+                       home: Optional[str] = None,
+                       notes: Optional[List[str]] = None) -> Optional[str]:
+    """Combine ``--to`` and ``--install-to``, resolving host names/aliases (#823, #935)."""
+    resolved_install = None
+    note = None
+    resolved_host = False
+    if install_to:
+        resolved_install, note, resolved_host = _resolve_install_to(
+            install_to, home=home)
+    elif home is not None:
+        from .integrations import _resolve_home
+        try:
+            _resolve_home(home)
+        except ValueError as e:
+            raise runstore.RunStoreError(str(e)) from None
+    if to and resolved_install:
+        if os.path.normpath(os.path.expanduser(to)) != os.path.normpath(
+                os.path.expanduser(resolved_install)):
+            raise runstore.RunStoreError(
+                f"--to {to!r} and --install-to {install_to!r} disagree; pass one")
+    if notes is not None:
+        if note:
+            notes.append(note)
+        if home is not None and not resolved_host:
+            notes.append(
+                "note: --home only applies when --install-to resolves to a host; "
+                "ignored for path destination")
+    return resolved_install if install_to else to
+
+
+def _grok_bot_apply_message(*, run_id: Optional[str] = None,
+                            source: Optional[str] = None,
+                            store: Optional[str] = None,
+                            home: Optional[str] = None) -> str:
+    """Build manual user-skill save instructions for ``grok-bot`` without writing."""
+    from .integrations import _resolve_home, grok_bot_user_skills_dir
+
+    try:
+        resolved_home, honour_env = _resolve_home(home)
+    except ValueError as e:
+        raise runstore.RunStoreError(str(e)) from None
+    user_dir = grok_bot_user_skills_dir(resolved_home, honour_env)
+    if source:
+        src = os.path.abspath(os.path.expanduser(source))
+        if os.path.islink(src):
+            raise runstore.RunStoreError(
+                f"--from {src} is a symlink; refuse to apply (would dereference)")
+        if not os.path.exists(src):
+            raise runstore.RunStoreError(f"--from {src} does not exist")
+        if os.path.isfile(src):
+            paths = [src]
+        else:
+            rels: List[str] = []
+            for dirpath, dirnames, filenames in os.walk(src):
+                dirnames[:] = sorted(
+                    d for d in dirnames
+                    if d not in (".git", "__pycache__")
+                    and not os.path.islink(os.path.join(dirpath, d)))
+                for fname in sorted(filenames):
+                    full = os.path.join(dirpath, fname)
+                    if fname == "SKILL.md" and not os.path.islink(full):
+                        rels.append(os.path.relpath(full, src))
+            paths = [os.path.join(src, rel) for rel in sorted(rels)] or [src]
+        return "\n".join([
+            f"grok-bot does not allow direct writes ({user_dir} is read-only). "
+            "ask Grok Bot to save each skill below as a user skill:",
+            *[f"  - {p}" for p in paths],
+        ])
+    if run_id:
+        resolved_id = resolve_run_id(run_id, store=store) or run_id
+        rd = runstore.get(resolved_id, store=store)
+        result = rd.result()
+        if result is None:
+            raise runstore.RunStoreError(f"{resolved_id} has no result to apply yet")
+        stage_dir = os.path.abspath(
+            os.path.join(tempfile.gettempdir(), f"agentdescent-apply-{resolved_id}"))
+        if isinstance(result.state, dict):
+            rels = sorted(
+                k for k in result.state
+                if k == "SKILL.md" or k.endswith("/SKILL.md"))
+            if not rels:
+                rels = sorted(result.state)
+            stage_target = stage_dir
+            paths = [os.path.join(stage_dir, rel.replace("/", os.sep)) for rel in rels]
+        else:
+            spec = EvolveSpec.from_dict(rd.spec_dict())
+            fname = os.path.basename(spec.target) or "SKILL.md"
+            stage_target = os.path.join(stage_dir, fname)
+            paths = [stage_target]
+        return "\n".join([
+            f"grok-bot does not allow direct writes ({user_dir} is read-only). "
+            f"First materialize without touching Grok Bot's store: "
+            f"`agentdescent apply {resolved_id} --to {stage_target}`; "
+            "then ask Grok Bot to save each file below as a user skill:",
+            *[f"  - {p}" for p in paths],
+        ])
+    return (
+        f"grok-bot does not allow direct writes ({user_dir} is read-only); "
+        "materialize with `agentdescent apply <run_id> --to <dir>` and ask "
+        "Grok Bot to save each SKILL.md as a user skill")
+
+
+def apply_with_target(run_id: Optional[str] = None, *, to: Optional[str] = None,
+                      install_to: Optional[str] = None, source: Optional[str] = None,
+                      store: Optional[str] = None, home: Optional[str] = None,
+                      dry_run: bool = False, backup: bool = True,
+                      cli_flags: bool = True
+                      ) -> Tuple[Dict[str, Any], List[str], str]:
+    """Shared CLI + MCP entry point for ``apply`` (#823, #935)."""
+    notes: List[str] = []
+    if source and run_id:
         raise runstore.RunStoreError(
-            f"--to {to!r} and --install-to {install_to!r} disagree; pass one")
-    return to or install_to
+            "pass a run_id or --from PATH, not both"
+            if cli_flags else "pass a run_id or from PATH, not both")
+    try:
+        dest = resolve_apply_dest(to, install_to, home=home, notes=notes)
+    except GrokBotInstallError:
+        raise GrokBotInstallError(
+            _grok_bot_apply_message(
+                run_id=run_id, source=source, store=store, home=home)) from None
+    if source:
+        if not dest:
+            raise runstore.RunStoreError(
+                "--from needs --to/--install-to PATH (where to install the artifact)"
+                if cli_flags
+                else "from needs to/install_to PATH (where to install the artifact)")
+        return (apply_from_payload(source, to=dest, dry_run=dry_run, backup=backup),
+                notes, source)
+    if not run_id:
+        raise runstore.RunStoreError(
+            "apply needs a run_id, or --from PATH --to/--install-to PATH"
+            if cli_flags
+            else "apply needs a run_id, or from PATH and to/install_to PATH")
+    return (apply_payload(run_id, to=dest, store=store, dry_run=dry_run, backup=backup),
+            notes, f"run {run_id}")
 
 
 def apply_payload(run_id: str, *, to: Optional[str] = None, store: Optional[str] = None,
@@ -2864,33 +3032,26 @@ def apply_from_payload(source: str, *, to: str, dry_run: bool = False,
 
 
 def cmd_apply(a: argparse.Namespace) -> int:
-    source = getattr(a, "source", None)
     try:
-        dest = resolve_apply_dest(getattr(a, "to", None),
-                                  getattr(a, "install_to", None))
+        payload, notes, what = apply_with_target(
+            getattr(a, "run_id", None),
+            to=getattr(a, "to", None),
+            install_to=getattr(a, "install_to", None),
+            source=getattr(a, "source", None),
+            store=a.store,
+            home=getattr(a, "home", None),
+            dry_run=a.dry_run,
+            backup=not a.no_backup,
+        )
     except runstore.RunStoreError as e:
-        print(f"error: {e}", file=sys.stderr)
+        if getattr(a, "json", False):
+            _out({"ok": False, "error": str(e)}, as_json=True)
+        else:
+            print(f"error: {e}", file=sys.stderr)
         return 2
-    if source:
-        if a.run_id:
-            print("error: pass a run_id or --from PATH, not both", file=sys.stderr)
-            return 2
-        if not dest:
-            print("error: --from needs --to/--install-to PATH "
-                  "(where to install the artifact)", file=sys.stderr)
-            return 2
-        payload = apply_from_payload(source, to=dest, dry_run=a.dry_run,
-                                     backup=not a.no_backup)
-        what = source
-    else:
-        if not a.run_id:
-            print("error: apply needs a run_id, or --from PATH --to/--install-to PATH",
-                  file=sys.stderr)
-            return 2
-        payload = apply_payload(a.run_id, to=dest, store=a.store, dry_run=a.dry_run,
-                                backup=not a.no_backup)
-        what = f"run {a.run_id}"
     _out(payload, as_json=True)
+    for note in notes:
+        print(note, file=sys.stderr)
     if payload.get("noop"):
         # After the JSON, on stderr: stdout stays one machine-readable document.
         print(f"nothing to apply: {payload.get('dest') or '(target)'} already matches "
@@ -5055,14 +5216,20 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("run_id", nargs="?")
     s.add_argument("--to", help="a different destination than the spec's target "
                    "(required with --from)")
-    s.add_argument("--install-to", dest="install_to", metavar="PATH",
+    s.add_argument("--install-to", dest="install_to", metavar="HOST|PATH",
                    help="install a skill_library (or any FileTree result) into a "
-                        "host skills root such as ~/.claude/skills; same write/"
-                        "backup semantics as --to (do not silently prune unrelated "
-                        "host skills). Alias of --to when --to is omitted")
+                        "host skills root: pass a host name/alias (claude-code/"
+                        "claude -> ~/.claude/skills, codex -> ~/.codex/skills, "
+                        "opencode -> ~/.config/opencode/skill, dsh/"
+                        "deepseek-harness -> ~/.dsh/skills, grok-bot/grok -> "
+                        "exits 2 with manual user-skill instructions without "
+                        "writing) or any directory path; same write/backup "
+                        "semantics as --to without pruning unrelated host skills")
     s.add_argument("--from", dest="source", metavar="PATH",
                    help="install an artifact from disk (e.g. a campaign's "
                    "final_target) instead of a run's result")
+    s.add_argument("--home", help="the host's home directory when --install-to "
+                   "names a host (default: the real home + host env vars)")
     s.add_argument("--dry-run", action="store_true", dest="dry_run")
     s.add_argument("--no-backup", action="store_true", dest="no_backup")
     s.set_defaults(fn=cmd_apply)

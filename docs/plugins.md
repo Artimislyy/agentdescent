@@ -306,7 +306,17 @@ line for line:
 | `plugin` | same, hooks frozen | `plugin_runner(host)` | same | `gated_reward(scorer)` | L1 | same, container advised |
 | `policy_slot` | `SlotSpec` | one inner search | `slot_reflector` | `meta_reward` | L1 | wall-clock budget |
 
-For `kind: skill_library`, install the evolved tree into a host skills root with `agentdescent apply <run_id> --install-to ~/.claude/skills` (same as `--to`; does not prune unrelated host skills).
+For `kind: skill_library`, install the evolved tree into a host skills root without pruning unrelated host skills (`agentdescent apply <run_id> --install-to <host-or-path>`):
+
+| host | `--install-to` value | destination (respects `--home` / host env) | notes |
+|---|---|---|---|
+| `claude-code` | `claude-code` / `claude` | `~/.claude/skills` (`$CLAUDE_CONFIG_DIR/skills`) | same write/backup semantics as `--to`, no prune |
+| `codex` | `codex` | `~/.codex/skills` (`$CODEX_HOME/skills`) | same write/backup semantics as `--to`, no prune |
+| `opencode` | `opencode` / `open-code` | `~/.config/opencode/skill` (`$XDG_CONFIG_HOME/opencode/skill`) | singular `skill/` directory |
+| `dsh` | `dsh` / `deepseek-harness` | `~/.dsh/skills` (`$DSH_HOME/skills`) | same write/backup semantics as `--to`, no prune |
+| `grok-bot` | `grok-bot` / `grok` | refuses writes (exit 2) | prints `ask Grok Bot to save ... as a user skill` and paths; `$AGENTDESCENT_GROK_BOT_SKILLS` is read-only |
+
+If a local path with the same name exists in the working directory (for example `./codex`), path semantics win with a note on `stderr` — pass `./codex` to force a cwd path unconditionally. The staging directory printed for `grok-bot` is only a suggestion; any `--to` directory works. MCP `apply(install_to=..., home=...)` resolves identically.
 
 The other fields:
 

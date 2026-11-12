@@ -24,8 +24,8 @@ import sys
 import sysconfig
 from typing import Callable, Dict, List, Optional, Tuple
 
-__all__ = ["HOSTS", "host_status", "install", "uninstall", "render_claude_plugin", "render_dsh_plugin",
-           "skill_text", "hooks_text"]
+__all__ = ["HOSTS", "host_status", "host_skills_dir", "install", "uninstall",
+           "render_claude_plugin", "render_dsh_plugin", "skill_text", "hooks_text"]
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -132,6 +132,23 @@ def _host_root(var: str, default: str, honour_env: bool = True) -> str:
     ``DSH_HOME`` / ``XDG_CONFIG_HOME`` must not send the write to the user's real
     configuration instead (#410)."""
     return (os.environ.get(var) if honour_env else None) or default
+
+
+def _dsh_root(home: str, honour_env: bool) -> str:
+    return _host_root("DSH_HOME", os.path.join(home, ".dsh"), honour_env)
+
+
+def _codex_root(home: str, honour_env: bool) -> str:
+    return _host_root("CODEX_HOME", os.path.join(home, ".codex"), honour_env)
+
+
+def _opencode_root(home: str, honour_env: bool) -> str:
+    config_home = _host_root("XDG_CONFIG_HOME", os.path.join(home, ".config"), honour_env)
+    return os.path.join(config_home, "opencode")
+
+
+def _claude_root(home: str, honour_env: bool) -> str:
+    return _host_root("CLAUDE_CONFIG_DIR", os.path.join(home, ".claude"), honour_env)
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +343,7 @@ def dsh_patch_block(launcher: Optional[List[str]] = None) -> str:
 
 
 def install_dsh(home: str, w: _Writer) -> None:
-    dsh_home = _host_root("DSH_HOME", os.path.join(home, ".dsh"), w.honour_env)
+    dsh_home = _dsh_root(home, w.honour_env)
     skill_dir = os.path.join(dsh_home, "skills", "agentdescent")
     w.write(os.path.join(skill_dir, "SKILL.md"), skill_text())
     w.write(os.path.join(skill_dir, "hooks.json"), hooks_text(w.launcher))
@@ -582,7 +599,7 @@ def _add_env_vars_in_place(path: str, w: "_Writer") -> bool:
 
 
 def install_codex(home: str, w: _Writer) -> None:
-    codex_home = _host_root("CODEX_HOME", os.path.join(home, ".codex"), w.honour_env)
+    codex_home = _codex_root(home, w.honour_env)
     w.write(os.path.join(codex_home, "skills", "agentdescent", "SKILL.md"), skill_text())
     # Same body as Claude's ``/agentdescent:evolve``; Codex loads it as
     # ``/prompts:evolve`` from ``~/.codex/prompts/`` (custom prompts are the
@@ -674,8 +691,7 @@ def _strip_jsonc_comments(raw: str) -> str:
 
 
 def install_opencode(home: str, w: _Writer) -> None:
-    config_home = _host_root("XDG_CONFIG_HOME", os.path.join(home, ".config"), w.honour_env)
-    root = os.path.join(config_home, "opencode")
+    root = _opencode_root(home, w.honour_env)
     # `{skill,skills}/**/SKILL.md` -- both spellings are accepted; `skill` is
     # what the sibling `agent` / `command` directories are named.
     w.write(os.path.join(root, "skill", "agentdescent", "SKILL.md"), skill_text())
@@ -1278,6 +1294,30 @@ def canonical_host(name: str) -> str:
     return HOST_ALIASES.get(key, key)
 
 
+def host_skills_dir(host: str, *, home: Optional[str] = None) -> Optional[str]:
+    """Writable user-skills root for ``host``, or ``None`` for ``grok-bot``.
+
+    Uses the same home and environment resolution (``DSH_HOME``, ``CODEX_HOME``,
+    ``XDG_CONFIG_HOME``, ``CLAUDE_CONFIG_DIR``) as ``install`` and
+    ``host_status``. An explicit ``home`` overrides those variables.
+    Returns ``None`` for ``grok-bot`` because ``$AGENTDESCENT_GROK_BOT_SKILLS``
+    is read-only and skills must be saved by Grok Bot as user skills (#935).
+    """
+    canonical = canonical_host(host)
+    if canonical not in HOSTS:
+        raise ValueError(f"unknown host {host!r}; choose from {sorted(HOSTS)}")
+    resolved_home, honour_env = _resolve_home(home)
+    if canonical == "dsh":
+        return os.path.join(_dsh_root(resolved_home, honour_env), "skills")
+    if canonical == "codex":
+        return os.path.join(_codex_root(resolved_home, honour_env), "skills")
+    if canonical == "opencode":
+        return os.path.join(_opencode_root(resolved_home, honour_env), "skill")
+    if canonical == "claude-code":
+        return os.path.join(_claude_root(resolved_home, honour_env), "skills")
+    return None
+
+
 def _read(path: str) -> Optional[str]:
     try:
         with open(path, encoding="utf-8") as fh:
@@ -1376,7 +1416,7 @@ def host_status(host: str, *, home: Optional[str] = None) -> Dict[str, str]:
         raise ValueError(f"unknown host {host!r}; choose from {sorted(HOSTS)}")
     home, honour_env = _resolve_home(home)   # explicit home is the whole world (#410)
     if host == "dsh":
-        root = _host_root("DSH_HOME", os.path.join(home, ".dsh"), honour_env)
+        root = _dsh_root(home, honour_env)
         skill = os.path.join(root, "skills", "agentdescent", "SKILL.md")
         patch = _read(os.path.join(root, "cordis.patch.yml")) or ""
         # Both markers: an interrupted write can leave only the start.
@@ -1389,7 +1429,7 @@ def host_status(host: str, *, home: Optional[str] = None) -> Dict[str, str]:
         skill = os.path.join(root, "skills", "agentdescent", "SKILL.md")
         mcp = _claude_mcp_state(os.path.join(root, ".mcp.json"))
     elif host == "codex":
-        root = _host_root("CODEX_HOME", os.path.join(home, ".codex"), honour_env)
+        root = _codex_root(home, honour_env)
         skill = os.path.join(root, "skills", "agentdescent", "SKILL.md")
         cfg = _read(os.path.join(root, "config.toml")) or ""
         # A live table header, not a substring: a commented-out one is not wired.
@@ -1407,8 +1447,7 @@ def host_status(host: str, *, home: Optional[str] = None) -> Dict[str, str]:
         user_skill, user_skill_path = _grok_bot_user_skill(
             grok_bot_user_skills_dir(home, honour_env))
     else:
-        root = os.path.join(_host_root("XDG_CONFIG_HOME", os.path.join(home, ".config"),
-                                       honour_env), "opencode")
+        root = _opencode_root(home, honour_env)
         skill = os.path.join(root, "skill", "agentdescent", "SKILL.md")
         mcp = _opencode_mcp_state(root)
     skill_state = _skill_state(skill)
@@ -1625,7 +1664,7 @@ class _Eraser:
 
 
 def _uninstall_dsh(home: str, e: _Eraser) -> None:
-    root = _host_root("DSH_HOME", os.path.join(home, ".dsh"), e.honour_env)
+    root = _dsh_root(home, e.honour_env)
     skill_dir = os.path.join(root, "skills", "agentdescent")
     for name in ("SKILL.md", "hooks.json"):
         e.remove_file(os.path.join(skill_dir, name))
@@ -1725,7 +1764,7 @@ def _is_legacy_codex_block(current: str) -> bool:
 
 
 def _uninstall_codex(home: str, e: _Eraser) -> None:
-    root = _host_root("CODEX_HOME", os.path.join(home, ".codex"), e.honour_env)
+    root = _codex_root(home, e.honour_env)
     skill_dir = os.path.join(root, "skills", "agentdescent")
     e.remove_file(os.path.join(skill_dir, "SKILL.md"))
     e.prune_dirs(skill_dir, root)
@@ -1750,8 +1789,7 @@ def _uninstall_codex(home: str, e: _Eraser) -> None:
 
 
 def _uninstall_opencode(home: str, e: _Eraser) -> None:
-    config_home = _host_root("XDG_CONFIG_HOME", os.path.join(home, ".config"), e.honour_env)
-    root = os.path.join(config_home, "opencode")
+    root = _opencode_root(home, e.honour_env)
     skill_dir = os.path.join(root, "skill", "agentdescent")
     e.remove_file(os.path.join(skill_dir, "SKILL.md"))
     e.prune_dirs(skill_dir, root)
