@@ -37,7 +37,7 @@ from typing import Annotated, Any, Dict, Optional, Sequence, Tuple
 from . import __version__, runstore
 from .cli import (NESTED_ENV, apply_from_payload, apply_payload, doctor_report,
                  plan_payload, require_cli_on_path, require_resume_host_on_path,
-                 require_resume_not_solved,
+                 require_resume_not_quota_exhausted, require_resume_not_solved,
                  resolve_run_id, show_payload, status_payload)
 from .evolvespec import (EvolveSpec, SpecError, budget_round_overshoot_warning,
                          compose, estimate)
@@ -183,7 +183,9 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
     "resume": (
         "Continue a stopped, failed or cancelled run on its existing ledger (the engine "
         "picks up where it left off). `run_id` may be `latest` or `last` for the newest "
-        "run (same as the CLI). Returns the new status."),
+        "run (same as the CLI). Refuses, with the provider's reset time when it named "
+        "one, a run whose last failure was a spent quota (`QuotaExhausted`): wait for "
+        "that reset, or pass `force=true` to retry now. Returns the new status."),
     "audit_status": (
         "Read a sparse-audit JSONL: how biased the run's cheap verifier is against ground "
         "truth (`delta_hat`), how *scattered* that error is (`resid_sd` -- the number the "
@@ -692,15 +694,20 @@ class Tools:
             return {"error": str(e)}
 
     def resume(self, run_id: str, budget_usd: Optional[float] = None,
-               usd_per_call: Optional[float] = None) -> Dict[str, Any]:
+               usd_per_call: Optional[float] = None,
+               force: bool = False) -> Dict[str, Any]:
         try:
             # A resumed run gets the *current* bridge: the session that started
             # it is likely gone, and its address with it.
             run_id = resolve_run_id(run_id, store=self.store) or run_id
             runstore.require_budget_pair(budget_usd, usd_per_call)
             # Same gates as CLI resume: a solved run is not relaunched (#900),
-            # and an absent plugin host must not relaunch and report running (#370).
+            # a run that died on a spent quota is not relaunched into the same
+            # 429 (#926, `force` opts out), and an absent plugin host must not
+            # relaunch and report running (#370).
             require_resume_not_solved(run_id, store=self.store)
+            if not force:
+                require_resume_not_quota_exhausted(run_id, store=self.store)
             require_resume_host_on_path(run_id, store=self.store)
             return runstore.resume(run_id, store=self.store, budget_usd=budget_usd,
                                    usd_per_call=usd_per_call,
@@ -1325,14 +1332,15 @@ def build_server(store: Optional[str] = None, *, name: str = "agentdescent",
         return t.cancel(run_id)
 
     async def resume(run_id: str, ctx, budget_usd: Optional[float] = None,
-                     usd_per_call: Optional[float] = None) -> Dict[str, Any]:
+                     usd_per_call: Optional[float] = None,
+                     force: bool = False) -> Dict[str, Any]:
         import asyncio
 
         import anyio.to_thread
 
         attach_bridge(ctx, asyncio.get_running_loop())
         return await anyio.to_thread.run_sync(
-            lambda: t.resume(run_id, budget_usd, usd_per_call))
+            lambda: t.resume(run_id, budget_usd, usd_per_call, force))
 
     resume.__annotations__["ctx"] = context_cls
     maybe_tool("resume")(resume)

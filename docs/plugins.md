@@ -612,6 +612,12 @@ and a run started from a shell can be picked up by an agent. `cancel` signals
 the process group, so the worker CLIs die with the run; `resume` re-launches the
 spec on the same ledger and the engine continues.
 
+One failure is not resumed by default: a run that ended on `QuotaExhausted` (the
+account's quota for that model is spent) is refused with the reset time the
+provider named, because a relaunch only re-burns a call into the same 429. Pass
+`resume <run_id> --force` -- `force=true` on the MCP tool -- to retry anyway once
+the reset has passed or the key/model has been changed (#926).
+
 ### A run that learned nothing: `propose_errors`
 
 `rounds.jsonl` rows (and `status` / `show`, as `propose_errors=N`) count the

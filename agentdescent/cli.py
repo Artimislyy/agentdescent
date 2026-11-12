@@ -38,6 +38,7 @@ from collections import deque
 import difflib
 import json
 import os
+import re
 import shlex
 import shutil
 import sys
@@ -1674,6 +1675,47 @@ def require_resume_not_solved(run_id: str, *, store: Optional[str] = None) -> No
             f"`agentdescent apply {run_id} --dry-run`")
 
 
+#: The provider's own words, when it names one: "It will reset at
+#: 2026-11-12 23:59:59 +0800 CST." The capture stops at the sentence's period or
+#: a quote, so a JSON body does not drag the rest of the message into the hint.
+_QUOTA_RE = re.compile(r"reset at ([^.\"}]+)")
+_QUOTA_MODEL_RE = re.compile(r"for model '([^']+)'")
+
+
+def require_resume_not_quota_exhausted(run_id: str, *,
+                                       store: Optional[str] = None) -> None:
+    """Refuse to relaunch a run whose last failure spent the provider quota (#926).
+
+    ``diagnose latest`` already says "wait for the reset", and ``resume`` is the
+    natural next command -- so it relaunched the detached worker, flipped the
+    status back to ``running`` and burned a start into the same 429, rewriting a
+    status the user was reading. A quota failure is not transient on a retry
+    timescale: the provider names a reset hours away. So the default is to
+    refuse, quote that reset when the message carries one, and name ``--force``
+    as the way to retry anyway.
+
+    Only a ``failed`` run is gated. A cancelled, bounded or ordinary provider
+    failure keeps resuming, and so does a run whose stored error is not a quota
+    refusal -- the gate reads why *this* attempt ended, not whether a quota error
+    ever appeared in the run's history.
+    """
+    st = runstore.get(run_id, store=store).status()
+    if st.state != "failed" or not st.error:
+        return
+    err = st.error.lstrip()
+    if not err.startswith("QuotaExhausted"):
+        return
+    model = _QUOTA_MODEL_RE.search(err)
+    reset = _QUOTA_RE.search(err)
+    who = f" for model '{model.group(1)}'" if model else ""
+    when = (f" (provider says the quota resets at {reset.group(1).strip()})"
+            if reset else " (the provider's message names the reset)")
+    raise SpecError(
+        f"cannot resume {run_id}: it failed on QuotaExhausted{who}{when} -- "
+        f"wait for the reset, or edit the run's agent model / api_key_env, or "
+        f"pass --force to retry now")
+
+
 def require_resume_host_on_path(run_id: str, *, store: Optional[str] = None) -> None:
     """Refuse to relaunch a stopped plugin run whose ``host`` CLI is not on PATH (#370).
 
@@ -2868,6 +2910,10 @@ def cmd_resume(a: argparse.Namespace) -> int:
     # `host_model` was borrowing.
     runstore.require_budget_pair(a.budget, a.usd_per_call)
     require_resume_not_solved(a.run_id, store=a.store)
+    # A spent quota is not retried by default: `diagnose` sends the user here and
+    # the relaunch only re-burned a call into the same 429 (#926).
+    if not getattr(a, "force", False):
+        require_resume_not_quota_exhausted(a.run_id, store=a.store)
     # Hard gate, unlike the warnings below: a missing plugin host cannot run a
     # single rollout, so do not relaunch the detached process at all (#370).
     require_resume_host_on_path(a.run_id, store=a.store)
@@ -5029,6 +5075,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("run_id")
     s.add_argument("--budget", type=float)
     s.add_argument("--usd-per-call", type=float, dest="usd_per_call")
+    s.add_argument("--force", action="store_true",
+                   help="resume even when the run failed on a spent provider quota (#926)")
     s.set_defaults(fn=cmd_resume)
 
     s = sub.add_parser("portfolio",
