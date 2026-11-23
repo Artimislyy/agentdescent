@@ -10,20 +10,34 @@ import subprocess
 import uuid
 from pathlib import Path
 
-from .harness import SKILL_KEY, SKILL_NAME, validate_skill
-from .records import RunRecords
-from .selection import compare_trials
+from .harness import (SKILL_KEY, SKILL_NAME, HARNESS_FILES, LEGACY_HARNESS_FILES,
+                      PROMPT_DIR, validate_skill, source_paths, read_text, safe_relpath)
+from .records import RunRecords, harness_sha256
+from .selection import DEFAULT_RULE, compare_default_trials, compare_trials
+from .trajectory import analysis_paths
 
 
 def _git(repo, *args):
     return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
 
 
+def _harness_keys(manifest, *, candidate=False):
+    version = manifest.get("schema_version", 1)
+    if version == 5:
+        keys = list(manifest["candidate_files"] if candidate else manifest["source"]["files"])
+        if not keys or len(keys) != len(set(keys)) or any(safe_relpath(key) != key for key in keys):
+            raise ValueError("invalid skills file manifest")
+        return tuple(keys)
+    if version not in (1, 2, 3, 4):
+        raise ValueError("unsupported experiment manifest version")
+    return {1: (SKILL_KEY,), 2: LEGACY_HARNESS_FILES, 3: HARNESS_FILES, 4: HARNESS_FILES}[version]
+
+
 def seal_evidence(root):
     """Digest durable evidence outside the mutable Git index/workspaces."""
     root = Path(root)
     files = {}
-    excluded = {"ledger", "demo-workspaces"}
+    excluded = {"ledger", "demo-workspaces", "reflector-runtime"}
     for path in sorted(root.rglob("*")):
         rel = path.relative_to(root)
         if rel.parts[0] in excluded or rel.name in {"evidence-manifest.json", "adoption.json", "adoption-pending.json"}:
@@ -36,8 +50,13 @@ def seal_evidence(root):
 def _verify_evidence(root):
     manifest_path = root / "evidence-manifest.json"
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    required = {"manifest.json", "final_evaluation.json", "candidate/SKILL.md",
-                "baseline/SKILL.md", "ledger_history.json"}
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    required = {"manifest.json", "final_evaluation.json", "ledger_history.json"}
+    required.update(f"{role}/{key}" for role in ("candidate", "baseline")
+                    for key in _harness_keys(manifest, candidate=role == "candidate"))
+    if manifest.get("schema_version", 1) >= 2:
+        required.add("reflection_prompt.md")
+    required.update("reflection_skill/" + key for key in manifest.get("source", {}).get("analysis", {}))
     if not required <= set(data["files"]):
         raise ValueError("incomplete evidence manifest")
     for relative, expected in data["files"].items():
@@ -88,23 +107,33 @@ def _verify_test_gate(root, manifest, assessment, baseline_hash, candidate_hash)
                 raise ValueError("test trial output was not sealed")
             saved = json.loads((root / relative).read_text(encoding="utf-8"))
             if (saved != output or output["task_id"] != row["task_id"]
-                    or output["phase"] != "test_" + role or output["skill_sha256"] != digest):
+                    or output["phase"] != "test_" + role or output.get("harness_sha256", output.get("skill_sha256")) != digest):
                 raise ValueError("test row does not match its recorded trial and skill")
             scores[role].append(_score(output["score"]))
     baseline = sum(scores["baseline"]) / len(rows)
     candidate = sum(scores["candidate"]) / len(rows)
-    gain = assessment["min_gain"]
-    if isinstance(gain, bool) or not isinstance(gain, (int, float)) or not math.isfinite(gain) or gain < 0:
-        raise ValueError("invalid minimum test gain")
-    comparison = compare_trials([r["baseline"] for r in rows], [r["candidate"] for r in rows], min_gain=gain)
-    for key in ("baseline_passed_seconds", "candidate_passed_seconds", "speed_improved"):
+    native = manifest.get("schema_version", 1) >= 4
+    before, after = [r["baseline"] for r in rows], [r["candidate"] for r in rows]
+    if native:
+        if assessment.get("rule") != DEFAULT_RULE:
+            raise ValueError("test acceptance policy does not match the experiment")
+        comparison = compare_default_trials(before, after)
+    else:
+        # Previously sealed runs must retain their original adoption rule.
+        gain = assessment["min_gain"]
+        if isinstance(gain, bool) or not isinstance(gain, (int, float)) or not math.isfinite(gain) or gain < 0:
+            raise ValueError("invalid minimum test gain")
+        comparison = compare_trials(before, after, min_gain=gain)
+    for key in ("baseline_passed_seconds", "candidate_passed_seconds", "speed_improved",
+                "no_task_regression", "p_improve"):
         if key in assessment and assessment[key] != comparison[key]:
-            raise ValueError("recorded test timing does not match the sealed trials")
+            raise ValueError("recorded test decision does not match the sealed trials")
     if (not math.isclose(_score(assessment["baseline_mean"]), baseline, abs_tol=1e-12)
             or not math.isclose(_score(assessment["candidate_mean"]), candidate, abs_tol=1e-12)
-            or not comparison["passed"]
-            or assessment["passed"] is not True or assessment["no_task_regression"] is not True):
+            or not comparison["passed"] or assessment["passed"] is not True
+            or (not native and assessment["no_task_regression"] is not True)):
         raise ValueError("recorded test scores do not satisfy the adoption rule")
+
 
 
 def _verified_ledger_commit(root, candidate_hash):
@@ -121,12 +150,13 @@ def _verified_ledger_commit(root, candidate_hash):
     payload = json.loads(_git(root / "ledger", "show", "{}:artifacts/{}.json".format(commit, artifact)))
     state = payload["state"].get("state", payload["state"])
     if (payload["version"] != entry["version"]
-            or hashlib.sha256(state[SKILL_KEY].encode("utf-8")).hexdigest() != candidate_hash):
+            or harness_sha256(state) != candidate_hash):
         raise ValueError("recorded Ledger commit has a different candidate")
     return commit
 
 
 def _atomic_bytes(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(".{}.{}.tmp".format(path.name, uuid.uuid4().hex))
     try:
         temporary.write_bytes(content)
@@ -147,22 +177,61 @@ def apply_run(run_dir):
     evidence_hash = _verify_evidence(root)
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assessment = json.loads((root / "final_evaluation.json").read_text(encoding="utf-8"))
-    candidate = (root / "candidate" / SKILL_KEY).read_bytes()
-    before = (root / "baseline" / SKILL_KEY).read_bytes()
-    candidate_hash = hashlib.sha256(candidate).hexdigest()
-    if candidate_hash != assessment["candidate_sha256"] or hashlib.sha256(before).hexdigest() != manifest["source"]["sha256"]:
+    keys = _harness_keys(manifest, candidate=True)
+    candidate = {key: read_text(root / "candidate" / key) for key in keys}
+    before = {key: read_text(root / "baseline" / key) for key in _harness_keys(manifest)}
+    candidate_hash, baseline_hash = harness_sha256(candidate), harness_sha256(before)
+    if candidate_hash != assessment["candidate_sha256"] or baseline_hash != manifest["source"]["sha256"]:
         raise ValueError("candidate/baseline does not match the evaluated version")
-    if validate_skill({SKILL_KEY: candidate.decode("utf-8")}):
-        raise ValueError("invalid candidate skill")
-    _verify_test_gate(root, manifest, assessment, hashlib.sha256(before).hexdigest(), candidate_hash)
+    if validate_skill(candidate, required=tuple(before)):
+        raise ValueError("invalid candidate harness")
+    _verify_test_gate(root, manifest, assessment, baseline_hash, candidate_hash)
     ledger_commit = _verified_ledger_commit(root, candidate_hash)
     repo = Path(manifest["pdweaver_repo"]).resolve()
-    relative = "skills/{}/{}".format(SKILL_NAME, SKILL_KEY)
-    target = repo / relative
-    if (target.is_symlink() or repo not in target.resolve().parents
-            or target.resolve() != Path(manifest["source"]["path"])
-            or Path(_git(repo, "rev-parse", "--show-toplevel")).resolve() != repo):
-        raise ValueError("native skill source mapping changed")
+    paths = source_paths(repo / "skills" / SKILL_NAME / SKILL_KEY, keys=keys)
+    targets = {key: paths[key] for key in keys}
+    relative = {key: str(path.relative_to(repo)) for key, path in targets.items()}
+    if Path(_git(repo, "rev-parse", "--show-toplevel")).resolve() != repo:
+        raise ValueError("native harness repository mapping changed")
+    for key, target in targets.items():
+        expected = (manifest["source"]["files"].get(key, {"path": str(target)})["path"] if "files" in manifest["source"]
+                    else manifest["source"]["path"])
+        if target.is_symlink() or repo not in target.resolve().parents or target.resolve() != Path(expected):
+            raise ValueError("native harness source mapping changed")
+
+    def committed_state(commit):
+        return {key: subprocess.check_output(["git", "-C", str(repo), "show", commit + ":" + rel]).decode("utf-8")
+                for key, rel in relative.items()}
+
+    def write_state(state):
+        for key in set(targets) - set(state):
+            targets[key].unlink(missing_ok=True)
+        for key, content in state.items():
+            _atomic_bytes(targets[key], content.encode("utf-8"))
+
+    baseline_files = {relative[key]: text.encode("utf-8") for key, text in before.items()}
+    reflection = manifest["source"].get("reflection") if manifest.get("schema_version", 1) < 5 else None
+    if reflection:
+        path = repo / "skills" / PROMPT_DIR / "reflection_prompt.md"
+        text = read_text(path)
+        if (path.resolve() != Path(reflection["path"]) or repo not in path.resolve().parents
+                or hashlib.sha256(text.encode("utf-8")).hexdigest() != reflection["sha256"]
+                or text != read_text(root / "reflection_prompt.md")):
+            raise ValueError("reflection prompt changed since evaluation")
+        baseline_files[str(path.relative_to(repo))] = text.encode("utf-8")
+    analysis = manifest["source"].get("analysis") if manifest.get("schema_version", 1) < 5 else None
+    if analysis:
+        paths = analysis_paths(repo)
+        if set(paths) != set(analysis):
+            raise ValueError("analysis skill files changed since evaluation")
+        for key, path in paths.items():
+            text = read_text(path)
+            if (path.resolve() != Path(analysis[key]["path"]) or repo not in path.resolve().parents
+                    or hashlib.sha256(text.encode("utf-8")).hexdigest() != analysis[key]["sha256"]
+                    or text != read_text(root / "reflection_skill" / key)):
+                raise ValueError("analysis skill changed since evaluation")
+            baseline_files[str(path.relative_to(repo))] = text.encode("utf-8")
+
     run_id = manifest["run_id"]
     # Only our generated run ids may become paths or Git grep expressions.
     if not run_id or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for c in run_id):
@@ -175,17 +244,16 @@ def apply_run(run_dir):
     existing = _git(repo, "log", "--all", "--format=%H", "--grep=^PDWeaver-RSI-Run: {}$".format(run_id)).splitlines()
     if existing:
         commit = existing[0]
-        saved = subprocess.check_output(["git", "-C", str(repo), "show", "{}:{}".format(commit, relative)])
-        if hashlib.sha256(saved).hexdigest() != candidate_hash:
+        if committed_state(commit) != candidate:
             raise ValueError("existing adoption commit has a different skill")
         adopted = json.loads(_git(repo, "show", "{}:{}".format(commit, adoption_path)))
         if (not _matches_receipt(adopted, run_id, candidate_hash, evidence_hash)
                 or adopted.get("ledger_head") != ledger_commit
-                or adopted.get("source_sha256") != hashlib.sha256(before).hexdigest()):
+                or adopted.get("source_sha256") != baseline_hash):
             raise ValueError("existing adoption receipt belongs to different evidence")
         receipt = {**adopted, "status": "committed", "pdweaver_commit": commit,
                    "activation": "not_checked", "recovered": True,
-                   "working_skill_matches": target.read_bytes() == candidate}
+                   "working_harness_matches": all(read_text(targets[key]) == candidate[key] for key in keys)}
         records.write_json("adoption.json", receipt)
         return receipt
     expected_head = manifest["source"]["git_head"]
@@ -193,8 +261,9 @@ def apply_run(run_dir):
                             "--grep=^PDWeaver-RSI-Baseline: {}$".format(run_id)).splitlines()
     if baseline_commits:
         expected_head = baseline_commits[0]
-        saved = subprocess.check_output(["git", "-C", str(repo), "show", "{}:{}".format(expected_head, relative)])
-        if saved != before or _git(repo, "rev-parse", expected_head + "^") != manifest["source"]["git_head"]:
+        saved = {rel: subprocess.check_output(["git", "-C", str(repo), "show", expected_head + ":" + rel])
+                 for rel in baseline_files}
+        if saved != baseline_files or _git(repo, "rev-parse", expected_head + "^") != manifest["source"]["git_head"]:
             raise ValueError("baseline commit does not match the evaluated source")
     if _git(repo, "rev-parse", "HEAD") != expected_head:
         raise ValueError("PDWeaver advanced since evaluation; revalidate before application")
@@ -205,7 +274,7 @@ def apply_run(run_dir):
     if pending is not None and not own_pending:
         raise ValueError("pending adoption belongs to different evidence")
     staged = _git(repo, "diff", "--cached", "--name-only").splitlines()
-    allowed = {relative, adoption_path}
+    allowed = set(baseline_files) | {adoption_path}
     if staged and (not own_pending or not set(staged) <= allowed):
         raise ValueError("existing staged changes: finish or unstage them before explicit application")
     changed = _git(repo, "diff", "HEAD", "--name-only").splitlines()
@@ -217,45 +286,51 @@ def apply_run(run_dir):
                 or not _matches_receipt(prior, run_id, candidate_hash, evidence_hash)
                 or _git(repo, "ls-tree", "--name-only", "HEAD", "--", adoption_path)):
             raise ValueError("adoption record path already occupied")
-    current = target.read_bytes()
-    if current != before and (not own_pending or current != candidate):
+    if manifest.get("schema_version") == 5 and not set(source_paths(repo / "skills" / SKILL_NAME / SKILL_KEY)) <= set(keys):
+        raise ValueError("skills files changed since evaluation")
+    current = {key: read_text(target) for key, target in targets.items() if target.exists()}
+    if any(current.get(key) != before.get(key) and (not own_pending or current.get(key) != candidate[key]) for key in keys):
         raise ValueError("PDWeaver advanced since evaluation; revalidate before application")
     # A killed process can leave our candidate and index updates behind. Undo
     # only files whose content and pending receipt prove they belong to this run.
     if own_pending:
         for path in staged:
             indexed = subprocess.check_output(["git", "-C", str(repo), "show", ":" + path])
-            if path == relative:
-                if indexed not in (before, candidate):
+            if path in relative.values():
+                key = next(key for key, rel in relative.items() if rel == path)
+                if indexed not in (before.get(key, "").encode("utf-8"), candidate[key].encode("utf-8")):
                     raise ValueError("staged skill contains unrelated edits")
+            elif path in baseline_files:
+                if indexed != baseline_files[path]:
+                    raise ValueError("staged reflection prompt contains unrelated edits")
             elif not _matches_receipt(json.loads(indexed), run_id, candidate_hash, evidence_hash):
                 raise ValueError("staged adoption record contains unrelated edits")
         if staged:
             _git(repo, "reset", "--", *staged)
         if current != before:
-            _atomic_bytes(target, before)
+            write_state(before)
         if adoption_file.exists():
             adoption_file.unlink()
     changed = _git(repo, "diff", "HEAD", "--name-only").splitlines()
     records.write_json("adoption-pending.json", {"run_id": run_id, "source_head": expected_head,
                        "candidate_sha256": candidate_hash, "evidence_manifest_sha256": evidence_hash})
     # An untracked/modified native seed still needs a real rollback target.
-    tracked = bool(_git(repo, "ls-files", "--", relative))
-    if not tracked or relative in changed:
+    needs_baseline = any(not _git(repo, "ls-files", "--", rel) or rel in changed for rel in baseline_files)
+    if needs_baseline:
         try:
-            _git(repo, "add", "--", relative)
-            _git(repo, "commit", "--only", "-m", "chore(pdweaver): record native RSI skill baseline\n\nPDWeaver-RSI-Baseline: " + run_id,
-                 "--", relative)
+            _git(repo, "add", "--", *baseline_files)
+            _git(repo, "commit", "--only", "-m", "chore(pdweaver): record native RSI harness baseline\n\nPDWeaver-RSI-Baseline: " + run_id,
+                 "--", *baseline_files)
         except Exception:
             if _git(repo, "rev-parse", "HEAD") == expected_head:
-                _git(repo, "reset", "--", relative)
+                _git(repo, "reset", "--", *baseline_files)
             raise
         expected_head = _git(repo, "rev-parse", "HEAD")
     records.write_json("adoption-pending.json", {"run_id": run_id, "source_head": expected_head,
                        "candidate_sha256": candidate_hash, "evidence_manifest_sha256": evidence_hash})
     adoption = {"schema_version": 1, "run_id": run_id, "source_commit": manifest["source"]["git_head"],
                 "parent_commit": expected_head, "source_sha256": manifest["source"]["sha256"],
-                "candidate_sha256": candidate_hash, "skill_path": relative,
+                "candidate_sha256": candidate_hash, "harness_paths": relative,
                 "baseline_mean": assessment["baseline_mean"], "candidate_mean": assessment["candidate_mean"],
                 "baseline_passed_seconds": assessment.get("baseline_passed_seconds"),
                 "candidate_passed_seconds": assessment.get("candidate_passed_seconds"),
@@ -263,16 +338,16 @@ def apply_run(run_dir):
                 "ledger_head": ledger_commit}
     adoption_file.parent.mkdir(parents=True, exist_ok=True)
     try:
-        _atomic_bytes(target, candidate)
+        write_state(candidate)
         _atomic_bytes(adoption_file, (json.dumps(adoption, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-        _git(repo, "add", "--", relative, adoption_path)
-        _git(repo, "commit", "--only", "-m", "feat(pdweaver): adopt validated ECO skill\n\nPDWeaver-RSI-Run: " + run_id,
-             "--", relative, adoption_path)
+        _git(repo, "add", "--", *relative.values(), adoption_path)
+        _git(repo, "commit", "--only", "-m", "feat(pdweaver): adopt validated ECO harness\n\nPDWeaver-RSI-Run: " + run_id,
+             "--", *relative.values(), adoption_path)
     except Exception:
         # Only restore our own uncommitted files; preserve any successful Git history.
         if _git(repo, "rev-parse", "HEAD") == expected_head:
-            _git(repo, "reset", "--", relative, adoption_path)
-            _atomic_bytes(target, before)
+            _git(repo, "reset", "--", *relative.values(), adoption_path)
+            write_state(before)
             adoption_file.unlink(missing_ok=True)
         raise
     receipt = {**adoption, "status": "committed", "pdweaver_commit": _git(repo, "rev-parse", "HEAD"),

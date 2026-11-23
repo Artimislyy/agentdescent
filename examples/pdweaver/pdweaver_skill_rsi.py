@@ -1,4 +1,4 @@
-"""Evolve exactly one native PDWeaver SKILL.md, with durable change evidence."""
+"""Evolve PDWeaver's complete skills tree, with durable change evidence."""
 from __future__ import annotations
 
 import argparse
@@ -12,18 +12,34 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agentdescent import AggregatorConfig, Task, evolve, tree_reflector
-from agentdescent.agents import Usage, openai_compatible
+from agentdescent import AggregatorConfig, Task, evolve, tree_reflector, parse_tree
+from agentdescent.agents import Usage
+from agentdescent.parallel import WorkUnit
 from agentdescent.policies import Policies
 
 from .experiment import DEMO_MARKER, TrialRunner, digest, evaluate_final, reward
-from .harness import MAX_SKILL_BYTES, SKILL_KEY, SKILL_NAME, LoggedFileTree, load_initial
-from .records import RunRecords
-from .selection import SuccessThenSpeed
+from .harness import (MAX_SKILL_BYTES, MAX_TREE_BYTES, SKILL_KEY, SKILL_NAME, PROMPT_DIR,
+                      LoggedFileTree, load_initial, read_text, source_paths)
+from .records import RunRecords, harness_sha256
+from .selection import RejectTrainingRegression, SingleCandidate
+from .trajectory import analysis_context, analysis_paths
+from .reflector import FILE_INSTRUCTIONS, check_opencode, configure_reflector, complete_in_workspace
 
 
 EDA_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_REPO = EDA_ROOT / "PDWeaver"
+
+
+class SameTaskPerRound:
+    """每轮按清单选一道训练题，所有 worker 各自独立做这道题。"""
+
+    name = "same-task-per-round"
+
+    def plan(self, n_workers, round_index, keys):
+        if not keys:
+            return []
+        task_id = keys[round_index % len(keys)]
+        return [WorkUnit(worker=i, keys=[task_id]) for i in range(n_workers)]
 
 
 def git(repo, *args):
@@ -60,6 +76,12 @@ def build_parser():
     parser.add_argument("--base-url-env", default="OPENAI_BASE_URL")
     # 改进模型单次请求的输出 token 上限；不是整个实验的总 token 预算。
     parser.add_argument("--reflect-max-tokens", type=int, default=24000)
+    parser.add_argument("--reflect-context-tokens", type=int, default=128000,
+                        help="actual context limit of the improver's model service")
+    parser.add_argument("--reflect-steps", type=int, default=30,
+                        help="maximum OpenCode steps for one proposal, including evidence reading")
+    parser.add_argument("--reflect-timeout", type=float, default=1800,
+                        help="seconds allowed for one file-capable improver invocation")
 
     # EDA 正式验收与时间限制。
     # 独立验收进程使用的 Innovus 命令或完整路径；Agent 内部工具由 Runtime 配置。
@@ -74,16 +96,17 @@ def build_parser():
     parser.add_argument("--rounds", type=int, default=2)
     # 每轮参与训练执行和提出修改的逻辑 worker 数量。
     parser.add_argument("--workers", type=int, default=1)
-    # worker 同时执行的上限；本例也用它设置验证评估并发和实际试跑并发上限。
+    # 训练 worker 同时执行的上限。
     parser.add_argument("--max-concurrency", type=int, default=1)
+    parser.add_argument("--eval-concurrency", type=int, default=None,
+                        help="validation/test concurrency; default: --max-concurrency")
+    parser.add_argument("--same-task-per-round", action="store_true",
+                        help="all workers solve the same training task; advance in manifest order each round")
     # 搜索阶段任务执行预算；None 表示不设该上限。在轮边界检查，可能超出一轮。
     # 不包含搜索结束后，原版和最终版在 test 上的配对重跑。
     parser.add_argument("--max-rollouts", type=int, default=None)
     # 框架随机种子，用于帮助复现；不能保证远端模型输出完全一致。
     parser.add_argument("--seed", type=int, default=0)
-    # 最终 test 不允许已通过的题退步；默认先比通过率，持平时选成功题总耗时更短的。
-    # 大于 0 时强制要求通过率提升超过此值，不能仅凭提速采纳。
-    parser.add_argument("--min-test-gain", type=float, default=0.0)
 
     # 模式开关：store_true 表示默认 False，命令行写上该开关后变为 True。
     # 仅打印计划后退出，不读取 Skill / 任务数据，不调用模型或 EDA 服务。
@@ -100,13 +123,14 @@ def build_parser():
 def _load_inputs(args, source):
     """Validate configuration and freeze the skill, task splits and source repo."""
     #1. 检查轮数、worker 数等是否大于零
-    for name in ("rounds", "workers", "max_concurrency", "reflect_max_tokens"):
+    for name in ("rounds", "workers", "max_concurrency", "reflect_max_tokens", "reflect_context_tokens", "reflect_steps"):
         if getattr(args, name) < 1:
             raise ValueError("{} must be positive".format(name))
-    #2. 检查超时和最低提升要求
-    if (not all(math.isfinite(v) for v in (args.trial_timeout, args.verifier_timeout, args.min_test_gain))
-            or args.trial_timeout <= 0 or args.verifier_timeout <= 0 or args.min_test_gain < 0):
-        raise ValueError("timeouts must be positive and min-test-gain nonnegative")
+    if args.eval_concurrency is not None and args.eval_concurrency < 1:
+        raise ValueError("eval_concurrency must be positive")
+    #2. 检查超时
+    if not all(math.isfinite(v) and v > 0 for v in (args.trial_timeout, args.verifier_timeout, args.reflect_timeout)):
+        raise ValueError("timeouts must be positive")
     #3. 禁止用模拟实验结果写回仓库
     if args.offline_demo and args.apply:
         raise ValueError("offline fixture results can never be applied to PDWeaver")
@@ -125,8 +149,19 @@ def _load_inputs(args, source):
         splits = load_manifest(args.manifest)
         if not os.environ.get(args.api_key_env):
             raise ValueError("set the reflector credential environment variable {} before a real run".format(args.api_key_env))
+        if args.reflect_max_tokens >= args.reflect_context_tokens:
+            raise ValueError("reflect_context_tokens must exceed reflect_max_tokens")
+        check_opencode()
     #8. 记录原始 Skill 的身份，可以判断原始 Skill 是否发生变化
-    source_info = {"path": str(source), "sha256": digest(initial[SKILL_KEY]), "git_head": None}
+    paths = source_paths(source)
+    reflection_path = args.pdweaver_repo / "skills" / PROMPT_DIR / "reflection_prompt.md"
+    analysis = analysis_paths(args.pdweaver_repo)
+    source_info = {"path": str(source), "sha256": harness_sha256(initial), "git_head": None,
+                   "files": {key: {"path": str(path.resolve()), "sha256": digest(initial[key])}
+                             for key, path in paths.items()},
+                   "reflection": {"path": str(reflection_path.resolve()), "sha256": digest(read_text(reflection_path))},
+                   "analysis": {key: {"path": str(path.resolve()), "sha256": digest(read_text(path))}
+                                for key, path in analysis.items()}}
     if not args.offline_demo:
         expected = (args.pdweaver_repo / "skills" / SKILL_NAME / SKILL_KEY).resolve()
         if source != expected:
@@ -137,13 +172,18 @@ def _load_inputs(args, source):
         # Freeze engine code; the native seed may itself be new/uncommitted.
         changed = git(args.pdweaver_repo, "diff", "HEAD", "--name-only").splitlines()
         untracked = git(args.pdweaver_repo, "ls-files", "--others", "--exclude-standard").splitlines()
-        if any(path != "skills/{}/{}".format(SKILL_NAME, SKILL_KEY) for path in changed + untracked):
-            raise ValueError("PDWeaver has changes outside the native skill; freeze the intended code baseline before evaluation")
+        allowed = {str(path.resolve().relative_to(args.pdweaver_repo.resolve()))
+                   for path in (*paths.values(), reflection_path, *analysis.values())}
+        if any(path not in allowed for path in changed + untracked):
+            raise ValueError("PDWeaver has changes outside the harness; freeze the intended code baseline before evaluation")
     #检查rsi前后pDWeaver源代码是否发生变化，若发生变化则抛出异常
     def source_guard():
         if (git(args.pdweaver_repo, "rev-parse", "HEAD") != source_info["git_head"]
                 or git(args.pdweaver_repo, "status", "--porcelain", "--untracked-files=all") != source_info["git_status"]
-                or hashlib.sha256(source.read_bytes()).hexdigest() != source_info["sha256"]):
+                or set(source_paths(source)) != set(initial)
+                or any(digest(read_text(item["path"])) != item["sha256"]
+                       for item in (*source_info["files"].values(), source_info["reflection"],
+                                    *source_info["analysis"].values()))):
             raise RuntimeError("PDWeaver source baseline changed during the experiment")
 
     return initial, splits, source_info, None if args.offline_demo else source_guard
@@ -165,9 +205,13 @@ def _start_run(args, plan, initial, splits, source_info):
     #6. 创建记录器
     records = RunRecords(root)
     #7. 保存原始 Skill，作为实验基线
-    records.write_text(f"baseline/{SKILL_KEY}", initial[SKILL_KEY])
+    for key, text in initial.items():
+        records.write_text(f"baseline/{key}", text)
+    records.write_text("reflection_prompt.md", read_text(source_info["reflection"]["path"]))
+    for key, item in source_info["analysis"].items():
+        records.write_text("reflection_skill/" + key, read_text(item["path"]))
     #8. 组装本次实验的说明信息
-    manifest = {"schema_version": 1, "run_id": run_id, "plan": plan, "source": source_info,
+    manifest = {"schema_version": 5, "run_id": run_id, "plan": plan, "source": source_info,
                 "pdweaver_repo": str(args.pdweaver_repo.resolve()),
                 "split": {k: [t.id for t in v] for k, v in splits.items()},
                 "tasks": {t.id: {"prompt_sha256": digest(t.prompt), "meta": t.meta}
@@ -193,43 +237,44 @@ def _build_proposer(args, strategy, usage):
             return "<EDITS>" + json.dumps({"rationale": "offline fixture: add deterministic replay marker",
                 "edits": [{"path": SKILL_KEY, "content": strategy.initial()[SKILL_KEY] + "\n" + DEMO_MARKER + "\n"}]}) + "</EDITS>"
         return propose
-    complete = openai_compatible(args.reflect_model, api_key_env=args.api_key_env,
-                                base_url_env=args.base_url_env, max_tokens=args.reflect_max_tokens,
-                                usage=usage)
-    #reply = complete(prompt)把提示词发到配置的模型服务，返回模型回复
-    # 修改 Skill 时，先保证验收通过，再优化耗时。
-    template = """Improve the Skill using the verified result and trajectory (reward {reward:.2f}/1.00).
-Primary goal: complete the task and pass official verification (reward=1).
-Secondary goal: reduce solving time while preserving reward=1.
-If reward<1, fix correctness first. Optimise speed only after success.
-Generalise; do not hard-code this task, skip required checks or weaken acceptance criteria.
-FILES:
-{listing}
-{contents}
-TASK:
-{prompt}
-RESULT AND TRAJECTORY:
-{output}
-{expected}
-{protocol}"""
-    reflect = tree_reflector(complete, strategy=strategy,
-                             max_context_chars=MAX_SKILL_BYTES, max_output_chars=24000,
-                             template=template)
+    config = configure_reflector(args, strategy.records)
+    # WorkspaceAgent 在本题证据目录中使用只读工具，返回完整修改提案。
+    # 先提高诊断与修复能力，再根据轨迹减少无效尝试；不以压缩 Skill 为目标。
+    seed_template = read_text(args.pdweaver_repo / "skills" / PROMPT_DIR / "reflection_prompt.md")
 
     def propose(rendered, task, output, score):
-        from .trajectory import reflection_input
-        return reflect(rendered, task, reflection_input(output, strategy.records), score)
+        from .trajectory import prepare_evidence
+        state = parse_tree(rendered)
+        workspace = prepare_evidence(output, strategy.records, task, state)
+        def complete(prompt):
+            return complete_in_workspace(prompt + FILE_INSTRUCTIONS, workspace, config, args, strategy.records, usage)
+        guide = analysis_context(args.pdweaver_repo, state) or analysis_context(args.pdweaver_repo)
+        template = state.get("rsi-prompts/reflection_prompt.md", seed_template)
+        template = template.replace("只允许修改 SKILL.md 和 solver_prompt.md，不能删除文件：",
+                                    "允许改写和新增整个 skills/ 下的文本文件，保留已有文件：")
+        template += ("\n\n【本轮修改范围，以本段为准】允许改写和新增整个 skills/ 下的文本文件，保留已有文件。"
+                     "SKILL.md、solver_prompt.md 保留旧别名，分别对应 innovus-eco-closure-mcp/SKILL.md、"
+                     "rsi-prompts/solver_prompt.md；其他路径均相对 skills/，不要重复使用这两个文件的完整路径。"
+                     "可新增 <技能名>/SKILL.md、references/*.md、问题索引；新 Skill 需要合法 name/description。"
+                     "rsi-prompts/reflection_prompt.md 和轨迹分析指南也可修改，采纳后用于后续轮次。"
+                     "本次只返回 EDITS 提案；不得修改目录外的代码、题目或评分规则。"
+                     "\n\n【当前轨迹分析指南】\n" + guide.replace("{", "{{").replace("}", "}}"))
+        reflect = tree_reflector(complete, strategy=strategy, max_context_chars=0,
+                                 max_output_chars=None, template=template)
+        return reflect(rendered, task, read_text(workspace / "INDEX.md"), score)
 
     return propose
 
 
 def run_experiment(args):
     """Prepare → evolve on train/val → test → seal records → optionally apply."""
+    eval_concurrency = args.max_concurrency if args.eval_concurrency is None else args.eval_concurrency
     source = (args.skill or args.pdweaver_repo / "skills" / SKILL_NAME / SKILL_KEY).resolve()
-    plan = {"source": str(source), "editable": [SKILL_KEY], "rounds": args.rounds,
+    plan = {"source": str(source), "editable": ["skills/**"], "rounds": args.rounds,
             "workers": args.workers, "max_concurrency": args.max_concurrency,
+            "eval_concurrency": eval_concurrency, "same_task_per_round": args.same_task_per_round,
             "offline": args.offline_demo, "apply": args.apply,
-            "selection": "success_then_speed",
+            "selection": "agentdescent_default", "candidate_selection": "best_single_validation_score",
             "flow": "run -> reward -> tree_reflector -> Aggregator -> Ledger -> paired test -> optional Git adoption"}
     if args.dry_run:
         print(json.dumps(plan, ensure_ascii=False, indent=2))
@@ -245,33 +290,33 @@ def run_experiment(args):
     #6. 创建任务执行器和用量统计器
     runner = TrialRunner(records, workspace, server_url=args.server,
                          innovus=args.innovus, timeout=args.trial_timeout,
-                         verifier_timeout=args.verifier_timeout, concurrency=args.max_concurrency,
+                         verifier_timeout=args.verifier_timeout,
+                         concurrency=max(args.max_concurrency, eval_concurrency),
                          offline=args.offline_demo, source_guard=source_guard,
                          secret_env=(args.api_key_env,))
     #统计修改 Skill 的模型调用，模型调用用量统计器
     usage = Usage()
     try:
         #7. 创建“怎样提出改进”的函数
-        propose = _build_proposer(args, strategy, usage)
-        selection = SuccessThenSpeed(runner, splits["val"], records)
+        propose = records.wrap_propose(_build_proposer(args, strategy, usage))
         # Test tasks stay outside evolve; only train and val guide the search.
         #调用 evolve()，开始真正的多轮演化
         result = evolve(
             splits["train"] + splits["val"], reward, run=runner,
-            propose=records.wrap_propose(propose), strategy=strategy,
+            propose=propose, strategy=strategy,
             artifact_id="pdweaver-skill", repo_path=str(root / "ledger"),
             rounds=args.rounds, n_workers=args.workers, max_concurrency=args.max_concurrency,
-            eval_concurrency=args.max_concurrency, self_verify=False, shuffle=False,
-            # PASS 仍保留为 1；阈值高于 1，使成功任务也能提出提速修改。
-            solved_threshold=1.1,
-            policies=Policies(conflict=selection, acceptance=selection),
+            parallel=SameTaskPerRound() if args.same_task_per_round else None,
+            # Reflect on both PASS and FAIL; replay valid candidates through native self-verify.
+            solved_threshold=1.1, self_verify=True,
+            policies=Policies(conflict=SingleCandidate(runner, splits["val"]),
+                              screen=RejectTrainingRegression(runner, strategy)),
+            eval_concurrency=eval_concurrency, shuffle=False,
             held_out_frac=len(splits["val"]) / (len(splits["train"]) + len(splits["val"])),
-            # 所有候选用同一完整验证集比较，避免不同题目/抽样影响速度排序。
-            cheap_eval_tasks=len(splits["val"]), max_rollouts=args.max_rollouts,
-            max_worker_errors=1, seed=args.seed, usage=usage,
-            agg_config=AggregatorConfig(batch_trigger=1, max_wait_rounds=1,
-                                        trust_region_ops=1, trust_region_chars=MAX_SKILL_BYTES,
-                                        fusion_tournament=False, bounded_gate=False),
+            max_rollouts=args.max_rollouts, seed=args.seed, usage=usage,
+            # Evaluate this round's proposals before advancing to the next training task.
+            agg_config=AggregatorConfig(max_wait_rounds=1, trust_region_ops=strategy.max_files_per_diff,
+                                        trust_region_chars=MAX_TREE_BYTES),
             record_trajectories=True, on_reports=records.on_reports, on_round=records.on_round,
             stop_when=lambda info: bool(runner.failures), verbose=False,
         )
@@ -282,11 +327,15 @@ def run_experiment(args):
         #10. 检查实验是否完整，再保存最终候选
         if result.error or runner.failures:
             raise RuntimeError("incomplete evolution: {} / infra trials {}".format(result.error, runner.failures))
-        records.write_text(f"candidate/{SKILL_KEY}", result.state[SKILL_KEY])
+        for key, text in result.state.items():
+            records.write_text(f"candidate/{key}", text)
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        manifest["candidate_files"] = sorted(result.state)
+        records.write_json("manifest.json", manifest)
         #11. 用测试集比较“最初原版”和“最终版”
         assessment = evaluate_final(runner, strategy, initial, result.state, splits["test"],
-                                    min_gain=args.min_test_gain)
-        assessment.update(candidate_sha256=digest(result.state[SKILL_KEY]), baseline_sha256=source_info["sha256"])
+                                    concurrency=eval_concurrency)
+        assessment.update(candidate_sha256=harness_sha256(result.state), baseline_sha256=source_info["sha256"])
         records.write_json("final_evaluation.json", assessment)
         records.assert_healthy()
         #12. 保存实验摘要，固定证据文件

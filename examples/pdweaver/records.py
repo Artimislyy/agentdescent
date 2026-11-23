@@ -22,6 +22,13 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def harness_sha256(state):
+    """Include prompts in identity; retain the digest of legacy single-file runs."""
+    if set(state) == {"SKILL.md"}:
+        return sha256_text(state["SKILL.md"])
+    return sha256_text(json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+
+
 def _json_default(value):
     if dataclasses.is_dataclass(value):
         return dataclasses.asdict(value)
@@ -115,11 +122,11 @@ class RunRecords:
         self.write_text(relative, content)
         return {"sha256": digest, "file": relative}
 
-    def change(self, before: Optional[str], after: Optional[str]) -> dict:
+    def change(self, before: Optional[str], after: Optional[str], path="SKILL.md") -> dict:
         old, new = self.snapshot(before), self.snapshot(after)
         lines = difflib.unified_diff((before or "").splitlines(keepends=True),
                                      (after or "").splitlines(keepends=True),
-                                     fromfile="a/SKILL.md", tofile="b/SKILL.md")
+                                     fromfile="a/" + path, tofile="b/" + path)
         patch = "".join(line if line.endswith("\n") else
                         line + "\n\\ No newline at end of file\n" for line in lines)
         relative = f"diffs/{sha256_text(patch)}.patch"
@@ -128,10 +135,29 @@ class RunRecords:
                 "before_file": old["file"], "after_file": new["file"],
                 "patch_file": relative, "unified_diff": patch}
 
+    def snapshot_tree(self, state):
+        digest = harness_sha256(state)
+        relative = f"snapshots/{digest}.json"
+        self.write_json(relative, state)
+        return {"sha256": digest, "file": relative}
+
+    def change_tree(self, before, after):
+        old = self.snapshot_tree(before) if before is not None else {"sha256": None, "file": None}
+        new = self.snapshot_tree(after)
+        before = before or {}
+        changes = {key: self.change(before.get(key), after.get(key), key)
+                   for key in sorted(set(before) | set(after)) if before.get(key) != after.get(key)}
+        patch = "".join(change["unified_diff"] for change in changes.values())
+        relative = f"diffs/{sha256_text(patch)}.patch"
+        self.write_text(relative, patch)
+        return {"before_sha256": old["sha256"], "after_sha256": new["sha256"],
+                "before_file": old["file"], "after_file": new["file"], "files": changes,
+                "patch_file": relative, "unified_diff": patch}
+
     def wrap_propose(self, propose):
         """Also record no-op responses and failures before ``to_diff`` is called."""
         def recorded(rendered, task, output, reward):
-            before = self.snapshot(parse_tree(rendered).get("SKILL.md"))
+            before = self.snapshot_tree(parse_tree(rendered))
             event = {"proposal_id": uuid.uuid4().hex, "task_id": task.id,
                      "task_prompt": task.prompt, "reward": reward, "output": output,
                      "before": before}
@@ -154,8 +180,7 @@ class RunRecords:
                 row = dataclasses.asdict(report)
                 diff = report.candidate_diff or report.accepted
                 if diff is not None:
-                    text = (diff.ops or {}).get("SKILL.md")
-                    row["candidate_snapshot"] = self.snapshot(text)
+                    row["changed_files"] = {key: self.snapshot(text) for key, text in (diff.ops or {}).items()}
                 self.append("reports.jsonl", {"round": self._round, **row})
         except Exception as exc:
             self._failed(exc)
@@ -193,12 +218,11 @@ class RunRecords:
                 serialized = artifact["state"]
                 # EvolvingArtifact.serialize stores its mapping under 'state'.
                 state = serialized.get("state", serialized)
-                text = state["SKILL.md"]
                 history.append({"commit": sha, "version": artifact["version"],
                                 "artifact_id": artifact_id,
                                 "message": git("show", "-s", "--format=%B", sha).strip(),
-                                "change": self.change(before, text)})
-                before = text
+                                "change": self.change_tree(before, state)})
+                before = state
             self.write_json("ledger_history.json", history)
             if (self.root / "reports.jsonl").exists():
                 versions = {entry["version"]: entry["commit"] for entry in history}

@@ -1,15 +1,23 @@
 {
   "schema_version": 1,
   "tasks": [
-    {"id": "task_0060", "split": "train", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0060", "verifier": "innovus_tcl"},
-    {"id": "task_0063", "split": "train", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0063", "verifier": "innovus_tcl"},
-    {"id": "task_0093", "split": "train", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0093", "verifier": "innovus_tcl"},
-    {"id": "task_0099", "split": "train", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0099", "verifier": "innovus_tcl"},
+    {"id": "task_0242", "split": "train", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/bp_fe_top/task_0242", "verifier": "innovus_tcl"},
+    {"id": "task_0135", "split": "train", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/jpeg_encoder/task_0135", "verifier": "innovus_tcl"},
+    {"id": "task_0209", "split": "train", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ethmac/task_0209", "verifier": "innovus_tcl"},
+    {"id": "task_0099", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0099", "verifier": "innovus_tcl"},
     {"id": "task_0107", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0107", "verifier": "innovus_tcl"},
-    {"id": "task_0113", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0113", "verifier": "innovus_tcl"},
+    {"id": "task_0118", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0118", "verifier": "innovus_tcl"},
+    {"id": "task_0146", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/jpeg_encoder/task_0146", "verifier": "innovus_tcl"},
     {"id": "task_0152", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/bp_fe_top/task_0152", "verifier": "innovus_tcl"},
-    {"id": "task_0171", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/bp_fe_top/task_0171", "verifier": "innovus_tcl"},
-    {"id": "task_0200", "split": "test", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/swerv/task_0200", "verifier": "innovus_tcl"},
-    {"id": "task_0242", "split": "test", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/bp_fe_top/task_0242", "verifier": "innovus_tcl"}
+    {"id": "task_0187", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/swerv/task_0187", "verifier": "innovus_tcl"},
+    {"id": "task_0195", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/bp_fe_top/task_0195", "verifier": "innovus_tcl"},
+    {"id": "task_0200", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/swerv/task_0200", "verifier": "innovus_tcl"},
+    {"id": "task_0237", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/swerv/task_0237", "verifier": "innovus_tcl"},
+    {"id": "task_0249", "split": "val", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/jpeg_encoder/task_0249", "verifier": "innovus_tcl"},
+    {"id": "task_0081", "split": "test", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0081", "verifier": "innovus_tcl"},
+    {"id": "task_0093", "split": "test", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/ibex_top/task_0093", "verifier": "innovus_tcl"},
+    {"id": "task_0123", "split": "test", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/jpeg_encoder/task_0123", "verifier": "innovus_tcl"},
+    {"id": "task_0167", "split": "test", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/bp_fe_top/task_0167", "verifier": "innovus_tcl"},
+    {"id": "task_0224", "split": "test", "task_dir": "../../../../EDA/dataset_innovus_19_10/tasks/swerv/task_0224", "verifier": "innovus_tcl"}
   ]
 }

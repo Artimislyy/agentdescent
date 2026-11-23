@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import math
 import time
 import uuid
@@ -16,37 +17,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from .harness import SKILL_NAME
+from .harness import SKILL_NAME, PROMPT_DIR, SOLVER_KEY, read_text
 
 ACTIVE = {"STARTING", "RUNNING", "WAITING_TOOL", "PAUSING", "RESUMING", "QUEUED"}
 TERMINAL = {"COMPLETED", "WAITING_USER", "FAILED", "RECONCILE", "STOPPED", "PAUSED", "CANCELLED"}
-DEFAULT_USER_PROMPT = """Use the innovus-eco-closure-mcp project skill for this task.
-Before doing design work, call skill_tool with skill_name="innovus-eco-closure-mcp"
-to read its complete SKILL.md from this workspace. Read ./task.md, solve only
-this task, and produce ./repair.tcl. Keep all task constraints and required
-checks. Do not edit the installed skill, inspect other tasks or hidden evaluator
-files, or retrieve historical solutions.
-
-Fixed PDWeaver transport mapping (the skill's older eda-sandbox names describe
-the same operations; use the actual tools exposed by this PDWeaver service):
-- create_session -> session_create(tool_kind="innovus", workspace_path=<absolute
-  current workspace>). Do not supply session_id; use the returned session_id.
-  PDWeaver manages the creation request identity.
-- execute_in_session -> session_execute(session_id=<returned ID>, code=<Tcl>,
-  request_id=<new unique ID>, timeout_ms=<optional positive milliseconds>).
-  The old command argument becomes code. Retries of an accepted execution keep
-  its original request_id, exact code and timeout. For asynchronous execution,
-  session_submit has these arguments; session_wait(session_id, request_id)
-  observes that same execution without submitting it again.
-- destroy_sess  ion(instance_id=...) -> session_close(session_id=<returned ID>).
-  CLOSING is pending; session_get must confirm CLOSED before a fresh replay.
-- Execution previews/logs use output, log_path and log_complete, in place of
-  the skill's output_preview/full_log_path. Check state and error as well.
-Use MCP Runtime tools for every EDA launch and Tcl execution. Keep the default
-PDWeaver system instructions. This task authorizes closing only EDA sessions
-created for this workspace; release those sessions when finishing. Never close
-another task's sessions. Deliver the repair file and a concise evidence summary.
-"""
+HTTP_TIMEOUT = 20.0  # 单次 HTTP 请求超时；提交重试仍使用原请求 ID。
 
 
 class PDWeaverInfrastructureError(RuntimeError):
@@ -80,23 +55,33 @@ class _JsonClient:
         self.origin = _origin(origin)
         self.opener = build_opener(ProxyHandler({}), _NoRedirect())
 
-    def request(self, method: str, path: str, body: dict | None = None, *, timeout: float = 10.0) -> dict:
+    def request(self, method: str, path: str, body: dict | None = None, *, timeout: float = HTTP_TIMEOUT) -> dict:
         data = None if body is None else json.dumps(body).encode("utf-8")
         request = Request(self.origin + path, data=data, method=method,
                           headers={"Content-Type": "application/json"})
         # Retrying POST is safe here only because callers retain the exact
         # client_request_id/control_id. DELETE closes the same owned session.
         for attempt in range(2):
+            started, stage, http_status = time.monotonic(), "connect", None
             try:
                 with self.opener.open(request, timeout=timeout) as response:
+                    stage, http_status = "read_json", getattr(response, "status", None)
                     value = json.load(response)
                 if not isinstance(value, dict):
                     raise PDWeaverInfrastructureError("PDWeaver returned a non-object response")
                 return value
-            except HTTPError as exc:
-                # Do not copy arbitrary HTTP bodies or credentials into evidence.
-                raise PDWeaverInfrastructureError(f"PDWeaver HTTP request failed (status {exc.code})") from None
-            except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError, UnicodeError):
+            except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError, UnicodeError) as exc:
+                cause = getattr(exc, "reason", exc)
+                # Log types/codes only: exception text may contain URLs, bodies or credentials.
+                logging.getLogger(__name__).warning(
+                    "%s PDWeaver HTTP %s %s%s attempt=%d/2 stage=%s timeout=%.1fs "
+                    "elapsed=%.3fs error=%s cause=%s errno=%s status=%s",
+                    time.strftime("%Y-%m-%dT%H:%M:%S%z"), method, self.origin, urlsplit(path).path,
+                    attempt + 1, stage, timeout, time.monotonic() - started,
+                    type(exc).__name__, type(cause).__name__, getattr(cause, "errno", None),
+                    getattr(exc, "code", http_status))
+                if isinstance(exc, HTTPError):
+                    raise PDWeaverInfrastructureError(f"PDWeaver HTTP request failed (status {exc.code})") from None
                 if attempt:
                     raise PDWeaverInfrastructureError("PDWeaver transport or JSON response failed") from None
         raise AssertionError("unreachable")
@@ -197,7 +182,7 @@ def _stop(client: _JsonClient, tid: str, poll_interval: float) -> None:
     deadline = time.monotonic() + 30
     while True:
         task = client.request("GET", f"/api/tasks/{tid}")
-        if task.get("status") in TERMINAL:
+        if task.get("status") in TERMINAL - {"WAITING_USER"}:
             return
         if time.monotonic() >= deadline:
             raise PDWeaverInfrastructureError("PDWeaver reasoning stop was not confirmed")
@@ -206,15 +191,25 @@ def _stop(client: _JsonClient, tid: str, poll_interval: float) -> None:
 
 def _close_owned(runtime: _JsonClient, session: dict, workspace: Path, poll_interval: float) -> list[dict]:
     records = []
-    for sid in dict.fromkeys(session.get("eda_sessions", [])):
+    owned = list(session.get("eda_sessions", []))
+    # Agent 通信失败时，仍从独立 Runtime 按工作区找回遗漏的会话。
+    try:
+        for item in runtime.request("GET", "/console/api/sessions")["sessions"]:
+            if item["state"] != "CLOSED" and Path(item["workspace_path"]).resolve() == workspace:
+                owned.append(item["session_id"])
+    except (PDWeaverInfrastructureError, KeyError, TypeError, ValueError):
+        records.append({"state": "UNCONFIRMED", "error": "Cannot enumerate Runtime sessions; closing known sessions only"})
+    for sid in dict.fromkeys(owned):
         try:
             path = "/sessions/" + quote(sid, safe="")
             observed = runtime.request("GET", path)
-            # Public IDs can be redacted aliases. Refuse a missing/mismatched ID;
-            # never guess its private Runtime mapping or close an unrelated design.
+            # Links include historical observations; verify ownership before closing.
+            observed_workspace = observed.get("workspace_path")
             if (observed.get("session_id") != sid
-                    or Path(observed.get("workspace_path", "")).resolve() != workspace):
+                    or not isinstance(observed_workspace, str) or not Path(observed_workspace).is_absolute()):
                 raise PDWeaverInfrastructureError("Cannot confirm ownership of a linked EDA session")
+            if Path(observed_workspace).resolve() != workspace:
+                continue
             if observed.get("state") != "CLOSED":
                 observed = runtime.request("DELETE", path)
             if observed.get("session_id") != sid:
@@ -241,7 +236,7 @@ def _close_owned(runtime: _JsonClient, session: dict, workspace: Path, poll_inte
 
 
 def run_pdweaver(server_url: str, workspace: Path, evidence_dir: Path, *, timeout: float,
-                 poll_interval: float = 2.0, user_prompt: str = DEFAULT_USER_PROMPT) -> dict:
+                 poll_interval: float = 2.0, user_prompt: str | None = None) -> dict:
     """Execute once, export traces, and release owned EDA sessions.
 
     Ordinary agent failure returns a record with healthy=True and its actual
@@ -251,6 +246,8 @@ def run_pdweaver(server_url: str, workspace: Path, evidence_dir: Path, *, timeou
     """
     if not math.isfinite(timeout) or timeout <= 0 or not math.isfinite(poll_interval) or poll_interval <= 0:
         raise ValueError("timeout and poll_interval must be finite positive values")
+    if user_prompt is None:
+        user_prompt = read_text(Path(__file__).resolve().parents[4] / "PDWeaver" / "skills" / PROMPT_DIR / SOLVER_KEY)
     workspace, evidence_dir = Path(workspace).resolve(), Path(evidence_dir).resolve()
     candidate = workspace / ".pdweaver" / "skills" / SKILL_NAME / "SKILL.md"
     if not candidate.is_file() or not (workspace / "task.md").is_file():
@@ -277,8 +274,8 @@ def run_pdweaver(server_url: str, workspace: Path, evidence_dir: Path, *, timeou
         result["service"] = _public_service(identity, ui, runtime_identity)
         _save(evidence_dir, "service.json", result["service"])
         # 创建一个新的 PDWeaver 会话并提交任务。
-        session = client.request("POST", "/api/agent-sessions",
-                                 {"workspace": str(workspace), "client_request_id": uuid.uuid4().hex})
+        session_body = {"workspace": str(workspace), "client_request_id": uuid.uuid4().hex}
+        session = client.request("POST", "/api/agent-sessions", session_body)
         if Path(session.get("workspace", "")).resolve() != workspace or session.get("tasks"):
             raise PDWeaverInfrastructureError("PDWeaver did not create a fresh session in the trial workspace")
         sid = session["id"]
@@ -302,7 +299,7 @@ def run_pdweaver(server_url: str, workspace: Path, evidence_dir: Path, *, timeou
                 result["status"] = "TIMED_OUT"
                 break
             time.sleep(min(poll_interval, remaining))
-            task = client.request("GET", f"/api/tasks/{tid}", timeout=min(10.0, max(0.1, remaining)))
+            task = client.request("GET", f"/api/tasks/{tid}", timeout=min(HTTP_TIMEOUT, max(0.1, remaining)))
     except (PDWeaverInfrastructureError, KeyError, TypeError, ValueError) as exc:
         failure = exc if isinstance(exc, PDWeaverInfrastructureError) else PDWeaverInfrastructureError("Invalid PDWeaver API response")
     finally:
@@ -322,19 +319,26 @@ def run_pdweaver(server_url: str, workspace: Path, evidence_dir: Path, *, timeou
                     if task.get("status") in ACTIVE or task.get("status") == "WAITING_USER":
                         _stop(client, tid, poll_interval)
                 session = client.request("GET", f"/api/agent-sessions/{sid}")
-                try:
-                    # 保存本次解题过程，导出到：
-                    # trials/<trial_id>/agent/
-                    # ├── session.json
-                    # ├── task.json
-                    # ├── calls.json     # 调用了哪些工具、传了什么 Tcl、返回什么
-                    # ├── runs.json
-                    # └── events.json    # 模型输出、工具事件等
-                    # _export() 不会调用 trajectory.py。它先把轨迹保存到磁盘；后面需要反思时，trajectory.py 才读取这些文件。
-                    task, session = _export(client, sid, tid, evidence_dir)
-                except (PDWeaverInfrastructureError, KeyError, TypeError, ValueError) as exc:
-                    failure = failure or (exc if isinstance(exc, PDWeaverInfrastructureError)
-                                          else PDWeaverInfrastructureError("Invalid evidence export response"))
+            except (PDWeaverInfrastructureError, KeyError, TypeError, ValueError) as exc:
+                result["cleanup_error"] = (str(exc) if isinstance(exc, PDWeaverInfrastructureError)
+                                           else "Invalid task stop response")
+                failure = failure or (exc if isinstance(exc, PDWeaverInfrastructureError)
+                                      else PDWeaverInfrastructureError("Invalid task stop response"))
+            # 各步骤独立尝试：查询或停止失败，也继续导出轨迹和关闭已知的自有 EDA 会话。
+            try:
+                # 保存本次解题过程，导出到：
+                # trials/<trial_id>/agent/
+                # ├── session.json
+                # ├── task.json
+                # ├── calls.json     # 调用了哪些工具、传了什么 Tcl、返回什么
+                # ├── runs.json
+                # └── events.json    # 模型输出、工具事件等
+                # _export() 不会调用 trajectory.py。它先把轨迹保存到磁盘；后面需要反思时，trajectory.py 才读取这些文件。
+                task, session = _export(client, sid, tid, evidence_dir)
+            except (PDWeaverInfrastructureError, KeyError, TypeError, ValueError) as exc:
+                failure = failure or (exc if isinstance(exc, PDWeaverInfrastructureError)
+                                      else PDWeaverInfrastructureError("Invalid evidence export response"))
+            try:
                 if runtime:
                     # 关闭本次拥有的 EDA 会话
                     result["cleanup"] = _close_owned(runtime, session, workspace, poll_interval)
@@ -363,6 +367,11 @@ def run_pdweaver(server_url: str, workspace: Path, evidence_dir: Path, *, timeou
         result["feedback"] = _feedback(task)
         result["task_status"] = task.get("status")
         result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        result["cleanup_confirmed"] = not result.get("cleanup_error")
+        reason = str((task.get("result") or {}).get("reason", ""))
+        if (task.get("status") == "FAILED" and reason.startswith("[181001] model call failed")
+                and "APIConnectionError:" in reason):
+            failure = failure or PDWeaverInfrastructureError("PDWeaver model connection failed")
         # 标记基础设施故障并保存摘要
         if failure:
             result["healthy"] = False
